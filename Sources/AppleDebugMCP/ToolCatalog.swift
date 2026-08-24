@@ -585,30 +585,15 @@ enum ToolCatalog {
     }
 
     private static func stringArray(from value: Value?) -> [String] {
-        guard let value,
-              let data = try? JSONEncoder().encode(value),
-              let array = try? JSONSerialization.jsonObject(with: data) as? [String] else {
-            return []
-        }
-        return array
+        value?.arrayValue?.compactMap(\.stringValue) ?? []
     }
 
     private static func boolValue(from value: Value?, default defaultValue: Bool) -> Bool {
-        guard let value,
-              let data = try? JSONEncoder().encode(value),
-              let boolean = try? JSONSerialization.jsonObject(with: data) as? Bool else {
-            return defaultValue
-        }
-        return boolean
+        value?.boolValue ?? defaultValue
     }
 
     private static func intValue(from value: Value?) -> Int? {
-        guard let value,
-              let data = try? JSONEncoder().encode(value),
-              let number = try? JSONSerialization.jsonObject(with: data) as? NSNumber else {
-            return nil
-        }
-        return number.intValue
+        value?.intValue
     }
 
     private static func result<T: Encodable>(for value: T) -> CallTool.Result {

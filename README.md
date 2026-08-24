@@ -41,6 +41,7 @@ The public MCP surface will advertise only the capabilities supported by the act
 swift build
 swift test
 make check
+make fixture
 ```
 
 ## Run

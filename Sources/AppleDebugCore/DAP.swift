@@ -296,7 +296,7 @@ public actor LLDBDAPSession {
                     continue
                 }
                 guard message.success != false else {
-                    throw DAPError.requestFailed(message.message ?? "Unknown LLDB-DAP failure")
+                    throw DAPError.requestFailed(failureMessage(for: message))
                 }
                 return message
             }
@@ -309,8 +309,9 @@ public actor LLDBDAPSession {
             "args": .array(arguments.map(DAPValue.string)),
             "stopOnEntry": .boolean(stopOnEntry)
         ])
+        let response = try send(command: "launch", arguments: launchArguments)
         _ = try send(command: "configurationDone")
-        return try send(command: "launch", arguments: launchArguments)
+        return response
     }
 
     public func drainEvents() -> [DAPMessage] {
@@ -358,6 +359,18 @@ public actor LLDBDAPSession {
         input = inputPipe.fileHandleForWriting
         output = outputPipe.fileHandleForReading
         Thread.sleep(forTimeInterval: 0.1)
+    }
+
+    private func failureMessage(for message: DAPMessage) -> String {
+        if let message = message.message, !message.isEmpty {
+            return message
+        }
+        if case .object(let body) = message.body,
+           case .object(let error) = body["error"],
+           case .string(let format) = error["format"] {
+            return format
+        }
+        return "Unknown LLDB-DAP failure"
     }
 
     private func readChunk(from output: FileHandle) throws -> Data {

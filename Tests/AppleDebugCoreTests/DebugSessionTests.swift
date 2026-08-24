@@ -6,6 +6,14 @@ import XCTest
 @testable import AppleDebugCore
 
 final class DebugSessionTests: XCTestCase {
+    func testTargetLaunchRequiresExplicitPolicy() {
+        XCTAssertThrowsError(
+            try DebugPolicy.validateLaunchTarget(path: "/bin/echo")
+        ) { error in
+            XCTAssertEqual(error as? DebugPolicyError, .launchDisabled)
+        }
+    }
+
     func testManagerCreatesAndClosesDAPSession() async throws {
         let manager = DebugSessionManager()
         let summary = try await manager.create()

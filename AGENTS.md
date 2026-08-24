@@ -25,6 +25,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | --- | --- | --- |
 | Resolve and build | swift build | SwiftPM exits 0 and produces apple-debug-mcp |
 | Focused tests | swift test --filter CapabilitiesTests | XCTest exits 0 |
+| Authorized fixture | make fixture | clang/codesign produces the get-task-allow fixture binary |
 | Full repository check | make check | Build, tests, smoke protocol, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |
 | Run server | swift run apple-debug-mcp | MCP stdio process remains available until stdin closes |

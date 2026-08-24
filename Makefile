@@ -1,10 +1,13 @@
-.PHONY: build test check harness-check clean
+.PHONY: build test fixture check harness-check clean
 
 build:
 	swift build
 
 test:
 	swift test
+
+fixture:
+	./scripts/build_debug_fixture.sh
 
 check:
 	./scripts/check.sh
