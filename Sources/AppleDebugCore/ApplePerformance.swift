@@ -252,6 +252,54 @@ public struct ApplePerformanceSemanticSummary: Codable, Equatable, Sendable {
     }
 }
 
+public enum ApplePerformanceSemanticDomain: String, Codable, CaseIterable, Sendable {
+    case timeProfile = "time-profile"
+    case allocations
+    case systemTrace = "system-trace"
+    case powerEnergy = "power-energy"
+    case animation
+    case signposts
+    case swiftConcurrency = "swift-concurrency"
+    case generic
+}
+
+public struct ApplePerformanceTemplateSemanticReport: Codable, Equatable, Sendable {
+    public let templateName: String?
+    public let schema: String
+    public let domain: ApplePerformanceSemanticDomain
+    public let eventCount: Int
+    public let uniqueThreadCount: Int
+    public let uniqueProcessCount: Int
+    public let counts: [String: Int64]
+    public let durationsNanoseconds: [String: Int64]
+    public let numericTotals: [String: Double]
+    public let notes: [String]
+
+    public init(
+        templateName: String?,
+        schema: String,
+        domain: ApplePerformanceSemanticDomain,
+        eventCount: Int,
+        uniqueThreadCount: Int,
+        uniqueProcessCount: Int,
+        counts: [String: Int64],
+        durationsNanoseconds: [String: Int64],
+        numericTotals: [String: Double],
+        notes: [String]
+    ) {
+        self.templateName = templateName
+        self.schema = schema
+        self.domain = domain
+        self.eventCount = eventCount
+        self.uniqueThreadCount = uniqueThreadCount
+        self.uniqueProcessCount = uniqueProcessCount
+        self.counts = counts
+        self.durationsNanoseconds = durationsNanoseconds
+        self.numericTotals = numericTotals
+        self.notes = notes
+    }
+}
+
 public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
     public let tracePath: String
     public let schema: String
@@ -261,6 +309,7 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
     public let hotspots: [ApplePerformanceHotspot]
     public let flameStacks: [ApplePerformanceFlameStack]
     public let semantic: ApplePerformanceSemanticSummary
+    public let templateSemantic: ApplePerformanceTemplateSemanticReport
 
     public init(
         tracePath: String,
@@ -270,7 +319,8 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
         rows: [ApplePerformanceTraceRow],
         hotspots: [ApplePerformanceHotspot],
         flameStacks: [ApplePerformanceFlameStack],
-        semantic: ApplePerformanceSemanticSummary
+        semantic: ApplePerformanceSemanticSummary,
+        templateSemantic: ApplePerformanceTemplateSemanticReport
     ) {
         self.tracePath = tracePath
         self.schema = schema
@@ -280,6 +330,7 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
         self.hotspots = hotspots
         self.flameStacks = flameStacks
         self.semantic = semantic
+        self.templateSemantic = templateSemantic
     }
 }
 
@@ -425,6 +476,11 @@ public enum ApplePerformanceService {
         }
         let analysis = analyzeRows(rows)
         let semantic = semanticSummary(schema: schema, rows: rows)
+        let templateSemantic = buildTemplateSemanticReport(
+            templateName: summary.templateName,
+            schema: schema,
+            rows: rows
+        )
         return ApplePerformanceAnalysisResult(
             tracePath: tracePath,
             schema: schema,
@@ -433,7 +489,87 @@ public enum ApplePerformanceService {
             rows: includeRows ? rows : [],
             hotspots: analysis.hotspots,
             flameStacks: analysis.flameStacks,
-            semantic: semantic
+            semantic: semantic,
+            templateSemantic: templateSemantic
+        )
+    }
+
+    public static func buildTemplateSemanticReport(
+        templateName: String?,
+        schema: String,
+        rows: [ApplePerformanceTraceRow]
+    ) -> ApplePerformanceTemplateSemanticReport {
+        let domain = semanticDomain(templateName: templateName, schema: schema)
+        let threadCount = Set(rows.compactMap(\.threadID)).count
+        let processCount = Set(rows.compactMap(\.processID)).count
+        var counts: [String: Int64] = [
+            "events": Int64(rows.count),
+            "threads": Int64(threadCount),
+            "processes": Int64(processCount)
+        ]
+        let runningCount = rows.filter { $0.state?.localizedCaseInsensitiveCompare("Running") == .orderedSame }.count
+        let blockedCount = rows.filter { $0.state?.localizedCaseInsensitiveCompare("Blocked") == .orderedSame }.count
+        if runningCount > 0 { counts["running"] = Int64(runningCount) }
+        if blockedCount > 0 { counts["blocked"] = Int64(blockedCount) }
+
+        let taskRows = rows.filter { hasSemanticField($0.fields, fragments: ["task"], excluding: ["state", "priority", "count"]) }
+        let actorRows = rows.filter { hasSemanticField($0.fields, fragments: ["actor", "executor"], excluding: ["count", "queue"]) }
+        let continuationRows = rows.filter { row in
+            hasSemanticField(row.fields, fragments: ["continuation"], excluding: []) ||
+                row.fields.contains { key, value in
+                    key.localizedCaseInsensitiveContains("state") && value.localizedCaseInsensitiveContains("continuation")
+                }
+        }
+        if domain == .allocations { counts["allocations"] = Int64(rows.count) }
+        if domain == .animation { counts["hitches"] = Int64(rows.count) }
+        if domain == .signposts { counts["signposts"] = Int64(rows.count) }
+        if domain == .powerEnergy { counts["power-energy-samples"] = Int64(rows.count) }
+        if domain == .swiftConcurrency {
+            counts["tasks"] = Int64(taskRows.count)
+            counts["actors"] = Int64(actorRows.count)
+            counts["continuations"] = Int64(continuationRows.count)
+        }
+
+        var durations: [String: Int64] = [:]
+        var numericTotals: [String: Double] = [:]
+        for row in rows {
+            for (key, value) in row.fields where !key.hasSuffix(".fmt") {
+                let lowerKey = key.localizedLowercase
+                guard let number = numericValue(value) else { continue }
+                if lowerKey.contains("duration") || lowerKey.contains("latency") || lowerKey.contains("interval") {
+                    durations[durationName(for: domain, key: lowerKey), default: 0] += Int64(number)
+                }
+                if isSemanticMeasurement(domain: domain, key: lowerKey) {
+                    numericTotals[key, default: 0] += number
+                }
+            }
+        }
+        if let totalDuration = durations["durationNanoseconds"], domain == .animation {
+            durations["hitchDurationNanoseconds"] = totalDuration
+        }
+        if let totalDuration = durations["durationNanoseconds"], domain == .signposts {
+            durations["signpostDurationNanoseconds"] = totalDuration
+        }
+        let notes: [String]
+        if rows.isEmpty {
+            notes = ["The selected public xctrace schema exported no rows; the report contains no inferred metrics."]
+        } else {
+            notes = [
+                "Counts and numeric totals are reconstructed from public xctrace XML rows; numericTotals preserve the source field units.",
+                "Private framework/runtime state and undocumented Instruments databases are not accessed."
+            ]
+        }
+        return ApplePerformanceTemplateSemanticReport(
+            templateName: templateName,
+            schema: schema,
+            domain: domain,
+            eventCount: rows.count,
+            uniqueThreadCount: threadCount,
+            uniqueProcessCount: processCount,
+            counts: counts,
+            durationsNanoseconds: durations,
+            numericTotals: numericTotals,
+            notes: notes
         )
     }
 
@@ -585,7 +721,12 @@ public enum ApplePerformanceService {
         }}
         let taskCount = concurrencyRows.filter { $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("task") } }.count
         let actorCount = concurrencyRows.filter { $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("actor") } }.count
-        let continuationCount = concurrencyRows.filter { $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("continuation") } }.count
+        let continuationCount = concurrencyRows.filter { row in
+            row.fields.keys.contains { $0.localizedCaseInsensitiveContains("continuation") } ||
+                row.fields.contains { key, value in
+                    key.localizedCaseInsensitiveContains("state") && value.localizedCaseInsensitiveContains("continuation")
+                }
+        }.count
         return ApplePerformanceSemanticSummary(
             schema: schema,
             eventCount: rows.count,
@@ -602,6 +743,68 @@ public enum ApplePerformanceService {
             concurrencyActorCount: actorCount,
             concurrencyContinuationCount: continuationCount
         )
+    }
+
+    private static func semanticDomain(templateName: String?, schema: String) -> ApplePerformanceSemanticDomain {
+        let value = "\(templateName ?? "") \(schema)".localizedLowercase
+        if value.contains("swift") || value.contains("concurr") { return .swiftConcurrency }
+        if value.contains("alloc") { return .allocations }
+        if value.contains("system trace") || value.contains("system-trace") { return .systemTrace }
+        if value.contains("power") || value.contains("energy") { return .powerEnergy }
+        if value.contains("hitch") || value.contains("core-animation") || value.contains("animation") { return .animation }
+        if value.contains("signpost") { return .signposts }
+        if schema == "time-profile" { return .timeProfile }
+        if schema == "time-sample" || schema == "thread-info" || schema == "process-info" { return .systemTrace }
+        return .generic
+    }
+
+    private static func hasSemanticField(
+        _ fields: [String: String],
+        fragments: [String],
+        excluding: [String]
+    ) -> Bool {
+        fields.keys.contains { key in
+            guard !key.hasSuffix(".fmt") else { return false }
+            let lower = key.localizedLowercase
+            return fragments.contains(where: { lower.contains($0) }) &&
+                !excluding.contains(where: { lower.contains($0) })
+        }
+    }
+
+    private static func numericValue(_ value: String) -> Double? {
+        Double(value.replacingOccurrences(of: ",", with: ""))
+    }
+
+    private static func durationName(for domain: ApplePerformanceSemanticDomain, key: String) -> String {
+        _ = key
+        switch domain {
+        case .animation:
+            return "durationNanoseconds"
+        case .signposts:
+            return "durationNanoseconds"
+        default:
+            return "durationNanoseconds"
+        }
+    }
+
+    private static func isSemanticMeasurement(domain: ApplePerformanceSemanticDomain, key: String) -> Bool {
+        switch domain {
+        case .allocations:
+            return key.contains("alloc") || key.contains("size") || key.contains("bytes")
+        case .powerEnergy:
+            return key.contains("power") || key.contains("energy") || key.contains("watt") ||
+                key.contains("joule") || key.contains("charge") || key.contains("thermal") ||
+                key.contains("cpu") || key.contains("gpu")
+        case .animation:
+            return key.contains("hitch") || key.contains("frame") || key.contains("jank") ||
+                key.contains("duration") || key.contains("latency") || key.contains("interval")
+        case .signposts:
+            return key.contains("signpost") || key.contains("duration") || key.contains("interval")
+        case .swiftConcurrency:
+            return key.contains("duration") || key.contains("latency")
+        case .timeProfile, .systemTrace, .generic:
+            return key.contains("duration") || key.contains("weight") || key.contains("latency")
+        }
     }
 
     private static func parseDuration(_ value: String) -> Int64 {

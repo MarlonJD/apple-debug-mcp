@@ -44,7 +44,8 @@ public enum AppleKernelCapabilityService {
                 "apple_debug_memory_map",
                 "apple_debug_runtime_diagnose",
                 "apple_performance_record",
-                "apple_performance_analyze"
+                "apple_performance_analyze",
+                "apple_performance_semantic_report"
             ],
             notes: [
                 "Stock macOS does not expose an authorized kernel-debugging boundary to this local MCP server.",

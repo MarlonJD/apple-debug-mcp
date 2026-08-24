@@ -41,9 +41,11 @@ private final class WorkbenchModel: ObservableObject {
     @Published var assemblyOutput = ""
     @Published var analysisPath = ""
     @Published var controlFlowOutput = ""
+    @Published var controlFlowSummary = ""
     @Published var tracePath = ""
     @Published var performanceSchema = "time-profile"
     @Published var performanceOutput = ""
+    @Published var performanceSummary = ""
     @Published var errorMessage: String?
 
     let capabilities = CapabilityMatrix.reports()
@@ -65,6 +67,7 @@ private final class WorkbenchModel: ObservableObject {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             controlFlowOutput = String(decoding: try encoder.encode(report), as: UTF8.self)
+            controlFlowSummary = "Functions: \(report.functions.count) · Blocks: \(report.functions.reduce(0) { $0 + $1.blocks.count }) · Xrefs: \(report.xrefs.count) · Relocations: \(report.relocations.count) · Indirect symbols: \(report.indirectSymbols.count)"
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -78,6 +81,7 @@ private final class WorkbenchModel: ObservableObject {
             if performanceSchema == "swift-concurrency" {
                 let graph = try AppleSwiftConcurrencyGraphService.analyze(tracePath: tracePath)
                 performanceOutput = String(decoding: try encoder.encode(graph), as: UTF8.self)
+                performanceSummary = "Swift Concurrency graph · Rows: \(graph.sampleCount) · Nodes: \(graph.nodes.count) · Edges: \(graph.edges.count) · Live data: \(graph.liveDataAvailable ? "yes" : "no")"
             } else {
                 let report = try ApplePerformanceService.analyze(
                     tracePath: tracePath,
@@ -86,6 +90,7 @@ private final class WorkbenchModel: ObservableObject {
                     includeRows: false
                 )
                 performanceOutput = String(decoding: try encoder.encode(report), as: UTF8.self)
+                performanceSummary = "\(report.templateSemantic.domain.rawValue) · Rows: \(report.templateSemantic.eventCount) · Threads: \(report.templateSemantic.uniqueThreadCount) · Processes: \(report.templateSemantic.uniqueProcessCount) · Metrics: \(report.templateSemantic.counts.count)"
             }
             errorMessage = nil
         } catch {
@@ -370,6 +375,11 @@ private struct ControlFlowPanel: View {
                     .textFieldStyle(.roundedBorder)
                 Button("Analyze") { model.analyzeControlFlow() }
             }
+            if !model.controlFlowSummary.isEmpty {
+                Text(model.controlFlowSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             TextEditor(text: $model.controlFlowOutput)
                 .font(.system(.body, design: .monospaced))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
@@ -399,6 +409,11 @@ private struct PerformancePanel: View {
                 .frame(width: 190)
                 Button("Analyze") { model.analyzePerformance() }
                     .disabled(model.tracePath.isEmpty)
+            }
+            if !model.performanceSummary.isEmpty {
+                Text(model.performanceSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             ScrollView {
                 Text(model.performanceOutput.isEmpty ? "Select an existing trace bundle and schema." : model.performanceOutput)

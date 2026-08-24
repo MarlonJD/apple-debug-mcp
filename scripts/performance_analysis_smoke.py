@@ -101,7 +101,24 @@ def main() -> int:
             if payload.get("semantic", {}).get("eventCount", 0) <= 0:
                 raise RuntimeError("xctrace parser did not return semantic event metrics")
 
-        print("performance-analysis-smoke: xctrace XML produced rows, hotspots, and folded flame stacks")
+            response = request(
+                "tools/call",
+                {
+                    "name": "apple_performance_semantic_report",
+                    "arguments": {
+                        "tracePath": str(trace_path),
+                        "schema": "time-profile",
+                        "maximumRows": 300,
+                    },
+                },
+            )
+            if response.get("result", {}).get("isError"):
+                raise RuntimeError(response)
+            semantic_report = json.loads(response["result"]["content"][0]["text"])
+            if semantic_report.get("domain") != "time-profile" or semantic_report.get("eventCount", 0) <= 0:
+                raise RuntimeError("template-specific Time Profiler semantic report was incomplete")
+
+        print("performance-analysis-smoke: xctrace XML produced rows, hotspots, flame stacks, and a template-specific semantic report")
         return 0
     except Exception as error:
         print(f"performance-analysis-smoke: {error}", file=sys.stderr)

@@ -106,12 +106,16 @@ public struct DyldSharedCacheReport: Codable, Equatable, Sendable {
 public struct DyldSharedCacheDiscovery: Codable, Equatable, Sendable {
     public let searchedRoots: [String]
     public let candidates: [String]
+    public let runtimeHelpers: [String]
     public let utilityAvailable: Bool
+    public let notes: [String]
 
-    public init(searchedRoots: [String], candidates: [String], utilityAvailable: Bool) {
+    public init(searchedRoots: [String], candidates: [String], runtimeHelpers: [String], utilityAvailable: Bool, notes: [String]) {
         self.searchedRoots = searchedRoots
         self.candidates = candidates
+        self.runtimeHelpers = runtimeHelpers
         self.utilityAvailable = utilityAvailable
+        self.notes = notes
     }
 }
 
@@ -126,23 +130,125 @@ public enum AppleDyldSharedCacheService {
             "/System/Library/dyld",
             "/Library/Developer/CoreSimulator/Profiles/Runtimes",
             "/Library/Developer/CoreSimulator/Volumes",
-            "/Applications/Xcode.app/Contents/Developer/Platforms"
+            "/Applications/Xcode.app/Contents/Developer/Platforms",
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Developer/CoreSimulator").path
         ]
         var candidates = Set<String>()
+        var runtimeHelpers = Set<String>()
         for root in roots where FileManager.default.fileExists(atPath: root) {
+            collectKnownRuntimeArtifacts(
+                root: URL(fileURLWithPath: root),
+                candidates: &candidates,
+                runtimeHelpers: &runtimeHelpers
+            )
             guard let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
             var count = 0
             for case let url as URL in enumerator {
                 count += 1
                 if count > 50_000 { break }
-                if url.lastPathComponent.hasPrefix("dyld_shared_cache") { candidates.insert(url.path) }
+                let name = url.lastPathComponent.localizedLowercase
+                if name.hasPrefix("dyld_shared_cache") || name.hasPrefix("dyld_sim_shared_cache") {
+                    candidates.insert(url.path)
+                }
+                if name == "update_dyld_sim_shared_cache" {
+                    runtimeHelpers.insert(url.path)
+                }
             }
+        }
+        let notes: [String]
+        if candidates.isEmpty && !runtimeHelpers.isEmpty {
+            notes = [
+                "No mounted dyld shared-cache file was found in the bounded roots.",
+                "A public Simulator runtime cache-update helper was found; private cache utilities and private runtime databases were not assumed."
+            ]
+        } else if candidates.isEmpty {
+            notes = ["No mounted dyld shared-cache file was found in the bounded roots."]
+        } else {
+            notes = ["Mounted cache candidates were discovered; inspect each with the public header, mapping, UUID, and image-table parser."]
         }
         return DyldSharedCacheDiscovery(
             searchedRoots: roots,
             candidates: candidates.sorted(),
-            utilityAvailable: ToolchainProbe.path(for: "dyld_shared_cache_util") != nil
+            runtimeHelpers: runtimeHelpers.sorted(),
+            utilityAvailable: ToolchainProbe.path(for: "dyld_shared_cache_util") != nil,
+            notes: notes
         )
+    }
+
+    private static func collectKnownRuntimeArtifacts(
+        root: URL,
+        candidates: inout Set<String>,
+        runtimeHelpers: inout Set<String>
+    ) {
+        var runtimeRoots = [
+            root,
+            root.appendingPathComponent("Library/Developer/CoreSimulator/Profiles/Runtimes")
+        ]
+        if let children = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            runtimeRoots.append(contentsOf: children.map {
+                $0.appendingPathComponent("Library/Developer/CoreSimulator/Profiles/Runtimes")
+            })
+        }
+
+        for runtimeRoot in runtimeRoots {
+            guard let runtimes = try? FileManager.default.contentsOfDirectory(
+                at: runtimeRoot,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            ) else { continue }
+            for runtime in runtimes.prefix(256) where runtime.pathExtension == "simruntime" {
+                let resources = runtime.appendingPathComponent("Contents/Resources")
+                let helper = resources.appendingPathComponent("update_dyld_sim_shared_cache")
+                appendRegularFile(helper, runtimeHelpers: &runtimeHelpers)
+                if let resourceEntries = try? FileManager.default.contentsOfDirectory(
+                    at: resources,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles]
+                ) {
+                    for entry in resourceEntries.prefix(512) {
+                        appendCacheOrHelper(entry, candidates: &candidates, runtimeHelpers: &runtimeHelpers)
+                    }
+                }
+                let dyldRoot = resources.appendingPathComponent("RuntimeRoot/System/Library/dyld")
+                if let dyldEntries = try? FileManager.default.contentsOfDirectory(
+                    at: dyldRoot,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles]
+                ) {
+                    for entry in dyldEntries.prefix(512) {
+                        appendCacheOrHelper(entry, candidates: &candidates, runtimeHelpers: &runtimeHelpers)
+                    }
+                }
+            }
+        }
+    }
+
+    private static func appendCacheOrHelper(
+        _ url: URL,
+        candidates: inout Set<String>,
+        runtimeHelpers: inout Set<String>
+    ) {
+        let name = url.lastPathComponent.localizedLowercase
+        if name.hasPrefix("dyld_shared_cache") || name.hasPrefix("dyld_sim_shared_cache") {
+            appendRegularFile(url, candidates: &candidates)
+        } else if name == "update_dyld_sim_shared_cache" {
+            appendRegularFile(url, runtimeHelpers: &runtimeHelpers)
+        }
+    }
+
+    private static func appendRegularFile(_ url: URL, candidates: inout Set<String>) {
+        guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { return }
+        candidates.insert(url.path)
+    }
+
+    private static func appendRegularFile(_ url: URL, runtimeHelpers: inout Set<String>) {
+        guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { return }
+        runtimeHelpers.insert(url.path)
     }
 
     public static func inspect(

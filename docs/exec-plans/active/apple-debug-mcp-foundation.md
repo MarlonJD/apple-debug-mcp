@@ -66,6 +66,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 22:35Z) Add indirect-symbol/data-in-code CFG evidence and bounded dyld cache discovery smoke; current host reports no mounted cache and no `dyld_shared_cache_util`.
 - [x] (2026-08-24 23:05Z) Merge the public Swift Concurrency xctrace schemas, resolve reference nodes, reconstruct task/actor/continuation edges, and verify a live async fixture through `make swift-concurrency-graph-smoke`.
 - [x] (2026-08-24 23:15Z) Promote address-based branch/call xrefs to the CFG report and verify direct call references in the fixture smoke.
+- [x] (2026-08-24 23:45Z) Add Mach-O relocation records and bounded dyld cache/helper discovery evidence; smoke the object-file `_usleep` relocation and the current runtime-helper/no-cache state.
+- [x] (2026-08-24 23:55Z) Add template-specific semantic reports and MCP dispatch for public xctrace domains; verify the live Time Profiler report plus allocation/concurrency domain unit cases.
+- [x] (2026-08-25 00:05Z) Surface template semantic metrics and CFG xref/relocation counts in the native workbench; verify the SwiftUI product build.
 - [x] (2026-08-24 23:25Z) Expand the native workbench debugger panel with pause/continue/instruction stepping and explicitly grant-gated expression evaluation; verify the SwiftUI product build.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 

@@ -27,7 +27,17 @@ def main() -> int:
                 break
         if not payload.get("searchedRoots") or not isinstance(payload.get("candidates"), list):
             raise RuntimeError("dyld cache discovery report was incomplete")
-        print(f"dyld-cache-smoke: searched {len(payload['searchedRoots'])} bounded roots; candidates={len(payload['candidates'])}, utilityAvailable={payload.get('utilityAvailable')}")
+        if len(payload["searchedRoots"]) < 4 or not payload.get("notes") or not isinstance(payload.get("runtimeHelpers"), list):
+            raise RuntimeError("dyld cache discovery did not explain bounded mount/helper state")
+        print(
+            "dyld-cache-smoke: searched %d bounded roots; candidates=%d, runtimeHelpers=%d, utilityAvailable=%s"
+            % (
+                len(payload["searchedRoots"]),
+                len(payload["candidates"]),
+                len(payload["runtimeHelpers"]),
+                payload.get("utilityAvailable"),
+            )
+        )
         return 0
     except Exception as error:
         print(f"dyld-cache-smoke: {error}", file=sys.stderr)

@@ -111,6 +111,28 @@ public struct ControlFlowXref: Codable, Equatable, Sendable {
     }
 }
 
+public struct ControlFlowRelocation: Codable, Equatable, Sendable {
+    public let section: String
+    public let address: String
+    public let pcrel: Bool?
+    public let length: String
+    public let isExtern: Bool?
+    public let type: String
+    public let scattered: Bool?
+    public let symbol: String?
+
+    public init(section: String, address: String, pcrel: Bool?, length: String, isExtern: Bool?, type: String, scattered: Bool?, symbol: String?) {
+        self.section = section
+        self.address = address
+        self.pcrel = pcrel
+        self.length = length
+        self.isExtern = isExtern
+        self.type = type
+        self.scattered = scattered
+        self.symbol = symbol
+    }
+}
+
 public struct ControlFlowFunction: Codable, Equatable, Sendable {
     public let name: String
     public let startAddress: String
@@ -145,6 +167,7 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
     public let indirectSymbols: [ControlFlowIndirectSymbol]
     public let dataInCode: [ControlFlowDataRange]
     public let xrefs: [ControlFlowXref]
+    public let relocations: [ControlFlowRelocation]
 
     public init(
         path: String,
@@ -154,7 +177,8 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
         externalCalls: [String],
         indirectSymbols: [ControlFlowIndirectSymbol],
         dataInCode: [ControlFlowDataRange],
-        xrefs: [ControlFlowXref]
+        xrefs: [ControlFlowXref],
+        relocations: [ControlFlowRelocation]
     ) {
         self.path = path
         self.architecture = architecture
@@ -164,6 +188,7 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
         self.indirectSymbols = indirectSymbols
         self.dataInCode = dataInCode
         self.xrefs = xrefs
+        self.relocations = relocations
     }
 }
 
@@ -194,6 +219,7 @@ public enum AppleControlFlowService {
         let xrefs = parseXrefs(instructions: instructions, functions: functions)
         let indirectSymbols = parseIndirectSymbols(try runObjdump(executable: objdump, arguments: ["--macho", "--indirect-symbols", "--arch=\(architecture)", path]))
         let dataInCode = parseDataInCode(try runObjdump(executable: objdump, arguments: ["--macho", "--data-in-code", "--arch=\(architecture)", path]))
+        let relocations = parseRelocations(try runObjdump(executable: objdump, arguments: ["--macho", "--reloc", "--arch=\(architecture)", path]))
         return ControlFlowReport(
             path: path,
             architecture: architecture,
@@ -204,7 +230,8 @@ public enum AppleControlFlowService {
             },
             indirectSymbols: indirectSymbols,
             dataInCode: dataInCode,
-            xrefs: xrefs
+            xrefs: xrefs,
+            relocations: relocations
         )
     }
 
@@ -244,6 +271,40 @@ public enum AppleControlFlowService {
             let fields = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
             guard fields.count >= 3, let offset = UInt64(fields[0], radix: 16), let length = UInt64(fields[1]) else { continue }
             values.append(ControlFlowDataRange(offset: offset, length: length, kind: fields.dropFirst(2).joined(separator: " ")))
+        }
+        return values
+    }
+
+    static func parseRelocations(_ output: String) -> [ControlFlowRelocation] {
+        var section = ""
+        var values: [ControlFlowRelocation] = []
+        for line in output.split(whereSeparator: \.isNewline) {
+            let text = String(line)
+            if let open = text.firstIndex(of: "("),
+               let close = text.firstIndex(of: ")"),
+               text.hasPrefix("Relocation information") {
+                section = String(text[text.index(after: open)..<close])
+                continue
+            }
+            let fields = text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+            guard fields.count >= 7,
+                  let address = parseAddress(fields[0]),
+                  ["True", "False"].contains(fields[1]),
+                  ["True", "False"].contains(fields[3]),
+                  ["True", "False"].contains(fields[5]) else { continue }
+            let symbol = fields.dropFirst(6).joined(separator: " ")
+            values.append(
+                ControlFlowRelocation(
+                    section: section,
+                    address: formatAddress(address),
+                    pcrel: parseBool(fields[1]),
+                    length: fields[2],
+                    isExtern: parseBool(fields[3]),
+                    type: fields[4],
+                    scattered: parseBool(fields[5]),
+                    symbol: symbol.isEmpty ? nil : symbol
+                )
+            )
         }
         return values
     }
@@ -487,6 +548,14 @@ public enum AppleControlFlowService {
     private static func parseAddress(_ value: String) -> UInt64? {
         let normalized = value.hasPrefix("0x") ? String(value.dropFirst(2)) : value
         return UInt64(normalized, radix: 16)
+    }
+
+    private static func parseBool(_ value: String) -> Bool? {
+        switch value.localizedLowercase {
+        case "true": return true
+        case "false": return false
+        default: return nil
+        }
     }
 }
 

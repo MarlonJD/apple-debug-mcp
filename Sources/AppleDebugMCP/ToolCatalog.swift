@@ -219,6 +219,11 @@ enum ToolCatalog {
             inputSchema: performanceAnalyzeObjectSchema
         ),
         Tool(
+            name: "apple_performance_semantic_report",
+            description: "Return a template-specific semantic xctrace report for allocations, system trace, power/energy, animation, signposts, or Swift Concurrency public schemas.",
+            inputSchema: performanceSemanticReportObjectSchema
+        ),
+        Tool(
             name: "apple_swift_concurrency_graph",
             description: "Build a trace-backed Swift Concurrency task/actor/continuation graph from the public xctrace export; private runtime state is never accessed.",
             inputSchema: swiftConcurrencyGraphObjectSchema
@@ -1031,6 +1036,21 @@ enum ToolCatalog {
                         )
                     )
                 )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_performance_semantic_report":
+            guard let tracePath = params.arguments?["tracePath"]?.stringValue else {
+                return errorResult("Missing required tracePath argument.")
+            }
+            do {
+                let analysis = try ApplePerformanceService.analyze(
+                    tracePath: tracePath,
+                    schema: params.arguments?["schema"]?.stringValue ?? "time-profile",
+                    maximumRows: intValue(from: params.arguments?["maximumRows"]) ?? 5_000,
+                    includeRows: false
+                )
+                return result(for: analysis.templateSemantic)
             } catch {
                 return errorResult(error)
             }
@@ -2246,6 +2266,25 @@ enum ToolCatalog {
             "includeRows": .object([
                 "type": .string("boolean"),
                 "description": .string("Include parsed rows in addition to hotspots and folded flame stacks")
+            ])
+        ]),
+        "required": .array([.string("tracePath")])
+    ])
+
+    private static let performanceSemanticReportObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "tracePath": .object([
+                "type": .string("string"),
+                "description": .string("Absolute existing .trace bundle produced by apple_performance_record")
+            ]),
+            "schema": .object([
+                "type": .string("string"),
+                "description": .string("Allowlisted xctrace schema such as allocations, power, animation-hitches, os-signpost, or swift-concurrency")
+            ]),
+            "maximumRows": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum exported rows from 1 to 5000; defaults to 5000")
             ])
         ]),
         "required": .array([.string("tracePath")])

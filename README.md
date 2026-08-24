@@ -13,10 +13,11 @@ The current product surface includes:
 - bounded `xctrace` Time Profiler, Allocations, and System Trace capture for macOS or Simulator targets;
 - parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
 - semantic performance summaries for allocation bytes/events, running/blocked samples, hitches, signposts, and Swift concurrency task/actor/continuation rows;
+- template-specific semantic xctrace reports with explicit domains and bounded numeric totals for Time Profiler, Allocations, System Trace, Power/Energy, Animation, Signposts, and Swift Concurrency;
 - trace-backed Swift Concurrency task/actor/continuation graphs that merge the public `swift-task-*` and `swift-actor-*` xctrace schemas with explicit sampling and private-runtime boundaries;
 - Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
 - bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
-- Mach-O CFG/basic-block/call-graph/xref reports with address-based branch/call references and a direct dyld shared-cache header/mapping/image parser;
+- Mach-O CFG/basic-block/call-graph/xref/relocation reports with address-based branch/call references and a direct dyld shared-cache header/mapping/image parser plus bounded mount/helper discovery;
 - typed vmmap region reports, persisted memory snapshots, and region diffs;
 - Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
 - read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;

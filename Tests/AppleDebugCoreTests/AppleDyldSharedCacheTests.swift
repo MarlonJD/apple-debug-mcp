@@ -44,6 +44,15 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         XCTAssertEqual(report.uuid, "01020304-0506-0708-090A-0B0C0D0E0F10")
     }
 
+    func testDiscoveryReportsBoundedRootsAndExplicitCacheNotes() {
+        let discovery = AppleDyldSharedCacheService.discover()
+
+        XCTAssertGreaterThanOrEqual(discovery.searchedRoots.count, 4)
+        XCTAssertFalse(discovery.notes.isEmpty)
+        XCTAssertTrue(discovery.candidates.allSatisfy { $0.hasPrefix("/") })
+        XCTAssertTrue(discovery.runtimeHelpers.allSatisfy { $0.hasPrefix("/") })
+    }
+
     private func put32(_ data: inout Data, at offset: Int, value: UInt32) {
         for index in 0..<4 { data[offset + index] = UInt8((value >> UInt32(index * 8)) & 0xff) }
     }

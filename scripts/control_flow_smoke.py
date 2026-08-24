@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 
 def main() -> int:
@@ -54,6 +55,30 @@ def main() -> int:
             raise RuntimeError("control-flow report did not contain indirect symbol/xref evidence")
         if not payload.get("xrefs") or not any(xref.get("kind") == "call" for xref in payload["xrefs"]):
             raise RuntimeError("control-flow report did not contain address-based call xrefs")
+
+        with tempfile.TemporaryDirectory(prefix="apple-debug-mcp-relocations-") as directory:
+            object_path = Path(directory) / "debug_target.o"
+            compile_result = subprocess.run(
+                [
+                    "xcrun", "clang", "-target", "arm64-apple-macos13", "-c",
+                    str(root / "Tests/Fixtures/debug_target.c"), "-o", str(object_path)
+                ],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if compile_result.returncode != 0:
+                raise RuntimeError(compile_result.stderr.strip() or "relocation fixture compilation failed")
+            object_response = request(
+                "tools/call",
+                {"name": "apple_control_flow", "arguments": {"path": str(object_path), "architecture": "arm64"}},
+            )
+            if object_response.get("result", {}).get("isError"):
+                raise RuntimeError(object_response)
+            object_payload = json.loads(object_response["result"]["content"][0]["text"])
+            if not any(relocation.get("symbol") == "_usleep" for relocation in object_payload.get("relocations", [])):
+                raise RuntimeError("control-flow report did not contain object-file relocation evidence")
         print("control-flow-smoke: Mach-O instructions, basic blocks, and external call graph returned")
         return 0
     except Exception as error:

@@ -20,9 +20,9 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleRuntimeMetadata.swift | Objective-C metadata parsing and Swift symbol demangling | Maintainers; update with Objective-C/Swift ABI/toolchain changes |
 | Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
 | Sources/AppleDebugCore/AppleAssembler.swift | Self-contained arm64/x86_64 assembly, Mach-O text extraction, disassembly, and patch payload generation | Maintainers; update with clang/LLVM output changes |
-| Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, address-based xrefs, call graph, external calls, indirect symbols, and data-in-code reports | Maintainers; update with LLVM disassembly output changes |
+| Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, address-based xrefs, relocations, call graph, external calls, indirect symbols, and data-in-code reports | Maintainers; update with LLVM disassembly output changes |
 | Sources/AppleDebugCore/AppleSwiftConcurrencyGraph.swift | Public xctrace Swift Concurrency task, actor, continuation, and relationship graph reconstruction | Maintainers; update with Instruments schema changes |
-| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery plus direct header, mapping, UUID, code-signature, local-symbol, and image-table parser | Maintainers; update with public dyld cache layout changes |
+| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery, runtime-helper/mount evidence, plus direct header, mapping, UUID, code-signature, local-symbol, and image-table parser | Maintainers; update with public dyld cache layout changes |
 | Sources/AppleDebugCore/AppleMemoryMaps.swift | Typed vmmap regions, persisted snapshots, and region diffs | Maintainers; update with vmmap report format changes |
 | Sources/AppleDebugCore/AppleSimulatorEnvironment.swift | Fixed simctl environment controls and bounded input validation | Maintainers; update with simctl public subcommands |
 | Sources/AppleDebugCore/AppleReproBundle.swift | Screenshot/appinfo/log/trace/crash evidence bundle capture | Maintainers; update with Simulator evidence surfaces |
@@ -56,7 +56,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
-- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates and parses allowlisted performance tables into typed rows, hotspots, folded flame-stack data, and semantic summaries; the virtual Swift Concurrency schema merges public `swift-task-*`/`swift-actor-*` tables with a per-table row budget.
+- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates and parses allowlisted performance tables into typed rows, hotspots, folded flame-stack data, generic summaries, and template-specific semantic reports; the virtual Swift Concurrency schema merges public `swift-task-*`/`swift-actor-*` tables with a per-table row budget.
 - `AppleSwiftConcurrencyGraphService`: reconstructs task, actor, continuation-state, and parent/child evidence from materialized public xctrace rows and resolves exported reference nodes without accessing private Swift runtime state.
 - `AppleAssemblerService`: compiles bounded self-contained assembly to a temporary Mach-O object, extracts `__TEXT,__text`, and returns LLVM disassembly; `apple_debug_patch_assembly` feeds only those bytes into the existing expected-bytes transactional memory patch path.
 - `RuntimeDiagnosticsService`: runs fixed `heap`, `leaks`, `malloc_history`, and `sample` argument shapes against an attach-authorized process with bounded output; it never accepts shell fragments or arbitrary tool arguments.
@@ -90,7 +90,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 17. `apple_debug_memory_analyze`, `apple_debug_memory_snapshot`, and `apple_debug_memory_diff` expose typed vmmap state without replacing the attach gate.
 18. `apple_simulator_environment` and `apple_simulator_repro_bundle` use fixed simctl workflows and bounded artifact paths; they do not erase or pair devices.
 19. `apple_signing_audit`, `apple_patch_preview`, and `apple_resign_plan` inspect or plan release operations without silently signing or overwriting artifacts.
-20. `apple_plugin_list` discovers manifests only; `apple_swift_concurrency_graph` combines public Swift Concurrency export tables; `apple-debug-workbench` provides a local native GUI over selected analyzers.
+20. `apple_plugin_list` discovers manifests only; `apple_performance_semantic_report` returns bounded template-domain metrics; `apple_swift_concurrency_graph` combines public Swift Concurrency export tables; `apple-debug-workbench` provides a local native GUI over selected analyzers.
 21. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
 22. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
