@@ -39,6 +39,11 @@ enum ToolCatalog {
             inputSchema: pluginListObjectSchema
         ),
         Tool(
+            name: "apple_plugin_host_plan",
+            description: "Validate a signed plugin executable and return a sandboxed-host plan without executing it.",
+            inputSchema: pluginHostPlanObjectSchema
+        ),
+        Tool(
             name: "apple_macho_inspect",
             description: "Inspect a Mach-O or universal Mach-O file and return architectures, header metadata, load-command count, and segments without executing it.",
             inputSchema: pathObjectSchema
@@ -471,6 +476,21 @@ enum ToolCatalog {
             }
             do {
                 return result(for: try AppleDebugPluginManifestService.discover(directory: directory))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_plugin_host_plan":
+            guard let executablePath = params.arguments?["executablePath"]?.stringValue else {
+                return errorResult("Missing required executablePath argument.")
+            }
+            do {
+                return result(
+                    for: try ApplePluginHostService.plan(
+                        executablePath: executablePath,
+                        manifestPath: params.arguments?["manifestPath"]?.stringValue,
+                        requiredTeamIdentifier: params.arguments?["requiredTeamIdentifier"]?.stringValue
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1812,6 +1832,16 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("directory")])
+    ])
+
+    private static let pluginHostPlanObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "executablePath": .object(["type": .string("string")]),
+            "manifestPath": .object(["type": .string("string")]),
+            "requiredTeamIdentifier": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("executablePath")])
     ])
 
     private static let pathObjectSchema: Value = .object([

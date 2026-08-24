@@ -203,6 +203,55 @@ public struct ApplePerformanceFlameStack: Codable, Equatable, Sendable {
     }
 }
 
+public struct ApplePerformanceSemanticSummary: Codable, Equatable, Sendable {
+    public let schema: String
+    public let eventCount: Int
+    public let uniqueThreadCount: Int
+    public let uniqueProcessCount: Int
+    public let runningCount: Int
+    public let blockedCount: Int
+    public let allocationEventCount: Int
+    public let allocationBytes: Int64
+    public let hitchCount: Int
+    public let hitchDurationNanoseconds: Int64
+    public let signpostCount: Int
+    public let concurrencyTaskCount: Int
+    public let concurrencyActorCount: Int
+    public let concurrencyContinuationCount: Int
+
+    public init(
+        schema: String,
+        eventCount: Int,
+        uniqueThreadCount: Int,
+        uniqueProcessCount: Int,
+        runningCount: Int,
+        blockedCount: Int,
+        allocationEventCount: Int,
+        allocationBytes: Int64,
+        hitchCount: Int,
+        hitchDurationNanoseconds: Int64,
+        signpostCount: Int,
+        concurrencyTaskCount: Int,
+        concurrencyActorCount: Int,
+        concurrencyContinuationCount: Int
+    ) {
+        self.schema = schema
+        self.eventCount = eventCount
+        self.uniqueThreadCount = uniqueThreadCount
+        self.uniqueProcessCount = uniqueProcessCount
+        self.runningCount = runningCount
+        self.blockedCount = blockedCount
+        self.allocationEventCount = allocationEventCount
+        self.allocationBytes = allocationBytes
+        self.hitchCount = hitchCount
+        self.hitchDurationNanoseconds = hitchDurationNanoseconds
+        self.signpostCount = signpostCount
+        self.concurrencyTaskCount = concurrencyTaskCount
+        self.concurrencyActorCount = concurrencyActorCount
+        self.concurrencyContinuationCount = concurrencyContinuationCount
+    }
+}
+
 public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
     public let tracePath: String
     public let schema: String
@@ -211,6 +260,7 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
     public let rows: [ApplePerformanceTraceRow]
     public let hotspots: [ApplePerformanceHotspot]
     public let flameStacks: [ApplePerformanceFlameStack]
+    public let semantic: ApplePerformanceSemanticSummary
 
     public init(
         tracePath: String,
@@ -219,7 +269,8 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
         sampleCount: Int,
         rows: [ApplePerformanceTraceRow],
         hotspots: [ApplePerformanceHotspot],
-        flameStacks: [ApplePerformanceFlameStack]
+        flameStacks: [ApplePerformanceFlameStack],
+        semantic: ApplePerformanceSemanticSummary
     ) {
         self.tracePath = tracePath
         self.schema = schema
@@ -228,6 +279,7 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
         self.rows = rows
         self.hotspots = hotspots
         self.flameStacks = flameStacks
+        self.semantic = semantic
     }
 }
 
@@ -352,6 +404,7 @@ public enum ApplePerformanceService {
         )
         let rows = try PerformanceTraceRowsParser.parse(queryData, maximumRows: maximumRows)
         let analysis = analyzeRows(rows)
+        let semantic = semanticSummary(schema: schema, rows: rows)
         return ApplePerformanceAnalysisResult(
             tracePath: tracePath,
             schema: schema,
@@ -359,7 +412,8 @@ public enum ApplePerformanceService {
             sampleCount: rows.count,
             rows: includeRows ? rows : [],
             hotspots: analysis.hotspots,
-            flameStacks: analysis.flameStacks
+            flameStacks: analysis.flameStacks,
+            semantic: semantic
         )
     }
 
@@ -476,6 +530,62 @@ public enum ApplePerformanceService {
             return $0.foldedStack < $1.foldedStack
         }.prefix(10_000).map { $0 }
         return (hotspots, flameStacks)
+    }
+
+    private static func semanticSummary(schema: String, rows: [ApplePerformanceTraceRow]) -> ApplePerformanceSemanticSummary {
+        let threadIDs = Set(rows.compactMap(\.threadID))
+        let processIDs = Set(rows.compactMap(\.processID))
+        let runningCount = rows.filter { $0.state?.localizedCaseInsensitiveCompare("Running") == .orderedSame }.count
+        let blockedCount = rows.filter { $0.state?.localizedCaseInsensitiveCompare("Blocked") == .orderedSame }.count
+        let allocationRows = rows.filter { row in
+            schema.localizedCaseInsensitiveContains("alloc") || row.fields.keys.contains { $0.localizedCaseInsensitiveContains("alloc") }
+        }
+        let allocationBytes = allocationRows.reduce(Int64(0)) { total, row in
+            total + row.fields.reduce(Int64(0)) { value, pair in
+                guard pair.key.localizedCaseInsensitiveContains("size") || pair.key.localizedCaseInsensitiveContains("bytes") else { return value }
+                return value + Int64(Double(pair.value) ?? 0)
+            }
+        }
+        let hitchRows = rows.filter { schema.localizedCaseInsensitiveContains("hitch") || $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("hitch") } }
+        let hitchDuration = hitchRows.reduce(Int64(0)) { total, row in
+            total + row.fields.reduce(Int64(0)) { value, pair in
+                guard pair.key.localizedCaseInsensitiveContains("duration") || pair.key.localizedCaseInsensitiveContains("latency") else { return value }
+                return value + parseDuration(pair.value)
+            }
+        }
+        let signpostCount = rows.filter { schema.localizedCaseInsensitiveContains("signpost") || $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("signpost") } }.count
+        let concurrencyRows = rows.filter { schema.localizedCaseInsensitiveContains("concurrency") || $0.fields.keys.contains { key in
+            let value = key.localizedLowercase
+            return value.contains("task") || value.contains("actor") || value.contains("continuation")
+        }}
+        let taskCount = concurrencyRows.filter { $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("task") } }.count
+        let actorCount = concurrencyRows.filter { $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("actor") } }.count
+        let continuationCount = concurrencyRows.filter { $0.fields.keys.contains { $0.localizedCaseInsensitiveContains("continuation") } }.count
+        return ApplePerformanceSemanticSummary(
+            schema: schema,
+            eventCount: rows.count,
+            uniqueThreadCount: threadIDs.count,
+            uniqueProcessCount: processIDs.count,
+            runningCount: runningCount,
+            blockedCount: blockedCount,
+            allocationEventCount: allocationRows.count,
+            allocationBytes: allocationBytes,
+            hitchCount: hitchRows.count,
+            hitchDurationNanoseconds: hitchDuration,
+            signpostCount: signpostCount,
+            concurrencyTaskCount: taskCount,
+            concurrencyActorCount: actorCount,
+            concurrencyContinuationCount: continuationCount
+        )
+    }
+
+    private static func parseDuration(_ value: String) -> Int64 {
+        let normalized = value.replacingOccurrences(of: " ", with: "")
+        if let number = Double(normalized) { return Int64(number) }
+        if normalized.hasSuffix("ms"), let number = Double(normalized.dropLast(2)) { return Int64(number * 1_000_000) }
+        if normalized.hasSuffix("us"), let number = Double(normalized.dropLast(2)) { return Int64(number * 1_000) }
+        if normalized.hasSuffix("s"), let number = Double(normalized.dropLast()) { return Int64(number * 1_000_000_000) }
+        return 0
     }
 
     private struct MutableHotspot {

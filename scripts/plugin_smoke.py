@@ -31,6 +31,18 @@ def main() -> int:
                     break
             if payload != [manifest]:
                 raise RuntimeError(f"plugin manifest mismatch: {payload}")
+            process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "apple_plugin_host_plan", "arguments": {"executablePath": "/bin/echo"}}}) + "\n")
+            process.stdin.flush()
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    raise RuntimeError(process.stderr.read())
+                response = json.loads(line)
+                if response.get("id") == 3:
+                    host = json.loads(response["result"]["content"][0]["text"])
+                    break
+            if host.get("executionSupported") or not host.get("sandboxRequired"):
+                raise RuntimeError("plugin host plan did not fail closed with a sandbox requirement")
         print("plugin-smoke: safe plugin manifest discovery passed without code loading")
         return 0
     except Exception as error:

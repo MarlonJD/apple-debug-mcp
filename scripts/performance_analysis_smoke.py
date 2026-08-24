@@ -98,6 +98,8 @@ def main() -> int:
                 raise RuntimeError("xctrace parser returned no folded flame stacks")
             if payload.get("summary", {}).get("templateName") != "Time Profiler":
                 raise RuntimeError("xctrace parser did not decode the trace summary")
+            if payload.get("semantic", {}).get("eventCount", 0) <= 0:
+                raise RuntimeError("xctrace parser did not return semantic event metrics")
 
         print("performance-analysis-smoke: xctrace XML produced rows, hotspots, and folded flame stacks")
         return 0

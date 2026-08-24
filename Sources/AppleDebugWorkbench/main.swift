@@ -33,6 +33,7 @@ private final class WorkbenchModel: ObservableObject {
     @Published var targetPath = ""
     @Published var sessionID: String?
     @Published var debuggerOutput = ""
+    @Published var debuggerThreadID = ""
     @Published var architecture = "arm64"
     @Published var assemblySource = "mov x0, x0\nret\n"
     @Published var assemblyOutput = ""
@@ -95,6 +96,31 @@ private final class WorkbenchModel: ObservableObject {
             debuggerOutput = "Session closed"
         }
     }
+
+    func inspectThreads() {
+        guard let sessionID else { errorMessage = "Create a debugger session first."; return }
+        Task {
+            do {
+                let response = try await sessions.threads(sessionID: sessionID)
+                debuggerOutput = String(describing: response)
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func snapshot() {
+        guard let sessionID else { errorMessage = "Create a debugger session first."; return }
+        let threadID = Int(debuggerThreadID)
+        Task {
+            do {
+                let response = try await sessions.stopSnapshot(sessionID: sessionID, threadID: threadID, levels: 20)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                debuggerOutput = String(decoding: try encoder.encode(response), as: UTF8.self)
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
 }
 
 private struct WorkbenchView: View {
@@ -153,10 +179,16 @@ private struct DebuggerPanel: View {
                 Button("Create session") { model.createSession() }
                 Button("Launch stopped target") { model.launchTarget() }
                     .disabled(model.sessionID == nil)
+                Button("Threads") { model.inspectThreads() }
+                    .disabled(model.sessionID == nil)
+                Button("Stop snapshot") { model.snapshot() }
+                    .disabled(model.sessionID == nil)
                 Button("Close") { model.closeSession() }
                     .disabled(model.sessionID == nil)
             }
             TextField("Absolute signed target path", text: $model.targetPath)
+                .textFieldStyle(.roundedBorder)
+            TextField("Optional thread ID for snapshot", text: $model.debuggerThreadID)
                 .textFieldStyle(.roundedBorder)
             if let sessionID = model.sessionID {
                 Label("Session: \(sessionID)", systemImage: "circle.fill")
