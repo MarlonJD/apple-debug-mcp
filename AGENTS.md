@@ -28,6 +28,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Authorized fixture | make fixture | clang/codesign produces the get-task-allow fixture binary |
 | iOS fixture | make ios-fixture | xcodebuild produces the Simulator app bundle and dSYM |
 | iOS fixture smoke | make ios-fixture-smoke | Explicitly boot/install/launch/screenshot/terminate/shutdown a Simulator fixture |
+| iOS debug fixture smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture and inspect its process |
 | Full repository check | make check | Build, tests, smoke protocol, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |
 | Run server | swift run apple-debug-mcp | MCP stdio process remains available until stdin closes |

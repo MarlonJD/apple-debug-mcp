@@ -23,4 +23,5 @@
 | Debugger fixture behavior | python3 scripts/debug_fixture_smoke.py | Prove authorized launch and core debugger inspection end to end | Breakpoint, threads, stack, memory, disassembly, continue, and cleanup transcript | Maintainers; debugger surface changes | candidate |
 | iOS fixture build | make ios-fixture | Build the SwiftUI Simulator app and dSYM artifact | DebugApp.app and DebugApp.app.dSYM exist under .build/ios-fixture | Maintainers; fixture/project changes | candidate |
 | iOS Simulator fixture smoke | make ios-fixture-smoke | Exercise explicit Simulator app lifecycle | Install, launch, screenshot, terminate, and shutdown evidence | Maintainers; explicit mutation-authorized task | candidate |
+| iOS Simulator debugger smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture | Attach, threads, stack, memory, disassembly, and cleanup evidence | Maintainers; explicit mutation-authorized task | candidate |
 | Logs, metrics, or traces | stderr transcript; metrics/traces N/A | Diagnose CLI failures | Actionable stderr or justified N/A | Maintainers; runtime changes | candidate |
