@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -26,6 +26,9 @@ ios-ui-tree-smoke:
 
 package:
 	./scripts/package_macos.sh
+
+release-package:
+	./scripts/release_macos.sh
 
 check:
 	./scripts/check.sh

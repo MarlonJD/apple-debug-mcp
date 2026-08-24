@@ -51,6 +51,7 @@ swift test
 make check
 make harness-check
 make package
+make release-package
 make fixture
 make ios-fixture
 make ios-fixture-smoke
@@ -60,6 +61,10 @@ make ios-ui-tree-smoke
 ```
 
 `make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle and `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end.
+
+Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
+
+For a signed and notarized archive on a configured release Mac, see [docs/RELEASE.md](docs/RELEASE.md) and run `CODESIGN_IDENTITY='Developer ID Application: Burak Karahan (UPK4SC93AN)' NOTARY_PROFILE=general-notary make release-package`.
 
 ## Run
 

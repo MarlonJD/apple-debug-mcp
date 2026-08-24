@@ -9,7 +9,7 @@ owner: Apple Debug MCP maintainers
 
 # Establish the Apple Debug MCP foundation
 
-Maintain this plan according to the [configured planning policy](../../PLANS.md). The plan remains active while physical-device debugging, UI inspection, metadata analysis, and release engineering are outside the verified local boundary.
+Maintain this plan according to the [configured planning policy](../../PLANS.md). The plan remains active while physical-device debugging and signed/notarized release engineering are outside the verified local boundary.
 
 ## Purpose / Big Picture
 
@@ -29,8 +29,8 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 04:00Z) Add host/Simulator bounded unified-log adapter.
 - [x] (2026-08-24 04:05Z) Add CoreDevice inventory, fail-closed development-app install/launch operations, and an authorization-gated LLDB `device select` session path.
 - [ ] Add a paired physical-device fixture for remote LLDB attach and lifecycle evidence.
-- [ ] Add dedicated Objective-C/Swift metadata reports and richer UI inspection.
-- [ ] Add signed/notarized packaging and CI release artifacts.
+- [x] Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
+- [x] Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
 - [x] (2026-08-24 12:10Z) Add and verify the public MCP Simulator lifecycle smoke for launch flags, app metadata, containers, screenshots, and cleanup.
 - [x] (2026-08-24 12:20Z) Stabilize the iOS fixture accessibility identifiers and verify a 9-element semantic UI snapshot through XcodeBuildMCP.
@@ -44,6 +44,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 16:15Z) Add read-only binary differential analysis for Mach-O files, `.app` bundles, and `.dSYM` bundles with signatures, dependencies, symbols, exports, hashes, metadata, and UUIDs.
 - [x] (2026-08-24 16:20Z) Complete the supported LLDB-DAP parity surface with source breakpoint locations, instruction breakpoints, completions, variable-write policy, and instruction-granularity stepping; verify it against the macOS fixture.
 - [x] (2026-08-24 16:26Z) Make `apple_symbolicate` resolve `.app` executables and `.dSYM` DWARF payloads; verify symbolication against a temporary dSYM bundle.
+- [x] (2026-08-24 16:30Z) Add macOS CI checks and unsigned package artifact upload for pushes and pull requests; keep signing/notarization release-gated.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries

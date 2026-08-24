@@ -1,0 +1,32 @@
+name: Apple Debug MCP CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve Swift package
+        run: swift package resolve
+
+      - name: Run core and MCP checks
+        run: make check
+
+      - name: Build unsigned package
+        run: make package
+
+      - name: Upload unsigned package
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-debug-mcp-macos-unsigned
+          path: dist/*.tar.gz
+          if-no-files-found: error

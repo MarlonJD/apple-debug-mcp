@@ -11,7 +11,7 @@
 | Security-sensitive boundary | Capability restriction tests | Target-specific policy suite | Unauthorized operation fails closed | Keep operation disabled | Maintainers; policy change |
 | Apple binary analysis | swift test --filter AppleBinaryDiffTests | make check | Code signature, entitlements, dependencies, symbols, dyld exports, Objective-C/Swift metadata, regular-Mach-O/.app/.dSYM diff reports, and dSYM-aware symbolication | Keep analyzers bounded and never execute artifact inputs | Maintainers; toolchain change |
 | Repository harness authority | make harness-check | Bundled harness validator | Current routes, coverage, records, and commit boundary | Fail closed on warning/error | Maintainers; harness change |
-| Release or production | N/A | N/A | No hosted release action exists | Escalate if scope is added | Human product owner; scope change |
+| Release or production | make package; make release-package | `.github/workflows/ci.yml` plus configured release Mac | Unsigned package is CI-buildable; signed release target validates Developer ID, notarization staple, and Gatekeeper when authorized | Apple Developer credentials and explicit release authorization are required for the external submission | Human product owner; release scope |
 
 ## Rules
 
