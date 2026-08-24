@@ -17,6 +17,7 @@ final class MachOTests: XCTestCase {
         let thinReport = try MachOInspector.inspect(path: thinPath)
         XCTAssertEqual(thinReport.format, "Mach-O 64")
         XCTAssertTrue(thinReport.segments.contains { $0.name == "__TEXT" })
+        XCTAssertFalse(thinReport.strings.isEmpty)
     }
 
     func testRejectsNonMachOInput() {

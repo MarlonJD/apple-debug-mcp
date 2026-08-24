@@ -86,6 +86,20 @@ public struct MachOSegment: Codable, Equatable, Sendable {
     }
 }
 
+public struct MachOSymbol: Codable, Equatable, Sendable {
+    public let name: String
+    public let type: UInt8
+    public let section: UInt8
+    public let value: UInt64
+
+    public init(name: String, type: UInt8, section: UInt8, value: UInt64) {
+        self.name = name
+        self.type = type
+        self.section = section
+        self.value = value
+    }
+}
+
 public struct MachOReport: Codable, Equatable, Sendable {
     public let path: String
     public let format: String
@@ -94,6 +108,8 @@ public struct MachOReport: Codable, Equatable, Sendable {
     public let loadCommandCount: UInt32?
     public let flags: UInt32?
     public let segments: [MachOSegment]
+    public let symbols: [MachOSymbol]
+    public let strings: [String]
 
     public init(
         path: String,
@@ -102,7 +118,9 @@ public struct MachOReport: Codable, Equatable, Sendable {
         fileType: UInt32?,
         loadCommandCount: UInt32?,
         flags: UInt32?,
-        segments: [MachOSegment]
+        segments: [MachOSegment],
+        symbols: [MachOSymbol] = [],
+        strings: [String] = []
     ) {
         self.path = path
         self.format = format
@@ -111,6 +129,8 @@ public struct MachOReport: Codable, Equatable, Sendable {
         self.loadCommandCount = loadCommandCount
         self.flags = flags
         self.segments = segments
+        self.symbols = symbols
+        self.strings = strings
     }
 }
 
@@ -224,7 +244,8 @@ public enum MachOInspector {
             fileType: nil,
             loadCommandCount: nil,
             flags: nil,
-            segments: []
+            segments: [],
+            strings: extractStrings(data)
         )
     }
 
@@ -249,6 +270,7 @@ public enum MachOInspector {
         }
 
         var segments: [MachOSegment] = []
+        var symbolTable: SymbolTable?
         var commandOffset = base + headerSize
         for _ in 0..<Int(commandCount) {
             guard let command = readUInt32(data, at: commandOffset, order: header.order),
@@ -271,6 +293,20 @@ public enum MachOInspector {
                 )
                 segments.append(segment)
             }
+            if command == 0x2 {
+                guard let symbolOffset = readUInt32(data, at: commandOffset + 8, order: header.order),
+                      let symbolCount = readUInt32(data, at: commandOffset + 12, order: header.order),
+                      let stringOffset = readUInt32(data, at: commandOffset + 16, order: header.order),
+                      let stringSize = readUInt32(data, at: commandOffset + 20, order: header.order) else {
+                    throw MachOError.malformedLoadCommand
+                }
+                symbolTable = SymbolTable(
+                    symbolOffset: Int(symbolOffset),
+                    symbolCount: Int(symbolCount),
+                    stringOffset: Int(stringOffset),
+                    stringSize: Int(stringSize)
+                )
+            }
 
             commandOffset += Int(commandSize)
         }
@@ -291,8 +327,103 @@ public enum MachOInspector {
             fileType: fileType,
             loadCommandCount: commandCount,
             flags: flags,
-            segments: segments
+            segments: segments,
+            symbols: try parseSymbols(
+                data: data,
+                table: symbolTable,
+                order: header.order,
+                is64Bit: header.is64Bit
+            ),
+            strings: extractStrings(data)
         )
+    }
+
+    private struct SymbolTable {
+        let symbolOffset: Int
+        let symbolCount: Int
+        let stringOffset: Int
+        let stringSize: Int
+    }
+
+    private static func parseSymbols(
+        data: Data,
+        table: SymbolTable?,
+        order: ByteOrder,
+        is64Bit: Bool
+    ) throws -> [MachOSymbol] {
+        guard let table, table.symbolCount > 0 else {
+            return []
+        }
+        guard table.symbolCount <= 1_000_000 else {
+            throw MachOError.malformedLoadCommand
+        }
+        let entrySize = is64Bit ? 16 : 12
+        guard table.symbolOffset >= 0,
+              table.stringOffset >= 0,
+              table.stringSize >= 0,
+              table.symbolOffset + table.symbolCount * entrySize <= data.count,
+              table.stringOffset + table.stringSize <= data.count else {
+            throw MachOError.truncated
+        }
+
+        var symbols: [MachOSymbol] = []
+        for index in 0..<table.symbolCount {
+            let offset = table.symbolOffset + index * entrySize
+            guard let stringIndex = readUInt32(data, at: offset, order: order) else {
+                throw MachOError.truncated
+            }
+            let type = data[offset + 4]
+            let section = data[offset + 5]
+            let value: UInt64
+            if is64Bit {
+                guard let symbolValue = readUInt64(data, at: offset + 8, order: order) else {
+                    throw MachOError.truncated
+                }
+                value = symbolValue
+            } else {
+                guard let symbolValue = readUInt32(data, at: offset + 8, order: order) else {
+                    throw MachOError.truncated
+                }
+                value = UInt64(symbolValue)
+            }
+            guard Int(stringIndex) < table.stringSize else {
+                continue
+            }
+            let nameOffset = table.stringOffset + Int(stringIndex)
+            let name = readString(data, at: nameOffset, length: table.stringSize - Int(stringIndex))
+            if !name.isEmpty {
+                symbols.append(
+                    MachOSymbol(name: name, type: type, section: section, value: value)
+                )
+            }
+        }
+        return symbols
+    }
+
+    private static func extractStrings(
+        _ data: Data,
+        minimumLength: Int = 4,
+        limit: Int = 2_000
+    ) -> [String] {
+        var result: [String] = []
+        var current: [UInt8] = []
+        for byte in data {
+            if byte >= 0x20 && byte <= 0x7e {
+                current.append(byte)
+            } else {
+                if current.count >= minimumLength {
+                    result.append(String(decoding: current, as: UTF8.self))
+                    if result.count == limit {
+                        return result
+                    }
+                }
+                current.removeAll(keepingCapacity: true)
+            }
+        }
+        if current.count >= minimumLength && result.count < limit {
+            result.append(String(decoding: current, as: UTF8.self))
+        }
+        return result
     }
 
     private static func parseSegment(
