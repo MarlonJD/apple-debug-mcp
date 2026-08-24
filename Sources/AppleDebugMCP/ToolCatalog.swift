@@ -1145,7 +1145,10 @@ enum ToolCatalog {
                             action: action,
                             identifier: params.arguments?["identifier"]?.stringValue,
                             text: params.arguments?["text"]?.stringValue,
-                            direction: params.arguments?["direction"]?.stringValue
+                            direction: params.arguments?["direction"]?.stringValue,
+                            durationSeconds: doubleValue(from: params.arguments?["durationSeconds"]),
+                            scale: doubleValue(from: params.arguments?["scale"]),
+                            velocity: doubleValue(from: params.arguments?["velocity"])
                         )
                     )
                 )
@@ -1866,13 +1869,19 @@ enum ToolCatalog {
                 "type": .string("string"),
                 "enum": .array([
                     .string("tap"),
+                    .string("doubleTap"),
+                    .string("longPress"),
                     .string("typeText"),
                     .string("swipe"),
+                    .string("pinch"),
                     .string("wait")
                 ])
             ]),
             "identifier": .object(["type": .string("string")]),
             "text": .object(["type": .string("string")]),
+            "durationSeconds": .object(["type": .string("number")]),
+            "scale": .object(["type": .string("number")]),
+            "velocity": .object(["type": .string("number")]),
             "direction": .object([
                 "type": .string("string"),
                 "enum": .array([

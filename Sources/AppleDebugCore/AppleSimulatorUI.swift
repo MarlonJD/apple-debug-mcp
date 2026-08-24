@@ -97,12 +97,26 @@ public struct SimulatorUIActionRequest: Codable, Equatable, Sendable {
     public let identifier: String?
     public let text: String?
     public let direction: String?
+    public let durationSeconds: Double?
+    public let scale: Double?
+    public let velocity: Double?
 
-    public init(action: String, identifier: String? = nil, text: String? = nil, direction: String? = nil) {
+    public init(
+        action: String,
+        identifier: String? = nil,
+        text: String? = nil,
+        direction: String? = nil,
+        durationSeconds: Double? = nil,
+        scale: Double? = nil,
+        velocity: Double? = nil
+    ) {
         self.action = action
         self.identifier = identifier
         self.text = text
         self.direction = direction
+        self.durationSeconds = durationSeconds
+        self.scale = scale
+        self.velocity = velocity
     }
 }
 
@@ -258,7 +272,7 @@ public enum SimulatorUIService {
     }
 
     private static func validate(action: SimulatorUIActionRequest) throws {
-        guard ["tap", "typeText", "swipe", "wait"].contains(action.action) else {
+        guard ["tap", "doubleTap", "longPress", "typeText", "swipe", "pinch", "wait"].contains(action.action) else {
             throw SimulatorUIError.invalidAction
         }
         if let identifier = action.identifier {
@@ -267,8 +281,14 @@ public enum SimulatorUIService {
             }
         }
         switch action.action {
-        case "tap", "wait":
+        case "tap", "doubleTap", "wait":
             guard action.identifier != nil else { throw SimulatorUIError.invalidAction }
+        case "longPress":
+            guard action.identifier != nil else { throw SimulatorUIError.invalidAction }
+            let duration = action.durationSeconds ?? 1.0
+            guard duration.isFinite, (0.1...10.0).contains(duration) else {
+                throw SimulatorUIError.invalidAction
+            }
         case "typeText":
             guard action.identifier != nil,
                   let text = action.text,
@@ -278,6 +298,16 @@ public enum SimulatorUIService {
             }
         case "swipe":
             guard ["up", "down", "left", "right"].contains(action.direction ?? "up") else {
+                throw SimulatorUIError.invalidAction
+            }
+        case "pinch":
+            guard action.identifier != nil, let scale = action.scale else {
+                throw SimulatorUIError.invalidAction
+            }
+            let velocity = action.velocity ?? 1.0
+            guard scale.isFinite, velocity.isFinite,
+                  (0.5...2.0).contains(scale),
+                  (-10.0...10.0).contains(velocity), velocity != 0 else {
                 throw SimulatorUIError.invalidAction
             }
         default:

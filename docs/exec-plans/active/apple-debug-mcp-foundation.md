@@ -50,6 +50,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 17:20Z) Make generic `apple_xcode_build` return derived-data, app, and dSYM artifact metadata and fix xcodebuild pipe deadlocks; verify with `make xcode-artifact-smoke`.
 - [x] (2026-08-24 17:31Z) Add policy-gated Simulator URL, location, clear-location, and bounded video controls; verify location/video through `make ios-mcp-tool-smoke`.
 - [x] (2026-08-24 17:40Z) Add policy-gated generic `apple_xcode_test` execution with xcresult summary discovery; verify through `make xcode-test-smoke`.
+- [x] (2026-08-24 17:45Z) Expand XCUITest action schemas with doubleTap, longPress, and bounded pinch support; verify extra gestures through `make ios-ui-tree-smoke`.
 - [x] (2026-08-24 17:36Z) Replace pipe-before-wait Apple tool invocations with a bounded file-backed process runner across logs, Simulator, CoreDevice, symbolication, capability, and binary adapters.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 

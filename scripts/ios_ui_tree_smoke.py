@@ -100,6 +100,8 @@ def main() -> int:
         for action in (
             {"action": "typeText", "identifier": "debug.fixture.input", "text": "hello"},
             {"action": "tap", "identifier": "debug.fixture.button"},
+            {"action": "doubleTap", "identifier": "debug.fixture.title"},
+            {"action": "longPress", "identifier": "debug.fixture.button", "durationSeconds": 0.2},
             {"action": "swipe", "direction": "up"},
             {"action": "wait", "identifier": "debug.fixture.status"},
         ):
@@ -117,7 +119,7 @@ def main() -> int:
             if action_result.get("action") != action["action"]:
                 raise RuntimeError("UI action result did not preserve the requested action")
         print(
-            "ios-ui-tree-smoke: standalone MCP XCUITest bridge returned %d elements and completed tap, typeText, swipe, and wait actions for %s"
+            "ios-ui-tree-smoke: standalone MCP XCUITest bridge returned %d elements and completed tap, doubleTap, longPress, typeText, swipe, and wait actions for %s"
             % (len(snapshot["elements"]), simulator_id)
         )
         return 0

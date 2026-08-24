@@ -97,6 +97,12 @@ final class DebugAppUITests: XCTestCase {
         case "tap":
             guard let element else { throw invalidAction("tap requires identifier") }
             element.tap()
+        case "doubleTap":
+            guard let element else { throw invalidAction("doubleTap requires identifier") }
+            element.doubleTap()
+        case "longPress":
+            guard let element else { throw invalidAction("longPress requires identifier") }
+            element.press(forDuration: action.durationSeconds ?? 1.0)
         case "typeText":
             guard let element, let text = action.text else {
                 throw invalidAction("typeText requires identifier and text")
@@ -111,6 +117,11 @@ final class DebugAppUITests: XCTestCase {
             case "right": element?.swipeRight() ?? app.swipeRight()
             default: throw invalidAction("swipe direction must be up, down, left, or right")
             }
+        case "pinch":
+            guard let element, let scale = action.scale else {
+                throw invalidAction("pinch requires identifier and scale")
+            }
+            element.pinch(withScale: CGFloat(scale), velocity: CGFloat(action.velocity ?? 1.0))
         case "wait":
             guard element?.waitForExistence(timeout: 10) == true else {
                 throw invalidAction("wait requires an existing identifier")
@@ -137,6 +148,9 @@ private struct UIActionCommand: Codable {
     let identifier: String?
     let text: String?
     let direction: String?
+    let durationSeconds: Double?
+    let scale: Double?
+    let velocity: Double?
 }
 
 private struct ElementRecord: Codable {
