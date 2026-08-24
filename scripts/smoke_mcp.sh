@@ -21,7 +21,8 @@ error_file="$tmp_dir/stderr.log"
         '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"apple_capabilities","arguments":{}}}' \
         '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"apple_toolchain_status","arguments":{}}}' \
         '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"apple_lldb_dap_initialize","arguments":{}}}' \
-        '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"apple_macho_inspect","arguments":{"path":"/bin/echo"}}}'
+        '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"apple_macho_inspect","arguments":{"path":"/bin/echo"}}}' \
+        '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"apple_simulator_list","arguments":{}}}'
     sleep 0.5
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
@@ -31,5 +32,6 @@ grep -q 'apple_toolchain_status' "$output_file"
 grep -q 'ios-device' "$output_file"
 grep -q 'lldb-dap' "$output_file"
 grep -q 'Mach-O' "$output_file"
+grep -q 'iPhone' "$output_file"
 
 printf '%s\n' 'smoke: MCP initialize, tool discovery, capability, and toolchain calls passed'

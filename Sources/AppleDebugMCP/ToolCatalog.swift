@@ -77,6 +77,36 @@ enum ToolCatalog {
             name: "apple_debug_continue",
             description: "Continue an active debug session for a selected thread.",
             inputSchema: threadObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_list",
+            description: "List available iOS Simulator devices without changing simulator state.",
+            inputSchema: emptyObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_boot",
+            description: "Boot an available iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_shutdown",
+            description: "Shut down an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_install",
+            description: "Install an app bundle on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorInstallObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_launch",
+            description: "Launch an installed app on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorLaunchObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_terminate",
+            description: "Terminate an app on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorLaunchObjectSchema
         )
     ]
 
@@ -230,6 +260,47 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_simulator_list":
+            do {
+                return result(for: try SimulatorService.list())
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_boot", "apple_simulator_shutdown":
+            guard let udid = params.arguments?["udid"]?.stringValue else {
+                return errorResult("Missing required udid argument.")
+            }
+            do {
+                let action = params.name == "apple_simulator_boot"
+                    ? try SimulatorService.boot(udid: udid)
+                    : try SimulatorService.shutdown(udid: udid)
+                return result(for: action)
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_install":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let appPath = params.arguments?["appPath"]?.stringValue else {
+                return errorResult("Missing required udid or appPath argument.")
+            }
+            do {
+                return result(for: try SimulatorService.install(udid: udid, appPath: appPath))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_launch", "apple_simulator_terminate":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue else {
+                return errorResult("Missing required udid or bundleID argument.")
+            }
+            do {
+                let action = params.name == "apple_simulator_launch"
+                    ? try SimulatorService.launch(udid: udid, bundleID: bundleID)
+                    : try SimulatorService.terminate(udid: udid, bundleID: bundleID)
+                return result(for: action)
+            } catch {
+                return errorResult(error)
+            }
 
         default:
             return .init(
@@ -348,6 +419,32 @@ enum ToolCatalog {
             "instructionCount": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("sessionID"), .string("memoryReference"), .string("instructionCount")])
+    ])
+
+    private static let simulatorObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid")])
+    ])
+
+    private static let simulatorInstallObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "appPath": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("appPath")])
+    ])
+
+    private static let simulatorLaunchObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("bundleID")])
     ])
 
     private static func errorResult(_ error: Error) -> CallTool.Result {
