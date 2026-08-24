@@ -12,7 +12,7 @@ The target is a local macOS process or binary for which the user has debugging a
 
 ### iOS Simulator
 
-The target is an application installed in a local Simulator. The implemented surface includes Xcode build/discovery, install, launch, terminate, screenshot, logs, LLDB-DAP attach/inspection, Mach-O and binary-diff analysis, crash analysis, symbolication, Objective-C/Swift metadata, deep dSYM/DWARF reports, and policy-gated XCUITest accessibility-tree and fixture UI-action bridges. Simulator results do not replace physical-device evidence.
+The target is an application installed in a local Simulator. The implemented surface includes Xcode build/discovery, install, launch, terminate, screenshot, logs, LLDB-DAP attach/inspection, Mach-O and binary-diff analysis, crash analysis, symbolication, Objective-C/Swift metadata, deep dSYM/DWARF reports, project-backed XCUITest workflows, and a generated XCUITest runner that can inspect/act on an arbitrary installed app through `XCUIApplication(bundleIdentifier:)`. Simulator results do not replace physical-device evidence.
 
 ### Physical iOS device
 

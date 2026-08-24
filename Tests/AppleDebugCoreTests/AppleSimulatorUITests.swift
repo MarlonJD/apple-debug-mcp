@@ -18,4 +18,15 @@ final class AppleSimulatorUITests: XCTestCase {
             XCTAssertEqual(error as? SimulatorUIError, .mutationDisabled)
         }
     }
+
+    func testInstalledAppProbeRequiresExplicitMutationPolicy() {
+        XCTAssertThrowsError(
+            try SimulatorUIService.installedAppSnapshot(
+                udid: "00000000-0000-0000-0000-000000000000",
+                bundleID: "com.example.fixture"
+            )
+        ) { error in
+            XCTAssertEqual(error as? SimulatorUIError, .mutationDisabled)
+        }
+    }
 }

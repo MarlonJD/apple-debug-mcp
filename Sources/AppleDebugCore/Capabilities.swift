@@ -83,7 +83,7 @@ public enum CapabilityMatrix {
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
                     "Memory and variable mutation are disabled by default and require separate explicit policy grants.",
-                    "UI inspection and bounded tap, text-entry, swipe, and wait actions run through an explicit XCUITest probe; Simulator mutation permission is required."
+                    "UI inspection and bounded actions run through project-backed or generated XCUITest probes; the generated path targets an installed bundle ID and requires Simulator mutation permission."
                 ]
             ),
             CapabilityReport(

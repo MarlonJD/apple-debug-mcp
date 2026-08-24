@@ -324,6 +324,16 @@ enum ToolCatalog {
             inputSchema: simulatorUIActionObjectSchema
         ),
         Tool(
+            name: "apple_simulator_ui_probe",
+            description: "Generate a temporary XCUITest runner for an arbitrary installed Simulator application and return its accessibility tree. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorUIProbeObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_ui_probe_action",
+            description: "Generate a temporary XCUITest runner, perform a bounded action against an arbitrary installed Simulator application, and return the resulting tree. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorUIProbeActionObjectSchema
+        ),
+        Tool(
             name: "apple_device_list",
             description: "List CoreDevice physical-device inventory and explicit pairing/tunnel authorization state.",
             inputSchema: emptyObjectSchema
@@ -1275,6 +1285,48 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_simulator_ui_probe":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue else {
+                return errorResult("Missing required udid or bundleID argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorUIService.installedAppSnapshot(
+                        udid: udid,
+                        bundleID: bundleID,
+                        configuration: params.arguments?["configuration"]?.stringValue ?? "Debug"
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_ui_probe_action":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue,
+                  let action = params.arguments?["action"]?.stringValue else {
+                return errorResult("Missing required udid, bundleID, or action argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorUIService.performInstalledAppAction(
+                        udid: udid,
+                        bundleID: bundleID,
+                        configuration: params.arguments?["configuration"]?.stringValue ?? "Debug",
+                        action: .init(
+                            action: action,
+                            identifier: params.arguments?["identifier"]?.stringValue,
+                            text: params.arguments?["text"]?.stringValue,
+                            direction: params.arguments?["direction"]?.stringValue,
+                            durationSeconds: doubleValue(from: params.arguments?["durationSeconds"]),
+                            scale: doubleValue(from: params.arguments?["scale"]),
+                            velocity: doubleValue(from: params.arguments?["velocity"])
+                        )
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_device_list":
             do {
                 return result(for: try AppleDeviceService.list())
@@ -2124,6 +2176,45 @@ enum ToolCatalog {
             .string("scheme"),
             .string("action")
         ])
+    ])
+
+    private static let simulatorUIProbeObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object([
+                "type": .string("string"),
+                "description": .string("Bundle identifier of an application already installed in the selected Simulator")
+            ]),
+            "configuration": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("bundleID")])
+    ])
+
+    private static let simulatorUIProbeActionObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")]),
+            "configuration": .object(["type": .string("string")]),
+            "action": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("tap"), .string("doubleTap"), .string("longPress"),
+                    .string("typeText"), .string("swipe"), .string("pinch"), .string("wait")
+                ])
+            ]),
+            "identifier": .object(["type": .string("string")]),
+            "text": .object(["type": .string("string")]),
+            "durationSeconds": .object(["type": .string("number")]),
+            "scale": .object(["type": .string("number")]),
+            "velocity": .object(["type": .string("number")]),
+            "direction": .object([
+                "type": .string("string"),
+                "enum": .array([.string("up"), .string("down"), .string("left"), .string("right")])
+            ])
+        ]),
+        "required": .array([.string("udid"), .string("bundleID"), .string("action")])
     ])
 
     private static let deviceInstallObjectSchema: Value = .object([

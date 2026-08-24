@@ -21,6 +21,7 @@ The current product surface includes:
 - `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
 - crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
+- generated XCUITest runners that inspect and act on arbitrary applications already installed in a Simulator, without requiring the target app’s Xcode project;
 - Simulator URL opening, deterministic location injection/clear, and bounded video recording for automated reproduction;
 - Xcode project discovery, explicitly authorized builds with derived-data/`.app`/`.dSYM` manifests, and test execution with `.xcresult` summaries;
 - CoreDevice physical-device inventory plus authorization-gated development-app install/launch.
@@ -64,6 +65,7 @@ make ios-fixture-smoke
 make ios-debug-fixture-smoke
 make ios-mcp-tool-smoke
 make ios-ui-tree-smoke
+make ios-arbitrary-ui-smoke
 make dwarf-smoke
 make performance-analysis-smoke
 ```

@@ -21,7 +21,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
 | Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
-| Sources/AppleDebugCore/AppleSimulatorUI.swift | XCUITest accessibility-tree probe and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
+| Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
 | Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
 | Sources/AppleDebugCore/AppleDevice.swift | CoreDevice inventory and authorization-gated development-app operations | Maintainers; update with pairing/tunnel policy changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
@@ -61,8 +61,9 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
 13. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
-14. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-15. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+14. `apple_simulator_ui_probe` and `apple_simulator_ui_probe_action` generate a temporary UI-testing-only Xcode project and use `XCUIApplication(bundleIdentifier:)` to inspect an installed Simulator application; they never need to build or inject code into that application.
+15. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+16. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 

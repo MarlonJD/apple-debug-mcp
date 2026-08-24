@@ -59,6 +59,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 18:10Z) Harden LLDB-DAP EOF/process-status handling after a real fixture crash and preserve typed process-exit errors.
 - [x] (2026-08-24 17:36Z) Replace pipe-before-wait Apple tool invocations with a bounded file-backed process runner across logs, Simulator, CoreDevice, symbolication, capability, and binary adapters.
 - [x] (2026-08-24 18:45Z) Add deep bounded DWARF inspection for Mach-O/dSYM inputs, including DIE hierarchy/attributes, declaration locations, source lists, line-table rows, statistics, and address lookup plumbing; verify it through `make dwarf-smoke` against the generic iOS fixture.
+- [x] (2026-08-24 19:08Z) Add generated UI-test-only Xcode projects for arbitrary installed Simulator bundle IDs, with snapshot/action MCP tools and end-to-end install/probe/tap evidence through `make ios-arbitrary-ui-smoke`.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries
@@ -71,6 +72,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - Unified-log output is large even for a one-second host window, so the public adapter caps responses and the deterministic MCP smoke covers the tool schema rather than making log volume a required gate.
 - `dwarfdump --name` with `--show-children` returns a nested DIE stream rather than a flat symbol list; the DWARF adapter preserves offsets, depth, parent links, attributes, source paths, and bounded line rows so type/source evidence is not reduced to `atos` names.
 - `xctrace export --xpath` returns a bounded XML query result with deduplicated reference nodes; the parser preserves the first materialized frame/sample records and rejects arbitrary XPath/schema input so trace analysis stays deterministic and bounded.
+- A UI-test target can inspect an already installed Simulator app with `XCUIApplication(bundleIdentifier:)`; a generated UI-testing-only project is sufficient, but Apple still requires XCTest/Xcode and an accessibility-exposed target, so this does not bypass app UI privacy or entitlements.
 
 ## Decision Log
 
