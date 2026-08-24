@@ -29,7 +29,7 @@ Run this sweep manually at each major milestone and before a release or harness 
 | Finding | Evidence | Impact | Action | Destination | Owner | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | Physical-device fixture unavailable | CoreDevice reports unsupported pairing and unavailable tunnel | Remote LLDB evidence cannot be certified locally | Re-run only after an authorized paired device is available | Active ExecPlan | Apple Debug MCP maintainers | blocked-by-environment |
-| Accessibility-tree source not selected | Screenshot is available; UI inspection is restricted | AI cannot query UI hierarchy through MCP | Choose and fixture-test a Simulator-native source | Technical debt tracker | Apple Debug MCP maintainers | open |
+| Accessibility-tree source not selected | XCUITest attachment bridge and bounded gesture actions are fixture-tested | Arbitrary installed-app UI trees still require a UI-test-enabled project/scheme | Keep the fixture bridge explicit and extend project adapters only with a stable authorization contract | Technical debt tracker | Apple Debug MCP maintainers | resolved-for-fixture |
 
 ## Cadence and escalation
 
