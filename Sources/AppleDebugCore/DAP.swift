@@ -308,7 +308,7 @@ public actor LLDBDAPSession {
         while true {
             let data = try readChunk(from: output)
             if data.isEmpty {
-                let status = process?.terminationStatus ?? -1
+                let status = processStatus()
                 throw DAPError.processExited(status)
             }
             buffer.append(data)
@@ -372,7 +372,7 @@ public actor LLDBDAPSession {
                     timeoutMilliseconds: min(remaining, 10_000)
                 )
                 if data.isEmpty {
-                    let status = process?.terminationStatus ?? -1
+                    let status = processStatus()
                     throw DAPError.processExited(status)
                 }
                 buffer.append(data)
@@ -451,6 +451,11 @@ public actor LLDBDAPSession {
         }
     }
 
+    private func processStatus() -> Int32 {
+        guard let process else { return -1 }
+        return process.isRunning ? -1 : process.terminationStatus
+    }
+
     private func readChunk(
         from output: FileHandle,
         timeoutMilliseconds: Int = 10_000
@@ -473,7 +478,7 @@ public actor LLDBDAPSession {
             Darwin.read(output.fileDescriptor, buffer.baseAddress, buffer.count)
         }
         guard count > 0 else {
-            throw DAPError.processExited(process?.terminationStatus ?? -1)
+            throw DAPError.processExited(processStatus())
         }
         return Data(bytes.prefix(count))
     }

@@ -129,6 +129,11 @@ enum ToolCatalog {
             inputSchema: processObjectSchema
         ),
         Tool(
+            name: "apple_performance_record",
+            description: "Capture a bounded xctrace Time Profiler, Allocations, or System Trace artifact for an authorized macOS PID or Simulator.",
+            inputSchema: performanceRecordObjectSchema
+        ),
+        Tool(
             name: "apple_debug_disassemble",
             description: "Disassemble instructions from a stopped target through LLDB-DAP.",
             inputSchema: disassembleObjectSchema
@@ -669,6 +674,20 @@ enum ToolCatalog {
             }
             do {
                 return result(for: try await sessions.memoryMap(processID: processID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_performance_record":
+            do {
+                return result(
+                    for: try ApplePerformanceService.record(
+                        processID: intValue(from: params.arguments?["processID"]),
+                        simulatorUDID: params.arguments?["simulatorUDID"]?.stringValue,
+                        template: params.arguments?["template"]?.stringValue ?? "Time Profiler",
+                        durationSeconds: intValue(from: params.arguments?["durationSeconds"]) ?? 5,
+                        outputPath: params.arguments?["outputPath"]?.stringValue ?? ""
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1479,6 +1498,31 @@ enum ToolCatalog {
             "processID": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("processID")])
+    ])
+
+    private static let performanceRecordObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "processID": .object(["type": .string("integer")]),
+            "simulatorUDID": .object(["type": .string("string")]),
+            "template": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("Time Profiler"),
+                    .string("Allocations"),
+                    .string("System Trace")
+                ])
+            ]),
+            "durationSeconds": .object([
+                "type": .string("integer"),
+                "description": .string("Recording duration from 1 to 60 seconds; defaults to 5")
+            ]),
+            "outputPath": .object([
+                "type": .string("string"),
+                "description": .string("Absolute non-existing .trace output path")
+            ])
+        ]),
+        "required": .array([.string("outputPath")])
     ])
 
     private static let breakpointObjectSchema: Value = .object([

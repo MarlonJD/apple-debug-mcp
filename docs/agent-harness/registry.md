@@ -6,6 +6,8 @@
 | Focused tests | swift test --filter CapabilitiesTests | Verify platform policy and tool allowlist | XCTest exits 0 | Maintainers; core changes | verified |
 | Full validation | make check | Build, test, smoke, whitespace, and placeholder validation | Exit 0 with summary | Maintainers; every source change | verified |
 | Bounded Apple process execution | AppleProcessRunner; make check | Capture large Apple-tool stdout/stderr without pipe deadlocks | Core adapters return or report bounded output errors | Maintainers; external-tool adapter changes | verified-with-boundary |
+| Performance trace capture | apple_performance_record | Capture bounded raw xctrace artifacts for an authorized macOS PID or Simulator | Fixed templates, target policy, and 1–60 second output bounds are enforced | Maintainers; Instruments/Xcode changes | verified-with-boundary |
+| Performance trace smoke | make performance-smoke | Capture one short host Time Profiler trace through MCP | Non-empty `.trace` bundle is returned and cleaned with the temporary run | Maintainers; Instruments/Xcode changes | verified-with-boundary |
 | Project-native harness gate | make harness-check | Verify product checks and repository harness structure | Exit 0; no unresolved routes/placeholders | Maintainers; every harness change | verified |
 | Safe harness convergence | Manual repair followed by make harness-check | Repair safe docs/check drift | Fresh gate pass and refreshed evidence | Maintainers; manual task completion | verified |
 | Optional production attestation | N/A | Repository has no production deployment action | N/A with documented reason | Human product owner; scope change | N/A |

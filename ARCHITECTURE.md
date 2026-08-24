@@ -40,6 +40,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
+- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates; trace interpretation remains a separate symbolication/analysis step.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
 No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.

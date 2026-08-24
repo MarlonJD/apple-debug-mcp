@@ -97,6 +97,20 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testPerformanceCaptureRequiresExplicitTargetPolicy() {
+        XCTAssertThrowsError(
+            try ApplePerformanceService.record(
+                processID: nil,
+                simulatorUDID: nil,
+                template: "Time Profiler",
+                durationSeconds: 1,
+                outputPath: "/tmp/apple-debug-mcp.trace"
+            )
+        ) { error in
+            XCTAssertEqual(error as? ApplePerformanceError, .invalidRequest)
+        }
+    }
+
     func testExpressionEvaluationRequiresExplicitPolicy() {
         XCTAssertThrowsError(
             try DebugPolicy.validateEvaluate()

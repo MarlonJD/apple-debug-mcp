@@ -53,6 +53,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 17:45Z) Expand XCUITest action schemas with doubleTap, longPress, and bounded pinch support; verify extra gestures through `make ios-ui-tree-smoke`.
 - [x] (2026-08-24 17:52Z) Add attach-gated macOS `apple_debug_memory_map` vmmap reporting with bounded output and policy coverage.
 - [x] (2026-08-24 17:58Z) Add DAP stack/variable paging, hex formatting, and exception filter-option schemas; verify paged stack/variables through the macOS fixture.
+- [x] (2026-08-24 18:04Z) Add bounded policy-gated `apple_performance_record` xctrace capture for macOS PID or Simulator targets.
+- [x] (2026-08-24 18:08Z) Add `make performance-smoke` to capture and validate a short non-empty host Time Profiler trace bundle.
+- [x] (2026-08-24 18:10Z) Harden LLDB-DAP EOF/process-status handling after a real fixture crash and preserve typed process-exit errors.
 - [x] (2026-08-24 17:36Z) Replace pipe-before-wait Apple tool invocations with a bounded file-backed process runner across logs, Simulator, CoreDevice, symbolication, capability, and binary adapters.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
