@@ -24,8 +24,8 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 - [x] (2026-08-24 01:30Z) Add the SwiftPM package, official MCP SDK dependency, core capability model, and MCP tool registry.
 - [x] (2026-08-24 01:42Z) Add and exercise the MCP smoke fixture.
 - [x] (2026-08-24 01:44Z) Run build, test, whitespace, documentation, and project-native harness checks.
-- [ ] Create the authorized source commit and direct-child harness attestation checkpoint.
-- [ ] Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
+- [x] (2026-08-24 01:53Z) Create the authorized source commit 48ce3c9 and direct-child harness attestation checkpoint f6d5348.
+- [x] (2026-08-24 01:53Z) Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
 
 ## Surprises & Discoveries
 
@@ -57,7 +57,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 
 ## Outcomes & Retrospective
 
-The foundation is not complete until the MCP smoke, project-native checks, harness checks, source commit, and direct-child attestation are observed. The expected result is a small working server with explicit future debt rather than a false claim of full debugger parity.
+The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full LLDB, Mach-O, Simulator, and device product remains active follow-up work.
 
 ## Context and Orientation
 
@@ -112,3 +112,5 @@ The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool,
 
 - (2026-08-24 00:00Z) Change: Created the foundation plan and recorded the initial repository, dependency, licensing, and harness decisions.
   Reason: Establish a restartable implementation record for the first source and attestation checkpoints.
+- (2026-08-24 01:53Z) Change: Recorded the completed foundation, source commit, attestation commit, and GitHub push.
+  Reason: Keep the living plan aligned with observed repository state while leaving the full product work active.
