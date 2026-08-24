@@ -80,5 +80,6 @@ final class AppleXcodeTests: XCTestCase {
         XCTAssertTrue(context.sourcePaths.contains { $0.hasSuffix("/DebugApp.swift") })
         XCTAssertFalse(context.sourcePaths.contains { $0.hasSuffix("DebugAppUITests.swift") }, "paths=\(context.sourcePaths), notes=\(context.notes)")
         XCTAssertTrue(context.targetTriple?.contains("ios") == true)
+        XCTAssertTrue(context.notes.first?.contains("PBX Sources") == true)
     }
 }

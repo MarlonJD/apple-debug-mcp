@@ -441,12 +441,16 @@ public enum XcodeService {
                 guard let buildID = line.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "," }).first,
                       buildID.allSatisfy(\.isHexDigit),
                       let build = pbxBlock(in: text, marker: "\(buildID) /*") else { continue }
-                guard let fileRef = value(after: "fileRef = ", in: build) else { continue }
-                let fileBlock = pbxBlock(in: text, marker: "\(fileRef) /*")
-                let pathValue = fileBlock.flatMap { value(after: "path = ", in: $0) }
+                guard let rawFileRef = value(after: "fileRef = ", in: build),
+                      let fileRef = rawFileRef.split(whereSeparator: { $0 == " " || $0 == "\t" }).first.map(String.init) else { continue }
                 let commentName = line.split(separator: "/*", maxSplits: 1).dropFirst().first
                     .map(String.init)
                     .map { $0.replacingOccurrences(of: " in Sources */", with: "") }
+                    .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " \t,*/")) }
+                let fileBlock = commentName.flatMap { name in
+                    pbxBlock(in: text, marker: "\(fileRef) /* \(name) */ = {")
+                }
+                let pathValue = fileBlock.flatMap { value(after: "path = ", in: $0) }
                 let relativePath = pathValue?.trimmingCharacters(in: CharacterSet(charactersIn: " \t;\"")) ?? commentName
                 guard let relativePath, relativePath.hasSuffix(".swift") else { continue }
                 let candidate = projectDirectory.appendingPathComponent(relativePath).standardizedFileURL.path
