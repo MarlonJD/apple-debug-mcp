@@ -44,6 +44,11 @@ enum ToolCatalog {
             inputSchema: binaryInspectObjectSchema
         ),
         Tool(
+            name: "apple_dwarf_inspect",
+            description: "Query bounded DWARF source paths, types, declarations, statistics, and address lookups from a Mach-O or dSYM.",
+            inputSchema: dwarfInspectObjectSchema
+        ),
+        Tool(
             name: "apple_crash_inspect",
             description: "Parse an Apple .crash or .ips report into process, exception, thread, and image metadata without executing it.",
             inputSchema: crashObjectSchema
@@ -435,6 +440,39 @@ enum ToolCatalog {
                     for: try AppleRuntimeMetadataService.inspect(
                         path: path,
                         architecture: params.arguments?["architecture"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_dwarf_inspect":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(
+                    for: try DWARFService.inspect(
+                        path: path,
+                        architecture: params.arguments?["architecture"]?.stringValue,
+                        name: params.arguments?["name"]?.stringValue,
+                        lookupAddress: params.arguments?["lookupAddress"]?.stringValue,
+                        depth: intValue(from: params.arguments?["depth"]) ?? 3,
+                        includeSources: boolValue(
+                            from: params.arguments?["includeSources"],
+                            default: true
+                        ),
+                        includeStatistics: boolValue(
+                            from: params.arguments?["includeStatistics"],
+                            default: true
+                        ),
+                        includeLineTable: boolValue(
+                            from: params.arguments?["includeLineTable"],
+                            default: true
+                        ),
+                        includeRaw: boolValue(
+                            from: params.arguments?["includeRaw"],
+                            default: false
+                        )
                     )
                 )
             } catch {
@@ -1392,6 +1430,40 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("leftPath"), .string("rightPath")])
+    ])
+
+    private static let dwarfInspectObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Mach-O binary or .dSYM bundle")
+            ]),
+            "architecture": .object(["type": .string("string")]),
+            "name": .object([
+                "type": .string("string"),
+                "description": .string("Optional exact DW_AT_name query")
+            ]),
+            "lookupAddress": .object([
+                "type": .string("string"),
+                "description": .string("Optional hexadecimal address for dwarfdump source lookup")
+            ]),
+            "depth": .object([
+                "type": .string("integer"),
+                "description": .string("DWARF child recursion depth from 1 to 8; defaults to 3")
+            ]),
+            "includeSources": .object(["type": .string("boolean")]),
+            "includeStatistics": .object(["type": .string("boolean")]),
+            "includeLineTable": .object([
+                "type": .string("boolean"),
+                "description": .string("Include bounded DWARF line-table address/source rows")
+            ]),
+            "includeRaw": .object([
+                "type": .string("boolean"),
+                "description": .string("Include bounded raw debug-info output")
+            ])
+        ]),
+        "required": .array([.string("path")])
     ])
 
     private static let sessionCreateObjectSchema: Value = .object([

@@ -57,6 +57,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 18:08Z) Add `make performance-smoke` to capture and validate a short non-empty host Time Profiler trace bundle.
 - [x] (2026-08-24 18:10Z) Harden LLDB-DAP EOF/process-status handling after a real fixture crash and preserve typed process-exit errors.
 - [x] (2026-08-24 17:36Z) Replace pipe-before-wait Apple tool invocations with a bounded file-backed process runner across logs, Simulator, CoreDevice, symbolication, capability, and binary adapters.
+- [x] (2026-08-24 18:45Z) Add deep bounded DWARF inspection for Mach-O/dSYM inputs, including DIE hierarchy/attributes, declaration locations, source lists, line-table rows, statistics, and address lookup plumbing; verify it through `make dwarf-smoke` against the generic iOS fixture.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries
@@ -67,6 +68,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - The iOS Simulator fixture can be built, installed, launched, screenshot, attached with LLDB-DAP, inspected, and cleaned up on the local Xcode installation.
 - The current CoreDevice inventory reports `pairingState=unsupported` and `tunnelState=unavailable`; no physical-device mutation or debug attach was attempted.
 - Unified-log output is large even for a one-second host window, so the public adapter caps responses and the deterministic MCP smoke covers the tool schema rather than making log volume a required gate.
+- `dwarfdump --name` with `--show-children` returns a nested DIE stream rather than a flat symbol list; the DWARF adapter preserves offsets, depth, parent links, attributes, source paths, and bounded line rows so type/source evidence is not reduced to `atos` names.
 
 ## Decision Log
 
@@ -95,7 +97,7 @@ The repository contains `AppleDebugCore` and `AppleDebugMCP`. The core owns capa
 
 1. Keep the current local debugger and Simulator workflows green with fixture-based regression checks.
 2. Add physical-device evidence only after an authorized paired device, Developer Mode, signing, and explicit user direction are present.
-3. Add metadata/UI/release increments as separate fixture-backed checkpoints rather than advertising unsupported capabilities.
+3. Add metadata/UI/release/reverse-engineering increments as separate fixture-backed checkpoints rather than advertising unsupported capabilities.
 4. Refresh harness evidence and create a direct-child attestation after each source/documentation checkpoint.
 
 ## Concrete Steps

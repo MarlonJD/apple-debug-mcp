@@ -18,6 +18,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleSymbolication.swift | `atos` address resolution | Maintainers; update with symbolication inputs or output contract |
 | Sources/AppleDebugCore/AppleBinaryIntelligence.swift | Code signatures, entitlements, linked libraries, nm symbols, and dyld exports | Maintainers; update with Apple toolchain output changes |
 | Sources/AppleDebugCore/AppleRuntimeMetadata.swift | Objective-C metadata parsing and Swift symbol demangling | Maintainers; update with Objective-C/Swift ABI/toolchain changes |
+| Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
 | Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
 | Sources/AppleDebugCore/AppleSimulatorUI.swift | XCUITest accessibility-tree probe and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
@@ -36,11 +37,11 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `LLDBDAPSession`: owns one LLDB-DAP subprocess, DAP framing, request/response matching, event draining, and teardown.
 - `DebugSessionManager`: owns session IDs and routes launch, attach, source/instruction breakpoint locations, source/function/exception breakpoints, inspection, registers, modules, completions, variable mutation, stepping, watchpoints, evaluation, memory reads/search/patch, macOS vmmap reporting, and target lifecycle through policy checks. Physical sessions initialize LLDB with a validated `device select <UUID>` command and remain separately gated.
 - `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
-- `AppleBinaryIntelligenceService`, `AppleRuntimeMetadataService`, `AppleBinaryDiffService`, and `CrashSymbolicationService`: inspect signed Apple binaries, recover Objective-C/Swift metadata, compare regular Mach-O files or `.app`/`.dSYM` bundles, and triage crash frames without executing artifacts.
+- `AppleBinaryIntelligenceService`, `AppleRuntimeMetadataService`, `DWARFService`, `AppleBinaryDiffService`, and `CrashSymbolicationService`: inspect signed Apple binaries, recover Objective-C/Swift metadata, decode bounded DWARF DIE/type/source data and line tables, compare regular Mach-O files or `.app`/`.dSYM` bundles, and triage crash frames without executing artifacts.
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
-- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates; trace interpretation remains a separate symbolication/analysis step.
+- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates; the trace bundle is intentionally retained as the source artifact while higher-level hotspot/flamegraph interpretation remains a separate analysis step.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
 No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.
@@ -55,7 +56,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 6. `apple_debug_session_create` creates an owned persistent adapter session.
 7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, paged stack/variables, exception filter options, memory, disassembly, stepping, watchpoints, evaluation, memory search/patch, and continuation.
 8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
-9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_binary_diff`, `apple_symbolicate`, `apple_crash_inspect`, and `apple_crash_symbolicate` analyze local artifacts without launching them.
+9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_dwarf_inspect`, `apple_binary_diff`, `apple_symbolicate`, `apple_crash_inspect`, and `apple_crash_symbolicate` analyze local artifacts without launching them.
 10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
