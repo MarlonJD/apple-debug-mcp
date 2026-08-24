@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke performance-smoke package release-package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke performance-smoke performance-analysis-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -35,6 +35,9 @@ xcode-test-smoke: build
 
 performance-smoke: build
 	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/performance_trace_smoke.py
+
+performance-analysis-smoke: build
+	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/performance_analysis_smoke.py
 
 package:
 	./scripts/package_macos.sh

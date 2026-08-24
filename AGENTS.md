@@ -31,6 +31,8 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | iOS debug fixture smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture and inspect its process |
 | iOS MCP tool smoke | make ios-mcp-tool-smoke | Exercise public MCP Simulator lifecycle, launch flags, app metadata, container, screenshot, and cleanup |
 | iOS UI tree/action smoke | make ios-ui-tree-smoke | Run the XCUITest accessibility and tap/typeText/swipe/wait bridge through the standalone MCP server |
+| DWARF smoke | make dwarf-smoke | Build the generic iOS fixture and verify typed dSYM DIE/source/line/statistics output |
+| Performance analysis smoke | make performance-analysis-smoke | Capture a short Time Profiler trace and verify parsed rows, hotspots, and folded flame stacks |
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |

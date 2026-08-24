@@ -11,6 +11,7 @@ The current product surface includes:
 - bounded memory pattern search and expected-bytes transactional patch/rollback (write permission required);
 - authorized macOS `vmmap` memory-region reporting (attach permission required);
 - bounded `xctrace` Time Profiler, Allocations, and System Trace capture for macOS or Simulator targets;
+- parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
@@ -64,9 +65,10 @@ make ios-debug-fixture-smoke
 make ios-mcp-tool-smoke
 make ios-ui-tree-smoke
 make dwarf-smoke
+make performance-analysis-smoke
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, and `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics.
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, and `performance-analysis-smoke` verifies xctrace XML rows, hotspots, and folded flame stacks.
 
 Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
 

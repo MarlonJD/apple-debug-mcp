@@ -139,6 +139,11 @@ enum ToolCatalog {
             inputSchema: performanceRecordObjectSchema
         ),
         Tool(
+            name: "apple_performance_analyze",
+            description: "Parse an xctrace Time Profiler trace into bounded rows, symbol/frame hotspots, and folded flame-stack data.",
+            inputSchema: performanceAnalyzeObjectSchema
+        ),
+        Tool(
             name: "apple_debug_disassemble",
             description: "Disassemble instructions from a stopped target through LLDB-DAP.",
             inputSchema: disassembleObjectSchema
@@ -724,6 +729,25 @@ enum ToolCatalog {
                         template: params.arguments?["template"]?.stringValue ?? "Time Profiler",
                         durationSeconds: intValue(from: params.arguments?["durationSeconds"]) ?? 5,
                         outputPath: params.arguments?["outputPath"]?.stringValue ?? ""
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_performance_analyze":
+            guard let tracePath = params.arguments?["tracePath"]?.stringValue else {
+                return errorResult("Missing required tracePath argument.")
+            }
+            do {
+                return result(
+                    for: try ApplePerformanceService.analyze(
+                        tracePath: tracePath,
+                        schema: params.arguments?["schema"]?.stringValue ?? "time-profile",
+                        maximumRows: intValue(from: params.arguments?["maximumRows"]) ?? 5_000,
+                        includeRows: boolValue(
+                            from: params.arguments?["includeRows"],
+                            default: false
+                        )
                     )
                 )
             } catch {
@@ -1595,6 +1619,29 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("outputPath")])
+    ])
+
+    private static let performanceAnalyzeObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "tracePath": .object([
+                "type": .string("string"),
+                "description": .string("Absolute existing .trace bundle produced by apple_performance_record")
+            ]),
+            "schema": .object([
+                "type": .string("string"),
+                "enum": .array([.string("time-profile"), .string("time-sample")])
+            ]),
+            "maximumRows": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum exported rows from 1 to 5000; defaults to 5000")
+            ]),
+            "includeRows": .object([
+                "type": .string("boolean"),
+                "description": .string("Include parsed rows in addition to hotspots and folded flame stacks")
+            ])
+        ]),
+        "required": .array([.string("tracePath")])
     ])
 
     private static let breakpointObjectSchema: Value = .object([
