@@ -1,0 +1,46 @@
+// Apple Debug MCP
+// Copyright (C) 2026 Burak Karahan
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// swift-tools-version: 6.0
+
+import PackageDescription
+
+let package = Package(
+    name: "apple-debug-mcp",
+    platforms: [
+        .macOS(.v13)
+    ],
+    products: [
+        .library(
+            name: "AppleDebugCore",
+            targets: ["AppleDebugCore"]
+        ),
+        .executable(
+            name: "apple-debug-mcp",
+            targets: ["AppleDebugMCP"]
+        )
+    ],
+    dependencies: [
+        .package(
+            url: "https://github.com/modelcontextprotocol/swift-sdk.git",
+            from: "0.11.0"
+        )
+    ],
+    targets: [
+        .target(
+            name: "AppleDebugCore"
+        ),
+        .executableTarget(
+            name: "AppleDebugMCP",
+            dependencies: [
+                "AppleDebugCore",
+                .product(name: "MCP", package: "swift-sdk")
+            ]
+        ),
+        .testTarget(
+            name: "AppleDebugCoreTests",
+            dependencies: ["AppleDebugCore"]
+        )
+    ]
+)

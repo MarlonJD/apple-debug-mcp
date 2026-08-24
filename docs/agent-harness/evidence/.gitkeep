@@ -1,0 +1,1 @@
+Evidence records are generated only after a source commit and are bound to a direct-child attestation commit.

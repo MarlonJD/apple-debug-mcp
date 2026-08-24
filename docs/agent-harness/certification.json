@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "claim": "harness-ready",
+  "profile": "standard",
+  "repository_commit": "pending-source-commit",
+  "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
+  "deployment_target_id": "apple-debug-mcp-local",
+  "environment": "local",
+  "issued_at": "2026-08-24T00:00:00Z",
+  "expires_at": "2026-08-31T00:00:00Z",
+  "coverage_sha256": "pending-coverage-digest",
+  "evidence_root": "docs/agent-harness/evidence",
+  "project_native_gate": {
+    "command": "./scripts/harness_check.sh",
+    "evidence": "docs/agent-harness/evidence/project-native-gate.json"
+  },
+  "maintenance": {
+    "command": "./scripts/harness_check.sh",
+    "triggers": [
+      "manual"
+    ],
+    "max_age_hours": 168,
+    "evidence": "docs/agent-harness/evidence/continuous-maintenance.json"
+  },
+  "production_authority": {
+    "owner": null,
+    "approval_evidence": null,
+    "rollback_evidence": null
+  }
+}

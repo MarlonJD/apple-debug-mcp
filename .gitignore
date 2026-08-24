@@ -1,0 +1,18 @@
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+.DS_Store
+
+# Local MCP/client configuration
+.codex/
+.mcp.json
+
+# Debug artefacts
+*.dSYM/
+*.crash
+*.ips
+cores/
+dist/
