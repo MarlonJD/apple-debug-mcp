@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Foundation
+import Darwin
 
 public enum DAPValue: Codable, Equatable, Sendable {
     case object([String: DAPValue])
@@ -150,6 +151,7 @@ public enum DAPError: Error, Equatable, LocalizedError, Sendable {
     case processUnavailable
     case processExited(Int32)
     case requestFailed(String)
+    case timeout
     case toolUnavailable
 
     public var errorDescription: String? {
@@ -166,6 +168,8 @@ public enum DAPError: Error, Equatable, LocalizedError, Sendable {
             return "LLDB-DAP exited before completing the request with status \(status)."
         case .requestFailed(let message):
             return "LLDB-DAP request failed: \(message)"
+        case .timeout:
+            return "Timed out waiting for an LLDB-DAP response."
         case .toolUnavailable:
             return "The local lldb-dap executable was not found."
         }
@@ -276,7 +280,7 @@ public actor LLDBDAPSession {
         try input.write(contentsOf: DAPFraming.frame(request))
 
         while true {
-            let data = output.readData(ofLength: 4096)
+            let data = try readChunk(from: output)
             if data.isEmpty {
                 let status = process?.terminationStatus ?? -1
                 throw DAPError.processExited(status)
@@ -299,13 +303,33 @@ public actor LLDBDAPSession {
         }
     }
 
+    public func launch(program: String, arguments: [String], stopOnEntry: Bool) throws -> DAPMessage {
+        let launchArguments: DAPValue = .object([
+            "program": .string(program),
+            "args": .array(arguments.map(DAPValue.string)),
+            "stopOnEntry": .boolean(stopOnEntry)
+        ])
+        _ = try send(command: "configurationDone")
+        return try send(command: "launch", arguments: launchArguments)
+    }
+
     public func drainEvents() -> [DAPMessage] {
         defer { events.removeAll(keepingCapacity: true) }
         return events
     }
 
     public func stop() {
-        process?.terminate()
+        if let process {
+            try? input?.close()
+            try? output?.close()
+            if process.isRunning {
+                process.terminate()
+                if process.isRunning {
+                    _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                }
+                process.waitUntilExit()
+            }
+        }
         process = nil
         input = nil
         output = nil
@@ -333,5 +357,30 @@ public actor LLDBDAPSession {
         self.process = process
         input = inputPipe.fileHandleForWriting
         output = outputPipe.fileHandleForReading
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+
+    private func readChunk(from output: FileHandle) throws -> Data {
+        var descriptor = pollfd(
+            fd: output.fileDescriptor,
+            events: Int16(POLLIN),
+            revents: 0
+        )
+        let ready = Darwin.poll(&descriptor, 1, 10_000)
+        guard ready > 0 else {
+            if ready == 0 {
+                throw DAPError.timeout
+            }
+            throw DAPError.processUnavailable
+        }
+
+        var bytes = [UInt8](repeating: 0, count: 4096)
+        let count = bytes.withUnsafeMutableBytes { buffer in
+            Darwin.read(output.fileDescriptor, buffer.baseAddress, buffer.count)
+        }
+        guard count > 0 else {
+            throw DAPError.processExited(process?.terminationStatus ?? -1)
+        }
+        return Data(bytes.prefix(count))
     }
 }
