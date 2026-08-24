@@ -155,27 +155,14 @@ public enum ToolchainProbe {
     }
 
     private static func run(executable: String, arguments: [String]) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
+        guard let result = try? AppleProcessRunner.run(
+            executable: executable,
+            arguments: arguments,
+            maximumOutputSize: 256 * 1024
+        ), result.terminationStatus == 0 else {
             return nil
         }
-
-        guard process.terminationStatus == 0 else {
-            return nil
-        }
-
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        guard let value = String(data: data, encoding: .utf8)?
+        guard let value = String(data: result.stdout, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !value.isEmpty else {
             return nil

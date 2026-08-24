@@ -69,30 +69,24 @@ public enum SymbolicationService {
             arguments += ["-l", loadAddress]
         }
         arguments.append(address)
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = arguments
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-
+        let result: AppleProcessResult
         do {
-            try process.run()
-            process.waitUntilExit()
+            result = try AppleProcessRunner.run(
+                executable: "/usr/bin/xcrun",
+                arguments: arguments,
+                maximumOutputSize: 2 * 1024 * 1024
+            )
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw SymbolicationError.commandFailed(message)
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw SymbolicationError.commandFailed("atos output exceeds the 2 MB analysis limit.")
         } catch {
             throw SymbolicationError.commandFailed(error.localizedDescription)
         }
 
-        let stdout = String(
-            data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        let stderr = String(
-            data: errorPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        guard process.terminationStatus == 0 else {
+        let stdout = String(decoding: result.stdout, as: UTF8.self)
+        let stderr = String(decoding: result.stderr, as: UTF8.self)
+        guard result.terminationStatus == 0 else {
             throw SymbolicationError.commandFailed(
                 stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? stdout : stderr
             )

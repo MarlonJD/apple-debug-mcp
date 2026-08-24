@@ -182,29 +182,24 @@ public enum CodeSignatureService {
     }
 
     private static func run(executable: String, arguments: [String]) throws -> CommandResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        let output = Pipe()
-        let error = Pipe()
-        process.standardOutput = output
-        process.standardError = error
+        let result: AppleProcessResult
         do {
-            try process.run()
-            process.waitUntilExit()
+            result = try AppleProcessRunner.run(
+                executable: executable,
+                arguments: arguments,
+                maximumOutputSize: 2 * 1024 * 1024
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw AppleBinaryError.outputTooLarge
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw AppleBinaryError.commandFailed(message)
         } catch {
             throw AppleBinaryError.commandFailed(error.localizedDescription)
         }
-        let stdoutData = output.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = error.fileHandleForReading.readDataToEndOfFile()
-        guard stdoutData.count <= 2 * 1024 * 1024,
-              stderrData.count <= 2 * 1024 * 1024 else {
-            throw AppleBinaryError.outputTooLarge
-        }
         return CommandResult(
-            stdout: String(decoding: stdoutData, as: UTF8.self),
-            stderr: String(decoding: stderrData, as: UTF8.self),
-            terminationStatus: process.terminationStatus
+            stdout: String(decoding: result.stdout, as: UTF8.self),
+            stderr: String(decoding: result.stderr, as: UTF8.self),
+            terminationStatus: result.terminationStatus
         )
     }
 }
@@ -309,30 +304,25 @@ public enum AppleBinaryIntelligenceService {
     }
 
     private static func runXcrun(arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = arguments
-        let output = Pipe()
-        let error = Pipe()
-        process.standardOutput = output
-        process.standardError = error
+        let result: AppleProcessResult
         do {
-            try process.run()
-            process.waitUntilExit()
+            result = try AppleProcessRunner.run(
+                executable: "/usr/bin/xcrun",
+                arguments: arguments,
+                maximumOutputSize: 4 * 1024 * 1024
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw AppleBinaryError.outputTooLarge
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw AppleBinaryError.commandFailed(message)
         } catch {
             throw AppleBinaryError.commandFailed(error.localizedDescription)
         }
-        let stdout = output.fileHandleForReading.readDataToEndOfFile()
-        let stderr = error.fileHandleForReading.readDataToEndOfFile()
-        guard stdout.count <= 4 * 1024 * 1024,
-              stderr.count <= 4 * 1024 * 1024 else {
-            throw AppleBinaryError.outputTooLarge
-        }
-        guard process.terminationStatus == 0 else {
+        guard result.terminationStatus == 0 else {
             throw AppleBinaryError.commandFailed(
-                String(decoding: stderr, as: UTF8.self)
+                String(decoding: result.stderr, as: UTF8.self)
             )
         }
-        return String(decoding: stdout, as: UTF8.self)
+        return String(decoding: result.stdout, as: UTF8.self)
     }
 }

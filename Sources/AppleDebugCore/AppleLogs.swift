@@ -112,32 +112,23 @@ public enum AppleLogService {
     }
 
     private static func run(executable: String, arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-
+        let result: AppleProcessResult
         do {
-            try process.run()
-            process.waitUntilExit()
+            result = try AppleProcessRunner.run(
+                executable: executable,
+                arguments: arguments,
+                maximumOutputSize: maximumOutputSize
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw AppleLogError.outputTooLarge
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw AppleLogError.commandFailed(message)
         } catch {
             throw AppleLogError.commandFailed(error.localizedDescription)
         }
-
-        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        guard data.count <= maximumOutputSize else {
-            process.terminate()
-            throw AppleLogError.outputTooLarge
-        }
-        let stdout = String(decoding: data, as: UTF8.self)
-        let stderr = String(
-            data: errorPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        guard process.terminationStatus == 0 else {
+        let stdout = String(decoding: result.stdout, as: UTF8.self)
+        let stderr = String(decoding: result.stderr, as: UTF8.self)
+        guard result.terminationStatus == 0 else {
             throw AppleLogError.commandFailed(
                 stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? stdout : stderr
             )
