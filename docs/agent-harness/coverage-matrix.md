@@ -25,7 +25,7 @@ Current attestation source commit: f66215147590305f05b68bb670217f60fca30c82.
 | Entropy and technical debt are continuously controlled | entropy-cleanup-checklist.md and ../exec-plans/tech-debt-tracker.md | Dated sweep | [verified — manual cleanup checklist and debt tracker are recorded](evidence/coverage-15.json) |
 | Autonomy increases only after test, review, recovery, and escalation loops exist | operating-loop.md, output-contract.md, and policy gates | Evidence for granted level | [verified — mutation is opt-in, bounded, fixture-tested, and physical-device access remains escalated](evidence/coverage-16.json) |
 | Merge throughput policy matches project risk | SECURITY.md, RELIABILITY.md, and operating loop | Project-specific review rationale | [N/A — no hosted CI or merge policy is owned by this repository](evidence/coverage-17.json) |
-| Release, deployment, and production actions require repository-local authority | operating-loop.md, output-contract.md, and SECURITY.md | Gate or justified N/A | [N/A — no release or deployment action exists](evidence/coverage-18.json) |
+| Release, deployment, and production actions require repository-local authority | operating-loop.md, output-contract.md, SECURITY.md, and docs/RELEASE.md | Gate or justified N/A | [N/A — no production/deployment action exists; local signing/notarization is an explicit release-authority workflow](evidence/coverage-18.json) |
 | Repository-specific OpenAI examples are treated as options, not universal mandates | Case-study ledger below | Independent decision for every choice | [verified — case-study decision ledger is complete](evidence/coverage-19.json) |
 
 ## Case-study decision ledger

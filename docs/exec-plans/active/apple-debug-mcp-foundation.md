@@ -29,8 +29,8 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 04:00Z) Add host/Simulator bounded unified-log adapter.
 - [x] (2026-08-24 04:05Z) Add CoreDevice inventory, fail-closed development-app install/launch operations, and an authorization-gated LLDB `device select` session path.
 - [ ] Add a paired physical-device fixture for remote LLDB attach and lifecycle evidence.
-- [x] Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
-- [x] Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
+- [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
+- [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
 - [x] (2026-08-24 12:10Z) Add and verify the public MCP Simulator lifecycle smoke for launch flags, app metadata, containers, screenshots, and cleanup.
 - [x] (2026-08-24 12:20Z) Stabilize the iOS fixture accessibility identifiers and verify a 9-element semantic UI snapshot through XcodeBuildMCP.
