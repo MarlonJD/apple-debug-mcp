@@ -74,7 +74,9 @@ def main() -> int:
         candidates = [
             device
             for device in devices
-            if "iOS" in device.get("runtime", "") and device.get("isAvailable", True)
+            if "iOS" in device.get("runtime", "")
+            and device.get("isAvailable", True)
+            and device.get("name", "").startswith("iPhone")
         ]
         if not candidates:
             raise RuntimeError("no available iOS Simulator found")

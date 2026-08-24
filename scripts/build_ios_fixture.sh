@@ -4,7 +4,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
-simulator_id=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=data["devices"]; candidates=[d for runtime,items in devices.items() if "iOS" in runtime for d in items if d.get("isAvailable",True)]; print(candidates[0]["udid"] if candidates else "")')
+simulator_id=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=data["devices"]; candidates=[d for runtime,items in devices.items() if "iOS" in runtime for d in items if d.get("isAvailable",True) and d.get("name","").startswith("iPhone")]; print(candidates[0]["udid"] if candidates else "")')
 if [ -z "$simulator_id" ]; then
     printf '%s\n' 'ios-fixture: no available iOS Simulator found' >&2
     exit 1
