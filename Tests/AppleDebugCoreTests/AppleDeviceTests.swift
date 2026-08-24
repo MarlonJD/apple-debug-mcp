@@ -46,6 +46,14 @@ final class AppleDeviceTests: XCTestCase {
         }
     }
 
+    func testPhysicalDebugRejectsNonUUIDIdentifier() {
+        XCTAssertThrowsError(
+            try AppleDeviceService.validateAuthorizedDevice(identifier: "not-a-device")
+        ) { error in
+            XCTAssertEqual(error as? AppleDeviceError, .invalidIdentifier)
+        }
+    }
+
     func testListsCoreDevicesWithoutClaimingAuthorization() throws {
         let devices = try AppleDeviceService.list()
         XCTAssertTrue(devices.allSatisfy { !$0.identifier.isEmpty })

@@ -82,16 +82,16 @@ public enum DebugPolicy {
 
     public static func validatePositive(_ value: Int, label: String, maximum: Int? = nil) throws {
         guard value > 0 else {
-            throw DebugPolicyError.invalidRequest("(label) must be positive.")
+            throw DebugPolicyError.invalidRequest("\(label) must be positive.")
         }
         if let maximum, value > maximum {
-            throw DebugPolicyError.invalidRequest("(label) exceeds the maximum of (maximum).")
+            throw DebugPolicyError.invalidRequest("\(label) exceeds the maximum of \(maximum).")
         }
     }
 
     public static func validateNonNegative(_ value: Int, label: String) throws {
         guard value >= 0 else {
-            throw DebugPolicyError.invalidRequest("(label) must not be negative.")
+            throw DebugPolicyError.invalidRequest("\(label) must not be negative.")
         }
     }
 
@@ -104,24 +104,48 @@ public enum DebugPolicy {
 
 public struct DebugSessionSummary: Codable, Equatable, Sendable {
     public let sessionID: String
+    public let target: String
 
-    public init(sessionID: String) {
+    public init(sessionID: String, target: String = "macos") {
         self.sessionID = sessionID
+        self.target = target
     }
 }
 
 public actor DebugSessionManager {
-    private var sessions: [String: LLDBDAPSession] = [:]
+    private struct SessionRecord {
+        let session: LLDBDAPSession
+        let target: String
+        let deviceIdentifier: String?
+    }
+
+    private var sessions: [String: SessionRecord] = [:]
 
     public init() {}
 
-    public func create() async throws -> DebugSessionSummary {
+    public func create(deviceIdentifier: String? = nil) async throws -> DebugSessionSummary {
         let sessionID = UUID().uuidString.lowercased()
-        let session = try LLDBDAPSession()
+        let session: LLDBDAPSession
+        let target: String
+        if let deviceIdentifier {
+            guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_DEBUG"] == "1" else {
+                throw AppleDeviceError.debugDisabled
+            }
+            try AppleDeviceService.validateAuthorizedDevice(identifier: deviceIdentifier)
+            session = try LLDBDAPSession(deviceIdentifier: deviceIdentifier)
+            target = "ios-device:\(deviceIdentifier)"
+        } else {
+            session = try LLDBDAPSession()
+            target = "macos"
+        }
         do {
             _ = try await session.start()
-            sessions[sessionID] = session
-            return DebugSessionSummary(sessionID: sessionID)
+            sessions[sessionID] = SessionRecord(
+                session: session,
+                target: target,
+                deviceIdentifier: deviceIdentifier
+            )
+            return DebugSessionSummary(sessionID: sessionID, target: target)
         } catch {
             await session.stop()
             throw error
@@ -129,7 +153,10 @@ public actor DebugSessionManager {
     }
 
     public func list() -> [DebugSessionSummary] {
-        sessions.keys.sorted().map(DebugSessionSummary.init(sessionID:))
+        sessions.keys.sorted().compactMap { sessionID in
+            guard let record = sessions[sessionID] else { return nil }
+            return DebugSessionSummary(sessionID: sessionID, target: record.target)
+        }
     }
 
     public func launch(
@@ -139,25 +166,37 @@ public actor DebugSessionManager {
         stopOnEntry: Bool
     ) async throws -> DAPMessage {
         try DebugPolicy.validateLaunchTarget(path: program)
-        guard let session = sessions[sessionID] else {
-            throw DAPError.requestFailed("Unknown debug session: (sessionID)")
+        guard let record = sessions[sessionID] else {
+            throw DAPError.requestFailed("Unknown debug session: \(sessionID)")
+        }
+        guard record.deviceIdentifier == nil else {
+            throw DebugPolicyError.invalidRequest("Launch is not available for a physical-device session; use apple_device_launch.")
         }
         do {
-            return try await session.launch(
+            return try await record.session.launch(
                 program: program,
                 arguments: arguments,
                 stopOnEntry: stopOnEntry
             )
         } catch {
-            await session.stop()
+            await record.session.stop()
             sessions.removeValue(forKey: sessionID)
             throw error
         }
     }
 
     public func attach(sessionID: String, processID: Int) async throws -> DAPMessage {
-        try DebugPolicy.validateAttach(processID: processID)
-        return try await session(for: sessionID).attach(processID: processID)
+        try DebugPolicy.validatePositive(processID, label: "Process ID")
+        let record = try record(for: sessionID)
+        if let deviceIdentifier = record.deviceIdentifier {
+            guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_DEBUG"] == "1" else {
+                throw AppleDeviceError.debugDisabled
+            }
+            try AppleDeviceService.validateAuthorizedDevice(identifier: deviceIdentifier)
+        } else {
+            try DebugPolicy.validateAttach(processID: processID)
+        }
+        return try await record.session.attach(processID: processID)
     }
 
     public func setBreakpoint(sessionID: String, file: String, line: Int) async throws -> DAPMessage {
@@ -335,26 +374,30 @@ public actor DebugSessionManager {
     }
 
     public func close(sessionID: String) async -> Bool {
-        guard let session = sessions.removeValue(forKey: sessionID) else {
+        guard let record = sessions.removeValue(forKey: sessionID) else {
             return false
         }
-        await session.stop()
+        await record.session.stop()
         return true
     }
 
     public func closeAll() async {
         let sessions = self.sessions
         self.sessions.removeAll()
-        for session in sessions.values {
-            await session.stop()
+        for record in sessions.values {
+            await record.session.stop()
         }
     }
 
     private func session(for sessionID: String) throws -> LLDBDAPSession {
-        guard let session = sessions[sessionID] else {
+        try record(for: sessionID).session
+    }
+
+    private func record(for sessionID: String) throws -> SessionRecord {
+        guard let record = sessions[sessionID] else {
             throw DAPError.requestFailed("Unknown debug session: \(sessionID)")
         }
-        return session
+        return record
     }
 }
 

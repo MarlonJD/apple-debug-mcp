@@ -153,6 +153,7 @@ public enum DAPError: Error, Equatable, LocalizedError, Sendable {
     case requestFailed(String)
     case timeout
     case toolUnavailable
+    case invalidDeviceIdentifier
 
     public var errorDescription: String? {
         switch self {
@@ -172,6 +173,8 @@ public enum DAPError: Error, Equatable, LocalizedError, Sendable {
             return "Timed out waiting for an LLDB-DAP response."
         case .toolUnavailable:
             return "The local lldb-dap executable was not found."
+        case .invalidDeviceIdentifier:
+            return "The physical-device identifier is not a valid UUID."
         }
     }
 }
@@ -229,6 +232,7 @@ public enum DAPFraming {
 
 public actor LLDBDAPSession {
     private let executablePath: String
+    private let preInitCommand: String?
     private var process: Process?
     private var input: FileHandle?
     private var output: FileHandle?
@@ -241,6 +245,18 @@ public actor LLDBDAPSession {
             throw DAPError.toolUnavailable
         }
         self.executablePath = executablePath
+        self.preInitCommand = nil
+    }
+
+    public init(deviceIdentifier: String) throws {
+        guard UUID(uuidString: deviceIdentifier) != nil else {
+            throw DAPError.invalidDeviceIdentifier
+        }
+        guard let executablePath = ToolchainProbe.path(for: "lldb-dap") else {
+            throw DAPError.toolUnavailable
+        }
+        self.executablePath = executablePath
+        self.preInitCommand = "device select (deviceIdentifier)"
     }
 
     public func start() throws -> DAPMessage {
@@ -350,6 +366,9 @@ public actor LLDBDAPSession {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
+        if let preInitCommand {
+            process.arguments = ["--pre-init-command", preInitCommand]
+        }
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         process.standardInput = inputPipe

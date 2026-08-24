@@ -25,6 +25,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Session cleanup | Failed launch, explicit close, and server shutdown terminate only owned adapters | `DebugSessionManager`, `LLDBDAPSession.stop` | Session tests and fixture smoke |
 | Simulator mutation | Known UDID and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` are required | `SimulatorService.mutate` | `AppleSimulatorTests`, iOS smoke |
 | Physical devices | Install/launch require `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1`, known identifier, paired state, and available tunnel | `AppleDeviceService.mutate` | `AppleDeviceTests`, live inventory |
+| Physical-device LLDB | Session creation requires `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1`, a UUID identifier, paired state, available tunnel, and LLDB `device select` pre-initialization | `DebugSessionManager.create`, `LLDBDAPSession(deviceIdentifier:)` | `DebugSessionTests`, `AppleDeviceTests`; live attach requires a paired fixture |
 | Xcode builds | Require `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` and explicit project/scheme/configuration/destination | `XcodeService.build` | `AppleXcodeTests` |
 | Unified logs | Duration is bounded, predicates are single-line/limited, and output is capped at 2 MB | `AppleLogService` | `AppleLogsTests` |
 | Network | No HTTP listener exists; future HTTP must be localhost/authenticated/TLS-scoped | Architecture boundary | Review before transport addition |

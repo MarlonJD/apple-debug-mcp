@@ -27,7 +27,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 03:45Z) Add Mach-O universal/thin parsing, segments, symbols, strings, `atos` symbolication, and crash-report analysis.
 - [x] (2026-08-24 03:55Z) Add iOS Simulator inventory/lifecycle, Xcode fixture build, screenshot smoke, and LLDB-DAP attach smoke.
 - [x] (2026-08-24 04:00Z) Add host/Simulator bounded unified-log adapter.
-- [x] (2026-08-24 04:05Z) Add CoreDevice inventory and fail-closed development-app install/launch operations.
+- [x] (2026-08-24 04:05Z) Add CoreDevice inventory, fail-closed development-app install/launch operations, and an authorization-gated LLDB `device select` session path.
 - [ ] Add a paired physical-device fixture for remote LLDB attach and lifecycle evidence.
 - [ ] Add dedicated Objective-C/Swift metadata reports and richer UI inspection.
 - [ ] Add signed/notarized packaging and CI release artifacts.

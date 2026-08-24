@@ -38,6 +38,17 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testPhysicalDebugRequiresExplicitPolicy() async {
+        let manager = DebugSessionManager()
+
+        do {
+            _ = try await manager.create(deviceIdentifier: "DF79818E-85ED-569D-9FEB-9EA9B03A8766")
+            XCTFail("Physical debug session unexpectedly bypassed its policy gate")
+        } catch {
+            XCTAssertEqual(error as? AppleDeviceError, .debugDisabled)
+        }
+    }
+
     func testManagerCreatesAndClosesDAPSession() async throws {
         let manager = DebugSessionManager()
         let summary = try await manager.create()

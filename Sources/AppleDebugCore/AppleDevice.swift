@@ -8,7 +8,9 @@ public enum AppleDeviceError: Error, Equatable, LocalizedError, Sendable {
     case commandFailed(String)
     case invalidResponse
     case mutationDisabled
+    case debugDisabled
     case unknownDevice(String)
+    case invalidIdentifier
     case deviceNotAuthorized(String)
     case appNotFound
 
@@ -20,8 +22,12 @@ public enum AppleDeviceError: Error, Equatable, LocalizedError, Sendable {
             return "devicectl returned an invalid device inventory."
         case .mutationDisabled:
             return "Physical-device mutation is disabled. Set APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1 for an authorized workflow."
+        case .debugDisabled:
+            return "Physical-device debugging is disabled. Set APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 for an authorized workflow."
         case .unknownDevice(let identifier):
             return "Device is not in the CoreDevice inventory: \(identifier)"
+        case .invalidIdentifier:
+            return "Physical-device debugging requires a UUID device identifier."
         case .deviceNotAuthorized(let identifier):
             return "Device is not paired and tunnel-ready for authorized development: \(identifier)"
         case .appNotFound:
@@ -136,9 +142,9 @@ public enum AppleDeviceService {
         return AppleDeviceActionResult(action: "launch", identifier: identifier, output: output.stdout)
     }
 
-    private static func mutate(identifier: String) throws {
-        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_MUTATION"] == "1" else {
-            throw AppleDeviceError.mutationDisabled
+    public static func validateAuthorizedDevice(identifier: String) throws {
+        guard UUID(uuidString: identifier) != nil else {
+            throw AppleDeviceError.invalidIdentifier
         }
         guard let device = try list().first(where: { $0.identifier == identifier }) else {
             throw AppleDeviceError.unknownDevice(identifier)
@@ -146,6 +152,13 @@ public enum AppleDeviceService {
         guard device.isAuthorizedForDevelopment else {
             throw AppleDeviceError.deviceNotAuthorized(identifier)
         }
+    }
+
+    private static func mutate(identifier: String) throws {
+        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_MUTATION"] == "1" else {
+            throw AppleDeviceError.mutationDisabled
+        }
+        try validateAuthorizedDevice(identifier: identifier)
     }
 
     private struct CommandResult {

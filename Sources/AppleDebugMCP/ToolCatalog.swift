@@ -40,8 +40,8 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_debug_session_create",
-            description: "Create and initialize an authorized local LLDB-DAP debug session without launching a target.",
-            inputSchema: emptyObjectSchema
+            description: "Create and initialize an authorized LLDB-DAP session. Pass a physical-device UUID only with APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 and a paired development device.",
+            inputSchema: sessionCreateObjectSchema
         ),
         Tool(
             name: "apple_debug_session_list",
@@ -60,7 +60,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_debug_attach",
-            description: "Attach an authorized LLDB-DAP session to a process ID. Disabled unless APPLE_DEBUG_ALLOW_TARGET_ATTACH=1.",
+            description: "Attach an authorized local or paired physical-device LLDB-DAP session to a process ID. Local attach requires APPLE_DEBUG_ALLOW_TARGET_ATTACH=1; device attach requires APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1.",
             inputSchema: attachObjectSchema
         ),
         Tool(
@@ -269,7 +269,11 @@ enum ToolCatalog {
             }
         case "apple_debug_session_create":
             do {
-                return result(for: try await sessions.create())
+                return result(
+                    for: try await sessions.create(
+                        deviceIdentifier: params.arguments?["deviceIdentifier"]?.stringValue
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -666,6 +670,16 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("path")])
+    ])
+
+    private static let sessionCreateObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "deviceIdentifier": .object([
+                "type": .string("string"),
+                "description": .string("Optional paired physical-device UUID; requires APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1")
+            ])
+        ])
     ])
 
     private static let crashObjectSchema: Value = .object([

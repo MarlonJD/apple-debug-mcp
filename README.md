@@ -67,6 +67,7 @@ Safe defaults and opt-in boundaries:
 - `APPLE_DEBUG_ALLOW_MEMORY_WRITE=1` — permit at most 4096-byte DAP memory writes;
 - `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` — boot, install, launch, terminate, shut down, or screenshot a Simulator;
 - `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — mutate only a paired, tunnel-ready development device;
+- `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1` — create a physical-device LLDB session only after UUID, pairing, tunnel, signing, and Developer Mode checks pass;
 - `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` — run an explicitly selected Xcode project/scheme/configuration/destination build.
 
 Do not enable a boundary for software or devices you are not authorized to debug.
