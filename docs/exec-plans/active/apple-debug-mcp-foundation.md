@@ -35,6 +35,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 - [x] (2026-08-24 02:58Z) Add and run the signed macOS debugger fixture end to end and commit it as e0dd530.
 - [x] (2026-08-24 03:05Z) Add the SwiftUI iOS fixture project and verify xcodebuild produces the Simulator app and dSYM.
 - [x] (2026-08-24 03:12Z) Run the explicit iOS Simulator install/launch/screenshot/terminate/shutdown smoke.
+- [x] (2026-08-24 03:20Z) Run the iOS Simulator LLDB-DAP attach/threads/stack/memory/disassembly smoke from commits ee316c1 and 5648f7d.
 - [x] (2026-08-24 01:53Z) Create the authorized source commit 48ce3c9 and direct-child harness attestation checkpoint f6d5348.
 - [x] (2026-08-24 01:53Z) Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
 
@@ -56,6 +57,8 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
   Evidence: fixture-smoke passed launch, breakpoint request, threads, stack, memory read, disassembly, continue, and cleanup.
 - Observation: The iOS SwiftUI fixture launches successfully in an available iPhone 17 Pro Simulator and cleans up its state.
   Evidence: make ios-fixture-smoke passed and .build/ios-fixture/ios-fixture.png showed the fixture UI.
+- Observation: LLDB-DAP can attach to the running iOS Simulator fixture process and inspect its threads and stack.
+  Evidence: make ios-debug-fixture-smoke passed with the known fixture PID and cleaned up the Simulator.
 
 ## Decision Log
 
@@ -74,7 +77,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 
 ## Outcomes & Retrospective
 
-The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. Owned LLDB-DAP session lifecycle is committed as d101ae7 and proves create/initialize/close cleanup. Specialized debugger inspection operations are committed as 05dbc60 and map breakpoint, continue, threads, stack, memory-read, and disassembly requests. Simulator inventory and policy-gated lifecycle operations are committed as 073806c. CoreDevice inventory and authorization-gated physical-device operations are committed as 05adea3. Xcode discovery and policy-gated build execution are committed as ab45863. The signed macOS fixture and end-to-end debugger smoke are committed as e0dd530. The SwiftUI iOS fixture builds successfully to a Simulator app and dSYM via make ios-fixture, and the explicit Simulator smoke now proves install, launch, screenshot, terminate, and shutdown. The remaining work is Simulator LLDB attach/session proof, richer Mach-O metadata, and authorized physical-device debugging.
+The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. Owned LLDB-DAP session lifecycle is committed as d101ae7 and proves create/initialize/close cleanup. Specialized debugger inspection operations are committed as 05dbc60 and map breakpoint, continue, threads, stack, memory-read, and disassembly requests. Simulator inventory and policy-gated lifecycle operations are committed as 073806c. CoreDevice inventory and authorization-gated physical-device operations are committed as 05adea3. Xcode discovery and policy-gated build execution are committed as ab45863. The signed macOS fixture and end-to-end debugger smoke are committed as e0dd530. The SwiftUI iOS fixture builds successfully to a Simulator app and dSYM via make ios-fixture, and the explicit Simulator smoke proves install, launch, screenshot, terminate, and shutdown. The iOS Simulator LLDB-DAP attach smoke now proves attach, threads, stack, memory, disassembly, and cleanup. The remaining work is richer Mach-O metadata, broader Simulator UI/log coverage, and authorized physical-device debugging.
 
 ## Context and Orientation
 
@@ -149,3 +152,5 @@ The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool,
   Reason: Prove the macOS target-debugging surface without changing global Developer Mode state.
 - (2026-08-24 03:12Z) Change: Recorded the explicit iOS Simulator lifecycle smoke and screenshot evidence.
   Reason: Prove the fixture app can be built, installed, launched, observed, and cleaned up without leaving Simulator state behind.
+- (2026-08-24 03:20Z) Change: Recorded the iOS Simulator LLDB-DAP attach smoke and source commits ee316c1/5648f7d.
+  Reason: Prove the same debugger session surface works against a running authorized Simulator app.
