@@ -26,7 +26,8 @@ error_file="$tmp_dir/stderr.log"
         '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"apple_crash_inspect","arguments":{"path":"Tests/Fixtures/example.crash"}}}' \
         '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"apple_log_show","arguments":{"target":"host","last":"1s","predicate":"process == \"apple-debug-mcp\""}}}' \
         '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"apple_binary_inspect","arguments":{"path":"/bin/echo"}}}' \
-        '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"apple_binary_diff","arguments":{"leftPath":"/bin/echo","rightPath":"/bin/echo"}}}'
+        '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"apple_binary_diff","arguments":{"leftPath":"/bin/echo","rightPath":"/bin/echo"}}}' \
+        '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"apple_crash_symbolicate","arguments":{"crashPath":"Tests/Fixtures/example.crash","artifacts":[{"imageName":"AppleDebugFixture","binaryPath":"/bin/echo","architecture":"arm64e"}]}}}'
     sleep 2
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
@@ -62,5 +63,7 @@ grep -q 'dyldExports' "$output_file"
 grep -q 'apple_runtime_metadata' "$output_file"
 grep -q 'apple_binary_diff' "$output_file"
 grep -q '"id":11.*"isError":false' "$output_file"
+grep -q 'apple_crash_symbolicate' "$output_file"
+grep -q '"id":12.*"isError":false' "$output_file"
 
 printf '%s\n' 'smoke: MCP initialize, tool discovery, capability, and toolchain calls passed'

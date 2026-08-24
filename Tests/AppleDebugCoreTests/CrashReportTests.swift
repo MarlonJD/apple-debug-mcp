@@ -66,4 +66,41 @@ final class CrashReportTests: XCTestCase {
         XCTAssertEqual(report.threads.first?.frames.first?.symbol, "main")
         XCTAssertEqual(report.images.first?.uuid, "ABC")
     }
+
+    func testSymbolicatesCrashFramesAgainstNamedArtifact() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let crashPath = repositoryRoot.appendingPathComponent("Tests/Fixtures/example.crash").path
+        let report = try CrashSymbolicationService.symbolize(
+            path: crashPath,
+            artifacts: [
+                CrashSymbolicationArtifact(
+                    imageName: "AppleDebugFixture",
+                    binaryPath: "/bin/echo",
+                    architecture: "arm64e"
+                )
+            ]
+        )
+
+        XCTAssertEqual(report.crash.format, "crash")
+        XCTAssertEqual(report.frames.count, 3)
+        XCTAssertEqual(report.unmatchedFrameCount, 0)
+        XCTAssertTrue(report.frames.allSatisfy { $0.artifactPath == "/bin/echo" })
+    }
+
+    func testCrashSymbolicationRequiresAtLeastOneArtifact() {
+        XCTAssertThrowsError(
+            try CrashSymbolicationService.symbolize(
+                path: "/tmp/missing.crash",
+                artifacts: []
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? CrashReportError,
+                .invalidRequest("Crash symbolication requires between 1 and 32 artifacts.")
+            )
+        }
+    }
 }

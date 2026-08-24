@@ -49,6 +49,11 @@ enum ToolCatalog {
             inputSchema: crashObjectSchema
         ),
         Tool(
+            name: "apple_crash_symbolicate",
+            description: "Symbolicate bounded crash-report frames against supplied Mach-O, app, or dSYM artifacts without executing them.",
+            inputSchema: crashSymbolicateObjectSchema
+        ),
+        Tool(
             name: "apple_log_show",
             description: "Read bounded host or Simulator unified logs without mutating the target.",
             inputSchema: logShowObjectSchema
@@ -406,6 +411,21 @@ enum ToolCatalog {
             }
             do {
                 return result(for: try CrashReportAnalyzer.inspect(path: path))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_crash_symbolicate":
+            guard let crashPath = params.arguments?["crashPath"]?.stringValue,
+                  let artifacts = crashArtifacts(from: params.arguments?["artifacts"]) else {
+                return errorResult("Missing required crashPath or valid artifacts array argument.")
+            }
+            do {
+                return result(
+                    for: try CrashSymbolicationService.symbolize(
+                        path: crashPath,
+                        artifacts: artifacts
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1230,6 +1250,34 @@ enum ToolCatalog {
         "required": .array([.string("path")])
     ])
 
+    private static let crashSymbolicateObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "crashPath": .object([
+                "type": .string("string"),
+                "description": .string("Absolute path to an authorized .crash or .ips report")
+            ]),
+            "artifacts": .object([
+                "type": .string("array"),
+                "description": .string("Up to 32 image-to-binary/dSYM mappings"),
+                "items": .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "imageName": .object(["type": .string("string")]),
+                        "binaryPath": .object(["type": .string("string")]),
+                        "architecture": .object(["type": .string("string")]),
+                        "loadAddress": .object(["type": .string("string")])
+                    ]),
+                    "required": .array([
+                        .string("binaryPath"),
+                        .string("architecture")
+                    ])
+                ])
+            ])
+        ]),
+        "required": .array([.string("crashPath"), .string("artifacts")])
+    ])
+
     private static let logShowObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1768,6 +1816,31 @@ enum ToolCatalog {
 
     private static func stringArray(from value: Value?) -> [String] {
         value?.arrayValue?.compactMap(\.stringValue) ?? []
+    }
+
+    private static func crashArtifacts(from value: Value?) -> [CrashSymbolicationArtifact]? {
+        guard let values = value?.arrayValue, !values.isEmpty, values.count <= 32 else {
+            return nil
+        }
+        var artifacts: [CrashSymbolicationArtifact] = []
+        for value in values {
+            guard let object = value.objectValue,
+                  let binaryPath = object["binaryPath"]?.stringValue,
+                  let architecture = object["architecture"]?.stringValue,
+                  !binaryPath.isEmpty,
+                  !architecture.isEmpty else {
+                return nil
+            }
+            artifacts.append(
+                CrashSymbolicationArtifact(
+                    imageName: object["imageName"]?.stringValue,
+                    binaryPath: binaryPath,
+                    architecture: architecture,
+                    loadAddress: object["loadAddress"]?.stringValue
+                )
+            )
+        }
+        return artifacts
     }
 
     private static func boolValue(from value: Value?, default defaultValue: Bool) -> Bool {

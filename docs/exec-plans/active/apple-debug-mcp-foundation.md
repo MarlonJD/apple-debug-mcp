@@ -46,6 +46,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 16:26Z) Make `apple_symbolicate` resolve `.app` executables and `.dSYM` DWARF payloads; verify symbolication against a temporary dSYM bundle.
 - [x] (2026-08-24 16:30Z) Add macOS CI checks and unsigned package artifact upload for pushes and pull requests; keep signing/notarization release-gated.
 - [x] (2026-08-24 16:40Z) Add typed `apple_debug_wait_for_stop` event synchronization after continue/step and verify it against the macOS fixture.
+- [x] (2026-08-24 17:16Z) Add multi-artifact crash-frame triage through `apple_crash_symbolicate`; verify per-frame output against the text crash fixture.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries

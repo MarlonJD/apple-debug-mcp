@@ -10,6 +10,7 @@ public enum CrashReportError: Error, Equatable, LocalizedError, Sendable {
     case fileTooLarge
     case invalidJSON
     case unsupportedFormat
+    case invalidRequest(String)
 
     public var errorDescription: String? {
         switch self {
@@ -23,6 +24,8 @@ public enum CrashReportError: Error, Equatable, LocalizedError, Sendable {
             return "The .ips crash report does not contain a valid JSON object."
         case .unsupportedFormat:
             return "Only Apple .crash text reports and .ips JSON reports are supported."
+        case .invalidRequest(let message):
+            return message
         }
     }
 }
@@ -112,6 +115,176 @@ public struct CrashReport: Codable, Equatable, Sendable {
         self.threads = threads
         self.images = images
         self.fields = fields
+    }
+}
+
+public struct CrashSymbolicationArtifact: Codable, Equatable, Sendable {
+    public let imageName: String?
+    public let binaryPath: String
+    public let architecture: String
+    public let loadAddress: String?
+
+    public init(
+        imageName: String? = nil,
+        binaryPath: String,
+        architecture: String,
+        loadAddress: String? = nil
+    ) {
+        self.imageName = imageName
+        self.binaryPath = binaryPath
+        self.architecture = architecture
+        self.loadAddress = loadAddress
+    }
+}
+
+public struct CrashSymbolicatedFrame: Codable, Equatable, Sendable {
+    public let threadID: Int
+    public let frameIndex: Int
+    public let image: String?
+    public let address: String?
+    public let originalSymbol: String?
+    public let artifactPath: String?
+    public let symbol: String?
+    public let error: String?
+
+    public init(
+        threadID: Int,
+        frameIndex: Int,
+        image: String?,
+        address: String?,
+        originalSymbol: String?,
+        artifactPath: String?,
+        symbol: String?,
+        error: String?
+    ) {
+        self.threadID = threadID
+        self.frameIndex = frameIndex
+        self.image = image
+        self.address = address
+        self.originalSymbol = originalSymbol
+        self.artifactPath = artifactPath
+        self.symbol = symbol
+        self.error = error
+    }
+}
+
+public struct CrashSymbolicationReport: Codable, Equatable, Sendable {
+    public let crash: CrashReport
+    public let artifacts: [CrashSymbolicationArtifact]
+    public let frames: [CrashSymbolicatedFrame]
+    public let unmatchedFrameCount: Int
+
+    public init(
+        crash: CrashReport,
+        artifacts: [CrashSymbolicationArtifact],
+        frames: [CrashSymbolicatedFrame],
+        unmatchedFrameCount: Int
+    ) {
+        self.crash = crash
+        self.artifacts = artifacts
+        self.frames = frames
+        self.unmatchedFrameCount = unmatchedFrameCount
+    }
+}
+
+public enum CrashSymbolicationService {
+    public static func symbolize(
+        path: String,
+        artifacts: [CrashSymbolicationArtifact]
+    ) throws -> CrashSymbolicationReport {
+        guard !artifacts.isEmpty, artifacts.count <= 32 else {
+            throw CrashReportError.invalidRequest("Crash symbolication requires between 1 and 32 artifacts.")
+        }
+        let crash = try CrashReportAnalyzer.inspect(path: path)
+        var frames: [CrashSymbolicatedFrame] = []
+        var unmatchedFrameCount = 0
+
+        for thread in crash.threads {
+            for frame in thread.frames {
+                let artifact = matchingArtifact(for: frame, artifacts: artifacts)
+                guard let artifact else {
+                    unmatchedFrameCount += 1
+                    frames.append(
+                        CrashSymbolicatedFrame(
+                            threadID: thread.id,
+                            frameIndex: frame.index,
+                            image: frame.image,
+                            address: frame.address,
+                            originalSymbol: frame.symbol,
+                            artifactPath: nil,
+                            symbol: nil,
+                            error: "No symbolication artifact matched this image."
+                        )
+                    )
+                    continue
+                }
+                guard let address = frame.address else {
+                    frames.append(
+                        CrashSymbolicatedFrame(
+                            threadID: thread.id,
+                            frameIndex: frame.index,
+                            image: frame.image,
+                            address: nil,
+                            originalSymbol: frame.symbol,
+                            artifactPath: artifact.binaryPath,
+                            symbol: nil,
+                            error: "Crash frame has no address."
+                        )
+                    )
+                    continue
+                }
+                do {
+                    let result = try SymbolicationService.symbolize(
+                        binaryPath: artifact.binaryPath,
+                        architecture: artifact.architecture,
+                        address: address,
+                        loadAddress: artifact.loadAddress
+                    )
+                    frames.append(
+                        CrashSymbolicatedFrame(
+                            threadID: thread.id,
+                            frameIndex: frame.index,
+                            image: frame.image,
+                            address: frame.address,
+                            originalSymbol: frame.symbol,
+                            artifactPath: artifact.binaryPath,
+                            symbol: result.symbol,
+                            error: nil
+                        )
+                    )
+                } catch {
+                    frames.append(
+                        CrashSymbolicatedFrame(
+                            threadID: thread.id,
+                            frameIndex: frame.index,
+                            image: frame.image,
+                            address: frame.address,
+                            originalSymbol: frame.symbol,
+                            artifactPath: artifact.binaryPath,
+                            symbol: nil,
+                            error: error.localizedDescription
+                        )
+                    )
+                }
+            }
+        }
+        return CrashSymbolicationReport(
+            crash: crash,
+            artifacts: artifacts,
+            frames: frames,
+            unmatchedFrameCount: unmatchedFrameCount
+        )
+    }
+
+    private static func matchingArtifact(
+        for frame: CrashFrame,
+        artifacts: [CrashSymbolicationArtifact]
+    ) -> CrashSymbolicationArtifact? {
+        if let image = frame.image,
+           let exact = artifacts.first(where: { $0.imageName == image }) {
+            return exact
+        }
+        return artifacts.count == 1 ? artifacts[0] : nil
     }
 }
 
