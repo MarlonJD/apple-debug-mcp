@@ -59,6 +59,8 @@ Physical-device mutation is disabled by default and additionally requires a pair
 
 Xcode build execution is disabled by default. Set APPLE_DEBUG_ALLOW_XCODE_BUILD=1 only for an explicitly selected project, scheme, configuration, and destination.
 
+The explicit Simulator smoke is available with make ios-fixture-smoke; it boots a selected available iOS Simulator, installs and launches the fixture, captures a screenshot, then terminates and shuts it down.
+
 Example MCP configuration after building:
 
 ```json
