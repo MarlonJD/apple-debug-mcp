@@ -1,0 +1,19 @@
+Process:               AppleDebugFixture [4242]
+Path:                  /tmp/AppleDebugFixture.app/Contents/MacOS/AppleDebugFixture
+Identifier:            com.burakkarahan.AppleDebugFixture
+Version:               1.0 (1)
+Code Type:             ARM-64 (Native)
+Parent Process:        apple-debug-mcp [1]
+Date/Time:             2026-08-24 06:00:00.0000 +0000
+OS Version:            macOS 26.0
+Exception Type:        EXC_BAD_ACCESS (SIGSEGV)
+Exception Codes:       KERN_INVALID_ADDRESS at 0x0000000000000000
+Termination Reason:    Namespace SIGNAL, Code 11 Segmentation fault: 11
+Triggered by Thread:  0
+
+Thread 0 Crashed:
+0   AppleDebugFixture             0x0000000100001000 main + 16
+1   libdyld.dylib                 0x0000000180000000 start + 4
+
+Thread 1:
+0   libsystem_pthread.dylib      0x0000000181000000 _pthread_start + 8
