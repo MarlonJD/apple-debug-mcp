@@ -1127,7 +1127,8 @@ enum ToolCatalog {
                         path: path,
                         scheme: scheme,
                         configuration: configuration,
-                        destination: destination
+                        destination: destination,
+                        derivedDataPath: params.arguments?["derivedDataPath"]?.stringValue
                     )
                 )
             } catch {
@@ -1787,7 +1788,11 @@ enum ToolCatalog {
             "path": .object(["type": .string("string")]),
             "scheme": .object(["type": .string("string")]),
             "configuration": .object(["type": .string("string")]),
-            "destination": .object(["type": .string("string")])
+            "destination": .object(["type": .string("string")]),
+            "derivedDataPath": .object([
+                "type": .string("string"),
+                "description": .string("Optional absolute derived-data directory; build results include discovered app and dSYM artifacts")
+            ])
         ]),
         "required": .array([.string("path"), .string("scheme"), .string("destination")])
     ])

@@ -6,6 +6,7 @@ import Foundation
 
 public enum XcodeError: Error, Equatable, LocalizedError, Sendable {
     case invalidProjectPath
+    case invalidBuildRequest
     case buildDisabled
     case commandFailed(String)
     case invalidResponse
@@ -14,6 +15,8 @@ public enum XcodeError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .invalidProjectPath:
             return "Path must point to an existing .xcodeproj or .xcworkspace."
+        case .invalidBuildRequest:
+            return "Xcode build scheme, configuration, destination, or derived-data path is invalid."
         case .buildDisabled:
             return "Xcode build is disabled. Set APPLE_DEBUG_ALLOW_XCODE_BUILD=1 for an authorized local build."
         case .commandFailed(let message):
@@ -36,11 +39,25 @@ public struct XcodeDiscoveryResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct XcodeBuildArtifact: Codable, Equatable, Sendable {
+    public let kind: String
+    public let path: String
+    public let exists: Bool
+
+    public init(kind: String, path: String, exists: Bool) {
+        self.kind = kind
+        self.path = path
+        self.exists = exists
+    }
+}
+
 public struct XcodeBuildResult: Codable, Equatable, Sendable {
     public let projectPath: String
     public let scheme: String
     public let configuration: String
     public let destination: String
+    public let derivedDataPath: String?
+    public let artifacts: [XcodeBuildArtifact]
     public let output: String
 
     public init(
@@ -48,17 +65,23 @@ public struct XcodeBuildResult: Codable, Equatable, Sendable {
         scheme: String,
         configuration: String,
         destination: String,
+        derivedDataPath: String?,
+        artifacts: [XcodeBuildArtifact],
         output: String
     ) {
         self.projectPath = projectPath
         self.scheme = scheme
         self.configuration = configuration
         self.destination = destination
+        self.derivedDataPath = derivedDataPath
+        self.artifacts = artifacts
         self.output = output
     }
 }
 
 public enum XcodeService {
+    private static let maximumCommandOutput = 16 * 1024 * 1024
+
     public static func discover(path: String) throws -> XcodeDiscoveryResult {
         let kind = try validateProject(path: path)
         let result = try run(arguments: [kind, path, "-list", "-json"])
@@ -73,25 +96,133 @@ public enum XcodeService {
         path: String,
         scheme: String,
         configuration: String,
-        destination: String
+        destination: String,
+        derivedDataPath: String? = nil
     ) throws -> XcodeBuildResult {
         guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_XCODE_BUILD"] == "1" else {
             throw XcodeError.buildDisabled
         }
+        guard !scheme.isEmpty, scheme.utf8.count <= 256,
+              !configuration.isEmpty, configuration.utf8.count <= 256,
+              !destination.isEmpty, destination.utf8.count <= 1_024,
+              !scheme.contains("\0"), !configuration.contains("\0"),
+              !destination.contains("\0") else {
+            throw XcodeError.invalidBuildRequest
+        }
+        if let derivedDataPath {
+            guard !derivedDataPath.isEmpty, derivedDataPath.utf8.count <= 4_096,
+                  !derivedDataPath.contains("\0"),
+                  URL(fileURLWithPath: derivedDataPath).path.hasPrefix("/") else {
+                throw XcodeError.invalidBuildRequest
+            }
+        }
         let kind = try validateProject(path: path)
-        let result = try run(arguments: [
+        var arguments = [
             kind, path,
             "-scheme", scheme,
             "-configuration", configuration,
             "-destination", destination,
-            "build"
-        ])
+        ]
+        if let derivedDataPath {
+            arguments += ["-derivedDataPath", derivedDataPath]
+        }
+        arguments.append("build")
+        let result = try run(arguments: arguments)
+        let settings = try showBuildSettings(
+            kind: kind,
+            path: path,
+            scheme: scheme,
+            configuration: configuration,
+            destination: destination,
+            derivedDataPath: derivedDataPath
+        )
         return XcodeBuildResult(
             projectPath: path,
             scheme: scheme,
             configuration: configuration,
             destination: destination,
+            derivedDataPath: derivedDataPath ?? settings.derivedDataPath,
+            artifacts: settings.artifacts,
             output: result.stdout
+        )
+    }
+
+    private struct BuildSettingsResult {
+        let derivedDataPath: String?
+        let artifacts: [XcodeBuildArtifact]
+    }
+
+    private static func showBuildSettings(
+        kind: String,
+        path: String,
+        scheme: String,
+        configuration: String,
+        destination: String,
+        derivedDataPath: String?
+    ) throws -> BuildSettingsResult {
+        var arguments = [
+            kind, path,
+            "-scheme", scheme,
+            "-configuration", configuration,
+            "-destination", destination
+        ]
+        if let derivedDataPath {
+            arguments += ["-derivedDataPath", derivedDataPath]
+        }
+        arguments += ["-showBuildSettings", "-json"]
+        let result = try run(arguments: arguments)
+        guard let data = result.stdout.data(using: .utf8),
+              let values = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw XcodeError.invalidResponse
+        }
+
+        var artifacts: [XcodeBuildArtifact] = []
+        var inferredDerivedDataPath: String?
+        for value in values {
+            guard let settings = value["buildSettings"] as? [String: Any] else { continue }
+            let buildProducts = settings["BUILT_PRODUCTS_DIR"] as? String
+            let productName = settings["FULL_PRODUCT_NAME"] as? String
+            if let buildProducts, let productName {
+                appendArtifact(
+                    kind: productName.hasSuffix(".app") ? "app" : "product",
+                    path: URL(fileURLWithPath: buildProducts).appendingPathComponent(productName).path,
+                    to: &artifacts
+                )
+            }
+            if let dsymDirectory = settings["DWARF_DSYM_FOLDER_PATH"] as? String,
+               let dsymName = settings["DWARF_DSYM_FILE_NAME"] as? String {
+                appendArtifact(
+                    kind: "dSYM",
+                    path: URL(fileURLWithPath: dsymDirectory).appendingPathComponent(dsymName).path,
+                    to: &artifacts
+                )
+            }
+            if inferredDerivedDataPath == nil,
+               let buildDirectory = settings["BUILD_DIR"] as? String {
+                inferredDerivedDataPath = URL(fileURLWithPath: buildDirectory)
+                    .deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    .path
+            }
+        }
+        return BuildSettingsResult(
+            derivedDataPath: inferredDerivedDataPath,
+            artifacts: artifacts
+        )
+    }
+
+    private static func appendArtifact(
+        kind: String,
+        path: String,
+        to artifacts: inout [XcodeBuildArtifact]
+    ) {
+        guard !artifacts.contains(where: { $0.path == path }) else { return }
+        artifacts.append(
+            XcodeBuildArtifact(
+                kind: kind,
+                path: path,
+                exists: FileManager.default.fileExists(atPath: path)
+            )
         )
     }
 
@@ -117,26 +248,38 @@ public enum XcodeService {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
         process.arguments = arguments
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-xcode-\(UUID().uuidString).stdout")
+        let errorURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-xcode-\(UUID().uuidString).stderr")
+        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
+        defer {
+            try? FileManager.default.removeItem(at: outputURL)
+            try? FileManager.default.removeItem(at: errorURL)
+        }
 
         do {
+            let outputHandle = try FileHandle(forWritingTo: outputURL)
+            let errorHandle = try FileHandle(forWritingTo: errorURL)
+            process.standardOutput = outputHandle
+            process.standardError = errorHandle
             try process.run()
             process.waitUntilExit()
+            try outputHandle.close()
+            try errorHandle.close()
         } catch {
             throw XcodeError.commandFailed(error.localizedDescription)
         }
 
-        let stdout = String(
-            data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        let stderr = String(
-            data: errorPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
+        let stdoutData = try Data(contentsOf: outputURL)
+        let stderrData = try Data(contentsOf: errorURL)
+        guard stdoutData.count <= maximumCommandOutput,
+              stderrData.count <= maximumCommandOutput else {
+            throw XcodeError.commandFailed("xcodebuild output exceeds the 16 MB analysis limit.")
+        }
+        let stdout = String(decoding: stdoutData, as: UTF8.self)
+        let stderr = String(decoding: stderrData, as: UTF8.self)
         guard process.terminationStatus == 0 else {
             throw XcodeError.commandFailed(
                 stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? stdout : stderr

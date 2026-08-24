@@ -17,7 +17,7 @@ The current product surface includes:
 - `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
 - crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
-- Xcode project discovery and explicitly authorized builds;
+- Xcode project discovery and explicitly authorized builds with derived-data, `.app`, and `.dSYM` artifact manifests;
 - CoreDevice physical-device inventory plus authorization-gated development-app install/launch.
 
 The server is intentionally local and capability-aware. It does not provide arbitrary shell execution, bypass Apple signing or entitlements, or attach to stock App Store applications without an authorized development boundary.

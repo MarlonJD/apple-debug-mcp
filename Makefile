@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke package release-package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke xcode-artifact-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -23,6 +23,9 @@ ios-mcp-tool-smoke:
 
 ios-ui-tree-smoke:
 	APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1 python3 ./scripts/ios_ui_tree_smoke.py
+
+xcode-artifact-smoke: build
+	APPLE_DEBUG_ALLOW_XCODE_BUILD=1 python3 ./scripts/xcode_artifact_smoke.py
 
 package:
 	./scripts/package_macos.sh
