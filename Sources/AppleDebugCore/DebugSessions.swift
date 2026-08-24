@@ -112,6 +112,16 @@ public struct DebugSessionSummary: Codable, Equatable, Sendable {
     }
 }
 
+public struct RegisterSnapshot: Codable, Equatable, Sendable {
+    public let scopes: DAPMessage
+    public let variables: DAPMessage?
+
+    public init(scopes: DAPMessage, variables: DAPMessage?) {
+        self.scopes = scopes
+        self.variables = variables
+    }
+}
+
 public actor DebugSessionManager {
     private struct SessionRecord {
         let session: LLDBDAPSession
@@ -199,16 +209,68 @@ public actor DebugSessionManager {
         return try await record.session.attach(processID: processID)
     }
 
-    public func setBreakpoint(sessionID: String, file: String, line: Int) async throws -> DAPMessage {
+    public func setBreakpoint(
+        sessionID: String,
+        file: String,
+        line: Int,
+        condition: String? = nil,
+        hitCondition: String? = nil,
+        logMessage: String? = nil
+    ) async throws -> DAPMessage {
         try DebugPolicy.validatePositive(line, label: "Breakpoint line")
+        guard !file.isEmpty, file.utf8.count <= 4_096 else {
+            throw DebugPolicyError.invalidRequest("Breakpoint source path is invalid.")
+        }
+        if let condition { try DebugPolicy.validateExpression(condition) }
+        if let hitCondition { try DebugPolicy.validateExpression(hitCondition) }
+        if let logMessage { try DebugPolicy.validateExpression(logMessage) }
+        var breakpoint: [String: DAPValue] = ["line": .integer(line)]
+        if let condition { breakpoint["condition"] = .string(condition) }
+        if let hitCondition { breakpoint["hitCondition"] = .string(hitCondition) }
+        if let logMessage { breakpoint["logMessage"] = .string(logMessage) }
         let session = try session(for: sessionID)
         return try await session.send(
             command: "setBreakpoints",
             arguments: .object([
                 "source": .object(["path": .string(file)]),
                 "breakpoints": .array([
-                    .object(["line": .integer(line)])
+                    .object(breakpoint)
                 ])
+            ])
+        )
+    }
+
+    public func setFunctionBreakpoints(
+        sessionID: String,
+        name: String,
+        condition: String? = nil,
+        hitCondition: String? = nil
+    ) async throws -> DAPMessage {
+        guard !name.isEmpty, name.utf8.count <= 4_096 else {
+            throw DebugPolicyError.invalidRequest("Function breakpoint name is invalid.")
+        }
+        if let condition { try DebugPolicy.validateExpression(condition) }
+        if let hitCondition { try DebugPolicy.validateExpression(hitCondition) }
+        var breakpoint: [String: DAPValue] = ["name": .string(name)]
+        if let condition { breakpoint["condition"] = .string(condition) }
+        if let hitCondition { breakpoint["hitCondition"] = .string(hitCondition) }
+        return try await session(for: sessionID).send(
+            command: "setFunctionBreakpoints",
+            arguments: .object([
+                "breakpoints": .array([.object(breakpoint)])
+            ])
+        )
+    }
+
+    public func setExceptionBreakpoints(sessionID: String, filters: [String]) async throws -> DAPMessage {
+        guard filters.count <= 32,
+              filters.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw DebugPolicyError.invalidRequest("Exception breakpoint filters are invalid.")
+        }
+        return try await session(for: sessionID).send(
+            command: "setExceptionBreakpoints",
+            arguments: .object([
+                "filters": .array(filters.map(DAPValue.string))
             ])
         )
     }
@@ -304,6 +366,35 @@ public actor DebugSessionManager {
         )
     }
 
+    public func registers(sessionID: String, frameID: Int) async throws -> RegisterSnapshot {
+        let session = try session(for: sessionID)
+        let scopes = try await session.send(
+            command: "scopes",
+            arguments: .object(["frameId": .integer(frameID)])
+        )
+        guard case .object(let body) = scopes.body,
+              case .array(let scopeValues) = body["scopes"] else {
+            return RegisterSnapshot(scopes: scopes, variables: nil)
+        }
+        let registerReference = scopeValues.compactMap { value -> Int? in
+            guard case .object(let scope) = value,
+                  case .string(let name) = scope["name"],
+                  name.lowercased().contains("register"),
+                  case .integer(let reference) = scope["variablesReference"] else {
+                return nil
+            }
+            return reference
+        }.first
+        guard let registerReference else {
+            return RegisterSnapshot(scopes: scopes, variables: nil)
+        }
+        let variables = try await session.send(
+            command: "variables",
+            arguments: .object(["variablesReference": .integer(registerReference)])
+        )
+        return RegisterSnapshot(scopes: scopes, variables: variables)
+    }
+
     public func evaluate(
         sessionID: String,
         expression: String,
@@ -322,6 +413,48 @@ public actor DebugSessionManager {
         return try await session(for: sessionID).send(
             command: "evaluate",
             arguments: .object(arguments)
+        )
+    }
+
+    public func modules(
+        sessionID: String,
+        startModule: Int?,
+        moduleCount: Int?
+    ) async throws -> DAPMessage {
+        var arguments: [String: DAPValue] = [:]
+        if let startModule {
+            try DebugPolicy.validateNonNegative(startModule, label: "Module start")
+            arguments["startModule"] = .integer(startModule)
+        }
+        if let moduleCount {
+            try DebugPolicy.validatePositive(moduleCount, label: "Module count", maximum: 10_000)
+            arguments["moduleCount"] = .integer(moduleCount)
+        }
+        return try await session(for: sessionID).send(
+            command: "modules",
+            arguments: arguments.isEmpty ? nil : .object(arguments)
+        )
+    }
+
+    public func exceptionInfo(sessionID: String, threadID: Int) async throws -> DAPMessage {
+        try DebugPolicy.validatePositive(threadID, label: "Thread ID")
+        return try await session(for: sessionID).send(
+            command: "exceptionInfo",
+            arguments: .object(["threadId": .integer(threadID)])
+        )
+    }
+
+    public func terminate(sessionID: String, terminateDebuggee: Bool) async throws -> DAPMessage {
+        try await session(for: sessionID).send(
+            command: "terminate",
+            arguments: .object(["terminateDebuggee": .boolean(terminateDebuggee)])
+        )
+    }
+
+    public func disconnect(sessionID: String, terminateDebuggee: Bool) async throws -> DAPMessage {
+        try await session(for: sessionID).send(
+            command: "disconnect",
+            arguments: .object(["terminateDebuggee": .boolean(terminateDebuggee)])
         )
     }
 

@@ -78,9 +78,25 @@ def main() -> int:
         session_id = json.loads(created["result"]["content"][0]["text"])["sessionID"]
         source_path = str(root / "Tests" / "Fixtures" / "debug_target.c")
 
+        tool(
+            "apple_debug_set_function_breakpoint",
+            {"sessionID": session_id, "name": "main", "hitCondition": "1"},
+        )
+        tool(
+            "apple_debug_set_exception_breakpoints",
+            {"sessionID": session_id, "filters": ["cpp_throw"]},
+        )
+
         breakpoint_result = tool(
             "apple_debug_set_breakpoint",
-            {"sessionID": session_id, "file": source_path, "line": 10},
+            {
+                "sessionID": session_id,
+                "file": source_path,
+                "line": 10,
+                "condition": "1 == 1",
+                "hitCondition": "1",
+                "logMessage": "fixture breakpoint",
+            },
         )
         if "breakpoints" not in breakpoint_result["result"]["content"][0]["text"]:
             raise RuntimeError("breakpoint response did not contain breakpoints")
@@ -99,6 +115,7 @@ def main() -> int:
         if not threads:
             raise RuntimeError("debugger returned no threads")
         thread_id = threads[0]["id"]
+        tool("apple_debug_modules", {"sessionID": session_id, "moduleCount": 100})
 
         stack = json.loads(
             tool(
@@ -122,6 +139,11 @@ def main() -> int:
                 "apple_debug_variables",
                 {"sessionID": session_id, "variablesReference": variables_reference},
             )
+        registers = json.loads(
+            tool("apple_debug_registers", {"sessionID": session_id, "frameID": frame_id})["result"]["content"][0]["text"]
+        )
+        if "scopes" not in registers:
+            raise RuntimeError("register snapshot did not contain scopes")
         tool(
             "apple_debug_evaluate",
             {"sessionID": session_id, "expression": "1 + 1", "frameID": frame_id},
@@ -146,7 +168,7 @@ def main() -> int:
         if not closed.get("closed"):
             raise RuntimeError("debug session did not close")
         session_id = None
-        print("fixture-smoke: launch, breakpoint, threads, stack, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup passed")
+        print("fixture-smoke: launch, breakpoints, exceptions, modules, threads, stack, registers, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup passed")
         return 0
     except Exception as error:
         print(f"fixture-smoke: {error}", file=sys.stderr)

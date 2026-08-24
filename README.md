@@ -5,9 +5,9 @@ Apple Debug MCP is a local, GPL-licensed MCP server for AI-assisted debugging an
 The current product surface includes:
 
 - macOS LLDB-DAP launch and attach sessions;
-- source breakpoints, threads, stack traces, scopes, variables, stepping, pause/continue, disassembly, and bounded memory reads;
+- source/function/exception breakpoints, threads, stack traces, scopes, registers, variables, modules, stepping, pause/continue, disassembly, and bounded memory reads;
 - watchpoint plumbing through DAP data breakpoints;
-- explicitly authorized expression evaluation and memory writes;
+- explicitly authorized expression evaluation and memory writes, plus target terminate/disconnect control;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - `atos` symbolication and `.crash`/`.ips` crash-report inspection;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;

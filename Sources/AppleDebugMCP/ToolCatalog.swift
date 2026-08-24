@@ -65,8 +65,18 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_debug_set_breakpoint",
-            description: "Set a source-line breakpoint in an active debug session.",
+            description: "Set a source-line breakpoint with optional condition, hit condition, or log message.",
             inputSchema: breakpointObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_set_function_breakpoint",
+            description: "Set a function breakpoint with optional condition or hit condition.",
+            inputSchema: functionBreakpointObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_set_exception_breakpoints",
+            description: "Configure exception breakpoint filters supported by LLDB-DAP.",
+            inputSchema: exceptionBreakpointObjectSchema
         ),
         Tool(
             name: "apple_debug_threads",
@@ -114,6 +124,21 @@ enum ToolCatalog {
             inputSchema: variablesObjectSchema
         ),
         Tool(
+            name: "apple_debug_registers",
+            description: "Read the register scope and register variables for a stopped stack frame.",
+            inputSchema: frameObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_modules",
+            description: "List loaded modules/images in an active debug session.",
+            inputSchema: moduleObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_exception_info",
+            description: "Read exception information for a stopped thread.",
+            inputSchema: threadObjectSchema
+        ),
+        Tool(
             name: "apple_debug_evaluate",
             description: "Evaluate an expression in a stopped frame. Disabled unless APPLE_DEBUG_ALLOW_EVALUATE=1.",
             inputSchema: evaluateObjectSchema
@@ -132,6 +157,16 @@ enum ToolCatalog {
             name: "apple_debug_write_memory",
             description: "Write up to 4096 bytes to a stopped target. Disabled unless APPLE_DEBUG_ALLOW_MEMORY_WRITE=1.",
             inputSchema: writeMemoryObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_terminate",
+            description: "Request target termination through LLDB-DAP.",
+            inputSchema: terminateObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_disconnect",
+            description: "Disconnect the LLDB-DAP session with an explicit terminate-debuggee choice.",
+            inputSchema: terminateObjectSchema
         ),
         Tool(
             name: "apple_simulator_list",
@@ -347,7 +382,47 @@ enum ToolCatalog {
                 return errorResult("Missing required sessionID, file, or line argument.")
             }
             do {
-                return result(for: try await sessions.setBreakpoint(sessionID: sessionID, file: file, line: line))
+                return result(
+                    for: try await sessions.setBreakpoint(
+                        sessionID: sessionID,
+                        file: file,
+                        line: line,
+                        condition: params.arguments?["condition"]?.stringValue,
+                        hitCondition: params.arguments?["hitCondition"]?.stringValue,
+                        logMessage: params.arguments?["logMessage"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_set_function_breakpoint":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let name = params.arguments?["name"]?.stringValue else {
+                return errorResult("Missing required sessionID or name argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.setFunctionBreakpoints(
+                        sessionID: sessionID,
+                        name: name,
+                        condition: params.arguments?["condition"]?.stringValue,
+                        hitCondition: params.arguments?["hitCondition"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_set_exception_breakpoints":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.setExceptionBreakpoints(
+                        sessionID: sessionID,
+                        filters: stringArray(from: params.arguments?["filters"])
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -446,6 +521,41 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_debug_registers":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let frameID = intValue(from: params.arguments?["frameID"]) else {
+                return errorResult("Missing required sessionID or frameID argument.")
+            }
+            do {
+                return result(for: try await sessions.registers(sessionID: sessionID, frameID: frameID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_modules":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.modules(
+                        sessionID: sessionID,
+                        startModule: intValue(from: params.arguments?["startModule"]),
+                        moduleCount: intValue(from: params.arguments?["moduleCount"])
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_exception_info":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let threadID = intValue(from: params.arguments?["threadID"]) else {
+                return errorResult("Missing required sessionID or threadID argument.")
+            }
+            do {
+                return result(for: try await sessions.exceptionInfo(sessionID: sessionID, threadID: threadID))
+            } catch {
+                return errorResult(error)
+            }
         case "apple_debug_evaluate":
             guard let sessionID = params.arguments?["sessionID"]?.stringValue,
                   let expression = params.arguments?["expression"]?.stringValue else {
@@ -512,6 +622,28 @@ enum ToolCatalog {
                         data: data
                     )
                 )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_terminate", "apple_debug_disconnect":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            let terminateDebuggee = boolValue(
+                from: params.arguments?["terminateDebuggee"],
+                default: params.name == "apple_debug_terminate"
+            )
+            do {
+                let response = params.name == "apple_debug_terminate"
+                    ? try await sessions.terminate(
+                        sessionID: sessionID,
+                        terminateDebuggee: terminateDebuggee
+                    )
+                    : try await sessions.disconnect(
+                        sessionID: sessionID,
+                        terminateDebuggee: terminateDebuggee
+                    )
+                return result(for: response)
             } catch {
                 return errorResult(error)
             }
@@ -855,9 +987,35 @@ enum ToolCatalog {
         "properties": .object([
             "sessionID": .object(["type": .string("string")]),
             "file": .object(["type": .string("string")]),
-            "line": .object(["type": .string("integer")])
+            "line": .object(["type": .string("integer")]),
+            "condition": .object(["type": .string("string")]),
+            "hitCondition": .object(["type": .string("string")]),
+            "logMessage": .object(["type": .string("string")])
         ]),
         "required": .array([.string("sessionID"), .string("file"), .string("line")])
+    ])
+
+    private static let functionBreakpointObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "name": .object(["type": .string("string")]),
+            "condition": .object(["type": .string("string")]),
+            "hitCondition": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("sessionID"), .string("name")])
+    ])
+
+    private static let exceptionBreakpointObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "filters": .object([
+                "type": .string("array"),
+                "items": .object(["type": .string("string")])
+            ])
+        ]),
+        "required": .array([.string("sessionID"), .string("filters")])
     ])
 
     private static let threadObjectSchema: Value = .object([
@@ -898,6 +1056,16 @@ enum ToolCatalog {
             "variablesReference": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("sessionID"), .string("variablesReference")])
+    ])
+
+    private static let moduleObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "startModule": .object(["type": .string("integer")]),
+            "moduleCount": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID")])
     ])
 
     private static let evaluateObjectSchema: Value = .object([
@@ -946,6 +1114,15 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("sessionID"), .string("memoryReference"), .string("data")])
+    ])
+
+    private static let terminateObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "terminateDebuggee": .object(["type": .string("boolean")])
+        ]),
+        "required": .array([.string("sessionID")])
     ])
 
     private static let stackTraceObjectSchema: Value = .object([

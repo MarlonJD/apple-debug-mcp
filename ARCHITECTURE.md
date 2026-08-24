@@ -32,7 +32,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `AppleDebugCore` does not depend on MCP, so policy, parsing, and platform adapters remain testable without a transport.
 
 - `LLDBDAPSession`: owns one LLDB-DAP subprocess, DAP framing, request/response matching, event draining, and teardown.
-- `DebugSessionManager`: owns session IDs and routes launch, attach, breakpoints, inspection, stepping, watchpoints, evaluation, and memory writes through policy checks. Physical sessions initialize LLDB with a validated `device select <UUID>` command and remain separately gated.
+- `DebugSessionManager`: owns session IDs and routes launch, attach, source/function/exception breakpoints, inspection, registers, modules, stepping, watchpoints, evaluation, memory writes, and target lifecycle through policy checks. Physical sessions initialize LLDB with a validated `device select <UUID>` command and remain separately gated.
 - `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results.
