@@ -464,16 +464,28 @@ public actor DebugSessionManager {
         )
     }
 
-    public func setExceptionBreakpoints(sessionID: String, filters: [String]) async throws -> DAPMessage {
+    public func setExceptionBreakpoints(
+        sessionID: String,
+        filters: [String],
+        filterOptions: [DAPValue] = []
+    ) async throws -> DAPMessage {
         guard filters.count <= 32,
               filters.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
             throw DebugPolicyError.invalidRequest("Exception breakpoint filters are invalid.")
         }
+        guard filterOptions.count <= 32,
+              filterOptions.allSatisfy(exceptionFilterOptionIsValid) else {
+            throw DebugPolicyError.invalidRequest("Exception breakpoint filter options are invalid.")
+        }
+        var arguments: [String: DAPValue] = [
+            "filters": .array(filters.map(DAPValue.string))
+        ]
+        if !filterOptions.isEmpty {
+            arguments["filterOptions"] = .array(filterOptions)
+        }
         return try await session(for: sessionID).send(
             command: "setExceptionBreakpoints",
-            arguments: .object([
-                "filters": .array(filters.map(DAPValue.string))
-            ])
+            arguments: .object(arguments)
         )
     }
 
@@ -481,15 +493,25 @@ public actor DebugSessionManager {
         try await session(for: sessionID).send(command: "threads")
     }
 
-    public func stackTrace(sessionID: String, threadID: Int, levels: Int) async throws -> DAPMessage {
+    public func stackTrace(
+        sessionID: String,
+        threadID: Int,
+        levels: Int,
+        startFrame: Int? = nil
+    ) async throws -> DAPMessage {
         try DebugPolicy.validatePositive(threadID, label: "Thread ID")
         try DebugPolicy.validatePositive(levels, label: "Stack levels", maximum: 1_000)
+        var arguments: [String: DAPValue] = [
+            "threadId": .integer(threadID),
+            "levels": .integer(levels)
+        ]
+        if let startFrame {
+            try DebugPolicy.validateNonNegative(startFrame, label: "Stack start frame")
+            arguments["startFrame"] = .integer(startFrame)
+        }
         return try await session(for: sessionID).send(
             command: "stackTrace",
-            arguments: .object([
-                "threadId": .integer(threadID),
-                "levels": .integer(levels)
-            ])
+            arguments: .object(arguments)
         )
     }
 
@@ -564,10 +586,31 @@ public actor DebugSessionManager {
         )
     }
 
-    public func variables(sessionID: String, variablesReference: Int) async throws -> DAPMessage {
-        try await session(for: sessionID).send(
+    public func variables(
+        sessionID: String,
+        variablesReference: Int,
+        start: Int? = nil,
+        count: Int? = nil,
+        formatHex: Bool? = nil
+    ) async throws -> DAPMessage {
+        try DebugPolicy.validatePositive(variablesReference, label: "Variables reference")
+        var arguments: [String: DAPValue] = [
+            "variablesReference": .integer(variablesReference)
+        ]
+        if let start {
+            try DebugPolicy.validateNonNegative(start, label: "Variables start")
+            arguments["start"] = .integer(start)
+        }
+        if let count {
+            try DebugPolicy.validatePositive(count, label: "Variables count", maximum: 10_000)
+            arguments["count"] = .integer(count)
+        }
+        if let formatHex {
+            arguments["format"] = .object(["hex": .boolean(formatHex)])
+        }
+        return try await session(for: sessionID).send(
             command: "variables",
-            arguments: .object(["variablesReference": .integer(variablesReference)])
+            arguments: .object(arguments)
         )
     }
 
@@ -1050,6 +1093,18 @@ public actor DebugSessionManager {
             arguments: .object(["variablesReference": .integer(registerReference)])
         )
         return RegisterSnapshot(scopes: scopes, variables: variables)
+    }
+
+    private func exceptionFilterOptionIsValid(_ value: DAPValue) -> Bool {
+        guard case .object(let object) = value,
+              case .string(let filter) = object["filter"],
+              !filter.isEmpty, filter.utf8.count <= 256 else {
+            return false
+        }
+        if case .string(let condition)? = object["condition"] {
+            return (try? DebugPolicy.validateExpression(condition)) != nil
+        }
+        return object["condition"] == nil
     }
 
     private func sendWriteMemory(

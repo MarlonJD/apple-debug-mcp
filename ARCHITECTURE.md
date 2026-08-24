@@ -52,7 +52,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 4. `apple_toolchain_status` probes a fixed allowlist through `xcrun`/`xcode-select`.
 5. `apple_lldb_dap_initialize` starts LLDB-DAP, completes initialization, drains events, and tears down the probe adapter.
 6. `apple_debug_session_create` creates an owned persistent adapter session.
-7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, stack, scopes, variables, memory, disassembly, stepping, watchpoints, evaluation, memory search/patch, and continuation.
+7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, paged stack/variables, exception filter options, memory, disassembly, stepping, watchpoints, evaluation, memory search/patch, and continuation.
 8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
 9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_binary_diff`, `apple_symbolicate`, `apple_crash_inspect`, and `apple_crash_symbolicate` analyze local artifacts without launching them.
 10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.

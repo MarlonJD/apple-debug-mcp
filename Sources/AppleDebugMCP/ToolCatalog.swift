@@ -604,11 +604,21 @@ enum ToolCatalog {
             guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
                 return errorResult("Missing required sessionID argument.")
             }
+            let filterOptions: [DAPValue]
+            if let rawFilterOptions = params.arguments?["filterOptions"] {
+                guard let converted = dapValueArray(from: rawFilterOptions) else {
+                    return errorResult("filterOptions must be an array of valid objects.")
+                }
+                filterOptions = converted
+            } else {
+                filterOptions = []
+            }
             do {
                 return result(
                     for: try await sessions.setExceptionBreakpoints(
                         sessionID: sessionID,
-                        filters: stringArray(from: params.arguments?["filters"])
+                        filters: stringArray(from: params.arguments?["filters"]),
+                        filterOptions: filterOptions
                     )
                 )
             } catch {
@@ -630,7 +640,14 @@ enum ToolCatalog {
             }
             let levels = intValue(from: params.arguments?["levels"]) ?? 100
             do {
-                return result(for: try await sessions.stackTrace(sessionID: sessionID, threadID: threadID, levels: levels))
+                return result(
+                    for: try await sessions.stackTrace(
+                        sessionID: sessionID,
+                        threadID: threadID,
+                        levels: levels,
+                        startFrame: intValue(from: params.arguments?["startFrame"])
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -721,7 +738,15 @@ enum ToolCatalog {
                 return errorResult("Missing required sessionID or variablesReference argument.")
             }
             do {
-                return result(for: try await sessions.variables(sessionID: sessionID, variablesReference: variablesReference))
+                return result(
+                    for: try await sessions.variables(
+                        sessionID: sessionID,
+                        variablesReference: variablesReference,
+                        start: intValue(from: params.arguments?["start"]),
+                        count: intValue(from: params.arguments?["count"]),
+                        formatHex: params.arguments?["formatHex"]?.boolValue
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1513,6 +1538,17 @@ enum ToolCatalog {
             "filters": .object([
                 "type": .string("array"),
                 "items": .object(["type": .string("string")])
+            ]),
+            "filterOptions": .object([
+                "type": .string("array"),
+                "items": .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "filter": .object(["type": .string("string")]),
+                        "condition": .object(["type": .string("string")])
+                    ]),
+                    "required": .array([.string("filter")])
+                ])
             ])
         ]),
         "required": .array([.string("sessionID"), .string("filters")])
@@ -1557,7 +1593,10 @@ enum ToolCatalog {
         "type": .string("object"),
         "properties": .object([
             "sessionID": .object(["type": .string("string")]),
-            "variablesReference": .object(["type": .string("integer")])
+            "variablesReference": .object(["type": .string("integer")]),
+            "start": .object(["type": .string("integer")]),
+            "count": .object(["type": .string("integer")]),
+            "formatHex": .object(["type": .string("boolean")])
         ]),
         "required": .array([.string("sessionID"), .string("variablesReference")])
     ])
@@ -1729,7 +1768,8 @@ enum ToolCatalog {
         "properties": .object([
             "sessionID": .object(["type": .string("string")]),
             "threadID": .object(["type": .string("integer")]),
-            "levels": .object(["type": .string("integer")])
+            "levels": .object(["type": .string("integer")]),
+            "startFrame": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("sessionID"), .string("threadID")])
     ])
@@ -2034,6 +2074,33 @@ enum ToolCatalog {
             )
         }
         return artifacts
+    }
+
+    private static func dapValueArray(from value: Value) -> [DAPValue]? {
+        guard let values = value.arrayValue else { return nil }
+        let converted = values.compactMap(dapValue(from:))
+        return converted.count == values.count ? converted : nil
+    }
+
+    private static func dapValue(from value: Value) -> DAPValue? {
+        switch value {
+        case .null:
+            return .null
+        case .bool(let value):
+            return .boolean(value)
+        case .int(let value):
+            return .integer(value)
+        case .double(let value):
+            return .double(value)
+        case .string(let value):
+            return .string(value)
+        case .data(_, let data):
+            return .string(data.base64EncodedString())
+        case .array(let values):
+            return .array(values.compactMap(dapValue(from:)))
+        case .object(let object):
+            return .object(object.compactMapValues(dapValue(from:)))
+        }
     }
 
     private static func boolValue(from value: Value?, default defaultValue: Bool) -> Bool {

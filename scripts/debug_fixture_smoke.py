@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 
 def main() -> int:
@@ -29,12 +30,15 @@ def main() -> int:
         stderr=subprocess.PIPE,
         text=True,
     )
+    time.sleep(0.2)
     sequence = 0
     session_id = None
+    last_request = "startup"
 
     def request(method: str, params: dict) -> dict:
-        nonlocal sequence
+        nonlocal sequence, last_request
         sequence += 1
+        last_request = f"{method}#{sequence}"
         assert process.stdin is not None
         process.stdin.write(
             json.dumps(
@@ -48,7 +52,10 @@ def main() -> int:
         while True:
             line = process.stdout.readline()
             if not line:
-                raise RuntimeError("MCP server exited before returning a response")
+                assert process.stderr is not None
+                stderr = process.stderr.read().strip()
+                detail = f"; stderr: {stderr[:2_000]}" if stderr else ""
+                raise RuntimeError(f"MCP server exited during {last_request}{detail}")
             message = json.loads(line)
             if message.get("id") == sequence:
                 return message
@@ -133,7 +140,7 @@ def main() -> int:
         stack = json.loads(
             tool(
                 "apple_debug_stack_trace",
-                {"sessionID": session_id, "threadID": thread_id, "levels": 5},
+                {"sessionID": session_id, "threadID": thread_id, "levels": 5, "startFrame": 0},
             )["result"]["content"][0]["text"]
         )["body"]["stackFrames"]
         if not stack:
@@ -154,7 +161,13 @@ def main() -> int:
         if variables_reference:
             tool(
                 "apple_debug_variables",
-                {"sessionID": session_id, "variablesReference": variables_reference},
+                {
+                    "sessionID": session_id,
+                    "variablesReference": variables_reference,
+                    "start": 0,
+                    "count": 10,
+                    "formatHex": True,
+                },
             )
         registers = json.loads(
             tool("apple_debug_registers", {"sessionID": session_id, "frameID": frame_id})["result"]["content"][0]["text"]
