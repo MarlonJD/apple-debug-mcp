@@ -50,9 +50,10 @@ make fixture
 make ios-fixture
 make ios-fixture-smoke
 make ios-debug-fixture-smoke
+make ios-mcp-tool-smoke
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The two iOS targets are explicit Simulator mutation workflows and boot, install, launch, inspect, and shut down a selected local device.
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP boot/install/launch/app-info/container/screenshot/terminate path end to end.
 
 ## Run
 

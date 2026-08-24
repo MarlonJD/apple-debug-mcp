@@ -7,6 +7,7 @@ import Foundation
 public enum SimulatorError: Error, Equatable, LocalizedError, Sendable {
     case commandFailed(String)
     case mutationDisabled
+    case invalidLaunchArguments
     case unknownDevice(String)
     case invalidResponse
 
@@ -16,6 +17,8 @@ public enum SimulatorError: Error, Equatable, LocalizedError, Sendable {
             return "Simulator command failed: \(message)"
         case .mutationDisabled:
             return "Simulator mutation is disabled. Set APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1 for an authorized local workflow."
+        case .invalidLaunchArguments:
+            return "Simulator launch arguments are invalid or exceed the safety limit."
         case .unknownDevice(let identifier):
             return "Simulator is not in the available inventory: \(identifier)"
         case .invalidResponse:
@@ -52,6 +55,32 @@ public struct SimulatorActionResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct SimulatorAppInfoResult: Codable, Equatable, Sendable {
+    public let udid: String
+    public let bundleID: String
+    public let output: String
+
+    public init(udid: String, bundleID: String, output: String) {
+        self.udid = udid
+        self.bundleID = bundleID
+        self.output = output
+    }
+}
+
+public struct SimulatorContainerResult: Codable, Equatable, Sendable {
+    public let udid: String
+    public let bundleID: String
+    public let container: String
+    public let path: String
+
+    public init(udid: String, bundleID: String, container: String, path: String) {
+        self.udid = udid
+        self.bundleID = bundleID
+        self.container = container
+        self.path = path
+    }
+}
+
 public enum SimulatorService {
     public static func list() throws -> [SimulatorDevice] {
         let result = try run(arguments: ["simctl", "list", "devices", "available", "--json"])
@@ -82,7 +111,16 @@ public enum SimulatorService {
     }
 
     public static func boot(udid: String) throws -> SimulatorActionResult {
-        try mutate(action: "boot", udid: udid, arguments: ["simctl", "boot", udid])
+        try validateMutationTarget(udid: udid)
+        let boot = try run(arguments: ["simctl", "boot", udid])
+        let status = try run(arguments: ["simctl", "bootstatus", udid, "-b"])
+        return SimulatorActionResult(
+            action: "boot",
+            udid: udid,
+            output: [boot.stdout, status.stdout]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
+        )
     }
 
     public static func shutdown(udid: String) throws -> SimulatorActionResult {
@@ -93,8 +131,28 @@ public enum SimulatorService {
         try mutate(action: "install", udid: udid, arguments: ["simctl", "install", udid, appPath])
     }
 
-    public static func launch(udid: String, bundleID: String) throws -> SimulatorActionResult {
-        try mutate(action: "launch", udid: udid, arguments: ["simctl", "launch", udid, bundleID])
+    public static func launch(
+        udid: String,
+        bundleID: String,
+        arguments: [String] = [],
+        terminateRunning: Bool = false,
+        waitForDebugger: Bool = false
+    ) throws -> SimulatorActionResult {
+        guard arguments.count <= 64,
+              arguments.allSatisfy({ !$0.contains("\0") && $0.utf8.count <= 4096 }) else {
+            throw SimulatorError.invalidLaunchArguments
+        }
+        var command = ["simctl", "launch"]
+        if waitForDebugger {
+            command.append("--wait-for-debugger")
+        }
+        if terminateRunning {
+            command.append("--terminate-running-process")
+        }
+        command.append(udid)
+        command.append(bundleID)
+        command.append(contentsOf: arguments)
+        return try mutate(action: "launch", udid: udid, arguments: command)
     }
 
     public static func terminate(udid: String, bundleID: String) throws -> SimulatorActionResult {
@@ -110,10 +168,34 @@ public enum SimulatorService {
         }
 
         let destination = path ?? FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-(UUID().uuidString).png")
+            .appendingPathComponent("apple-debug-mcp-\(UUID().uuidString).png")
             .path
         let result = try run(arguments: ["simctl", "io", udid, "screenshot", destination])
         return SimulatorActionResult(action: "screenshot", udid: udid, output: result.stdout.isEmpty ? destination : result.stdout)
+    }
+
+    public static func appInfo(udid: String, bundleID: String) throws -> SimulatorAppInfoResult {
+        guard try list().contains(where: { $0.udid == udid }) else {
+            throw SimulatorError.unknownDevice(udid)
+        }
+        let result = try run(arguments: ["simctl", "appinfo", udid, bundleID])
+        return SimulatorAppInfoResult(udid: udid, bundleID: bundleID, output: result.stdout)
+    }
+
+    public static func appContainer(
+        udid: String,
+        bundleID: String,
+        container: String
+    ) throws -> SimulatorContainerResult {
+        guard ["app", "data", "groups"].contains(container) || !container.contains("\0") else {
+            throw SimulatorError.invalidLaunchArguments
+        }
+        guard try list().contains(where: { $0.udid == udid }) else {
+            throw SimulatorError.unknownDevice(udid)
+        }
+        let result = try run(arguments: ["simctl", "get_app_container", udid, bundleID, container])
+        let path = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return SimulatorContainerResult(udid: udid, bundleID: bundleID, container: container, path: path)
     }
 
     private static func mutate(
@@ -121,14 +203,18 @@ public enum SimulatorService {
         udid: String,
         arguments: [String]
     ) throws -> SimulatorActionResult {
+        try validateMutationTarget(udid: udid)
+        let result = try run(arguments: arguments)
+        return SimulatorActionResult(action: action, udid: udid, output: result.stdout)
+    }
+
+    private static func validateMutationTarget(udid: String) throws {
         guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION"] == "1" else {
             throw SimulatorError.mutationDisabled
         }
         guard try list().contains(where: { $0.udid == udid }) else {
             throw SimulatorError.unknownDevice(udid)
         }
-        let result = try run(arguments: arguments)
-        return SimulatorActionResult(action: action, udid: udid, output: result.stdout)
     }
 
     private struct CommandResult {

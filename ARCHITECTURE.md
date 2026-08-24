@@ -23,7 +23,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
 | Sources/AppleDebugMCP/ | MCP server startup and typed tool dispatch | Maintainers; update when the MCP surface changes |
 | Tests/Fixtures/ | Signed macOS debugger target, iOS Simulator app, and crash-report fixture | Maintainers; update when fixture contracts change |
-| scripts/ | Build, smoke, lifecycle, and repository-native harness commands | Maintainers; update when verification or cleanup changes |
+| scripts/ | Build, smoke, lifecycle, Simulator MCP, packaging, and repository-native harness commands | Maintainers; update when verification or cleanup changes |
 | docs/ | Canonical product, architecture, security, reliability, and agent workflow knowledge | Maintainers; update with boundary or workflow changes |
 
 ## Components and boundaries

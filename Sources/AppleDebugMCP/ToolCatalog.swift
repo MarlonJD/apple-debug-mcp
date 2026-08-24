@@ -155,7 +155,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_simulator_launch",
-            description: "Launch an installed app on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            description: "Launch an installed app on an iOS Simulator with optional arguments, termination, or wait-for-debugger. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
             inputSchema: simulatorLaunchObjectSchema
         ),
         Tool(
@@ -167,6 +167,16 @@ enum ToolCatalog {
             name: "apple_simulator_screenshot",
             description: "Capture a PNG screenshot from an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
             inputSchema: simulatorScreenshotObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_app_info",
+            description: "Read metadata for an installed Simulator application without changing target state.",
+            inputSchema: simulatorAppInfoObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_get_app_container",
+            description: "Resolve an installed Simulator application's app, data, or app-group container path.",
+            inputSchema: simulatorContainerObjectSchema
         ),
         Tool(
             name: "apple_device_list",
@@ -529,9 +539,24 @@ enum ToolCatalog {
                 return errorResult("Missing required udid or bundleID argument.")
             }
             do {
-                let action = params.name == "apple_simulator_launch"
-                    ? try SimulatorService.launch(udid: udid, bundleID: bundleID)
-                    : try SimulatorService.terminate(udid: udid, bundleID: bundleID)
+                let action: SimulatorActionResult
+                if params.name == "apple_simulator_launch" {
+                    action = try SimulatorService.launch(
+                        udid: udid,
+                        bundleID: bundleID,
+                        arguments: stringArray(from: params.arguments?["arguments"]),
+                        terminateRunning: boolValue(
+                            from: params.arguments?["terminateRunning"],
+                            default: false
+                        ),
+                        waitForDebugger: boolValue(
+                            from: params.arguments?["waitForDebugger"],
+                            default: false
+                        )
+                    )
+                } else {
+                    action = try SimulatorService.terminate(udid: udid, bundleID: bundleID)
+                }
                 return result(for: action)
             } catch {
                 return errorResult(error)
@@ -545,6 +570,32 @@ enum ToolCatalog {
                     for: try SimulatorService.screenshot(
                         udid: udid,
                         path: params.arguments?["path"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_app_info":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue else {
+                return errorResult("Missing required udid or bundleID argument.")
+            }
+            do {
+                return result(for: try SimulatorService.appInfo(udid: udid, bundleID: bundleID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_get_app_container":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue else {
+                return errorResult("Missing required udid or bundleID argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorService.appContainer(
+                        udid: udid,
+                        bundleID: bundleID,
+                        container: params.arguments?["container"]?.stringValue ?? "app"
                     )
                 )
             } catch {
@@ -893,7 +944,13 @@ enum ToolCatalog {
         "type": .string("object"),
         "properties": .object([
             "udid": .object(["type": .string("string")]),
-            "bundleID": .object(["type": .string("string")])
+            "bundleID": .object(["type": .string("string")]),
+            "arguments": .object([
+                "type": .string("array"),
+                "items": .object(["type": .string("string")])
+            ]),
+            "terminateRunning": .object(["type": .string("boolean")]),
+            "waitForDebugger": .object(["type": .string("boolean")])
         ]),
         "required": .array([.string("udid"), .string("bundleID")])
     ])
@@ -908,6 +965,28 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("udid")])
+    ])
+
+    private static let simulatorAppInfoObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("bundleID")])
+    ])
+
+    private static let simulatorContainerObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")]),
+            "container": .object([
+                "type": .string("string"),
+                "description": .string("app, data, groups, or a specific app-group identifier")
+            ])
+        ]),
+        "required": .array([.string("udid"), .string("bundleID")])
     ])
 
     private static let deviceInstallObjectSchema: Value = .object([

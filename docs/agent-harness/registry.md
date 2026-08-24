@@ -24,6 +24,7 @@
 | iOS fixture build | make ios-fixture | Build the SwiftUI Simulator app and dSYM artifact | DebugApp.app and DebugApp.app.dSYM exist under .build/ios-fixture | Maintainers; fixture/project changes | verified |
 | iOS Simulator fixture smoke | make ios-fixture-smoke | Exercise explicit Simulator app lifecycle | Install, launch, screenshot, terminate, and shutdown evidence | Maintainers; explicit mutation-authorized task | verified |
 | iOS Simulator debugger smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture | Attach, threads, stack, memory, disassembly, and cleanup evidence | Maintainers; explicit mutation-authorized task | verified |
+| iOS MCP Simulator smoke | make ios-mcp-tool-smoke | Exercise public MCP Simulator lifecycle and artifact tools | Boot, install, launch flags, app info, container, screenshot, terminate, and cleanup evidence | Maintainers; explicit mutation-authorized task | verified |
 | Crash report analysis | apple_crash_inspect | Parse bounded Apple .crash/.ips artifacts | Fixture report returns exception, threads, and frames | Maintainers; crash schema changes | verified |
 | Symbolication | apple_symbolicate | Resolve an address with atos | Universal-binary symbolication test passes | Maintainers; Xcode tool changes | verified |
 | Unsigned packaging | make package | Create a relocatable macOS archive from the release build | Archive contains executable, GPL license, README, and architecture docs | Maintainers; release workflow changes | verified-with-boundary |

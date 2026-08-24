@@ -28,4 +28,30 @@ final class AppleSimulatorTests: XCTestCase {
             XCTAssertEqual(error as? SimulatorError, .mutationDisabled)
         }
     }
+
+    func testLaunchRejectsUnsafeArguments() {
+        XCTAssertThrowsError(
+            try SimulatorService.launch(
+                udid: "00000000-0000-0000-0000-000000000000",
+                bundleID: "com.example.fixture",
+                arguments: [String(repeating: "x", count: 4097)]
+            )
+        ) { error in
+            XCTAssertEqual(error as? SimulatorError, .invalidLaunchArguments)
+        }
+    }
+
+    func testAppInfoRejectsUnknownSimulator() {
+        XCTAssertThrowsError(
+            try SimulatorService.appInfo(
+                udid: "00000000-0000-0000-0000-000000000000",
+                bundleID: "com.example.fixture"
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? SimulatorError,
+                .unknownDevice("00000000-0000-0000-0000-000000000000")
+            )
+        }
+    }
 }

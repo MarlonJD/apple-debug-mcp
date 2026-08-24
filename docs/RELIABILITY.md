@@ -19,6 +19,7 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | iOS fixture build regresses | make ios-fixture fails or app bundle/dSYM is missing | Inspect xcodebuild’s first error and preserve the selected Simulator destination | make ios-fixture |
 | iOS Simulator fixture leaves state behind | ios-fixture-smoke fails before cleanup | Rerun targeted terminate/shutdown for the known fixture UDID; do not erase the device | make ios-fixture-smoke |
 | iOS Simulator debugger attach regresses | ios-debug-fixture-smoke fails or leaves a session/process | Close the owned LLDB session, terminate the known bundle, and shutdown the known UDID | make ios-debug-fixture-smoke |
+| Simulator MCP lifecycle regresses | ios-mcp-tool-smoke fails during app info, container, launch flags, or screenshot | Use the known fixture UDID, terminate the fixture bundle, and preserve the first MCP error | make ios-mcp-tool-smoke |
 | Tool output becomes non-deterministic | Core tests or sorted JSON output changes unexpectedly | Reproduce with the same fixture and update the contract intentionally | swift test |
 | Debugger operation leaves a target or adapter running | Fixture smoke fails or process inspection finds an owned child | Close the session and rerun targeted cleanup; do not kill unrelated processes | macOS and iOS Simulator fixture smoke |
 | Crash report is malformed or unsupported | apple_crash_inspect returns a typed analysis error | Preserve the artifact and inspect it with the supported `.crash`/`.ips` parser | CrashReportTests |

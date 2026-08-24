@@ -37,6 +37,8 @@ grep -q 'Mach-O' "$output_file"
 grep -q 'iPhone' "$output_file"
 grep -q 'apple_debug_step' "$output_file"
 grep -q 'EXC_BAD_ACCESS' "$output_file"
+grep -q 'apple_simulator_app_info' "$output_file"
+grep -q 'apple_simulator_get_app_container' "$output_file"
 grep -q '"id":9.*"isError":false' "$output_file"
 
 printf '%s\n' 'smoke: MCP initialize, tool discovery, capability, and toolchain calls passed'
