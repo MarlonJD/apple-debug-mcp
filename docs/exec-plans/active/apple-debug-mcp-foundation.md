@@ -63,6 +63,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 19:25Z) Add Apple-native heap/leaks/malloc-history/sample diagnostics, self-contained arm64/x86_64 assembler/disassembly, transactional assembly patching, bounded forward stop traces, and explicit reverse/kernel capability reports; verify with runtime, assembler, macOS fixture, and reverse-boundary smokes.
 - [x] (2026-08-24 22:05Z) Add CFG/basic-block/call-graph analysis, direct dyld shared-cache table parsing, typed vmmap snapshots/diffs, expanded xctrace schema support, Simulator environment controls, reproducible evidence bundles, signing audits, patch/re-sign plans, native workbench build, and safe plugin manifest discovery.
 - [x] (2026-08-24 22:20Z) Add semantic xctrace summaries, workbench debugger thread/snapshot controls, and signed plugin-host validation with sandbox-required non-executing plans.
+- [x] (2026-08-24 22:35Z) Add indirect-symbol/data-in-code CFG evidence and bounded dyld cache discovery smoke; current host reports no mounted cache and no `dyld_shared_cache_util`.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries

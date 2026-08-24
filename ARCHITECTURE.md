@@ -20,8 +20,8 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleRuntimeMetadata.swift | Objective-C metadata parsing and Swift symbol demangling | Maintainers; update with Objective-C/Swift ABI/toolchain changes |
 | Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
 | Sources/AppleDebugCore/AppleAssembler.swift | Self-contained arm64/x86_64 assembly, Mach-O text extraction, disassembly, and patch payload generation | Maintainers; update with clang/LLVM output changes |
-| Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct branch edges, call graph, and external-call reports | Maintainers; update with LLVM disassembly output changes |
-| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Direct dyld shared-cache header, mapping, UUID, code-signature, local-symbol, and image-table parser | Maintainers; update with public dyld cache layout changes |
+| Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, call graph, external calls, indirect symbols, and data-in-code reports | Maintainers; update with LLVM disassembly output changes |
+| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery plus direct header, mapping, UUID, code-signature, local-symbol, and image-table parser | Maintainers; update with public dyld cache layout changes |
 | Sources/AppleDebugCore/AppleMemoryMaps.swift | Typed vmmap regions, persisted snapshots, and region diffs | Maintainers; update with vmmap report format changes |
 | Sources/AppleDebugCore/AppleSimulatorEnvironment.swift | Fixed simctl environment controls and bounded input validation | Maintainers; update with simctl public subcommands |
 | Sources/AppleDebugCore/AppleReproBundle.swift | Screenshot/appinfo/log/trace/crash evidence bundle capture | Maintainers; update with Simulator evidence surfaces |

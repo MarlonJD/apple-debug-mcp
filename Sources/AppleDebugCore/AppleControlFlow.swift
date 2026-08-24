@@ -69,6 +69,32 @@ public struct ControlFlowBlock: Codable, Equatable, Sendable {
     }
 }
 
+public struct ControlFlowIndirectSymbol: Codable, Equatable, Sendable {
+    public let section: String
+    public let address: String
+    public let index: Int
+    public let name: String
+
+    public init(section: String, address: String, index: Int, name: String) {
+        self.section = section
+        self.address = address
+        self.index = index
+        self.name = name
+    }
+}
+
+public struct ControlFlowDataRange: Codable, Equatable, Sendable {
+    public let offset: UInt64
+    public let length: UInt64
+    public let kind: String
+
+    public init(offset: UInt64, length: UInt64, kind: String) {
+        self.offset = offset
+        self.length = length
+        self.kind = kind
+    }
+}
+
 public struct ControlFlowFunction: Codable, Equatable, Sendable {
     public let name: String
     public let startAddress: String
@@ -100,19 +126,25 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
     public let instructions: [ControlFlowInstruction]
     public let functions: [ControlFlowFunction]
     public let externalCalls: [String]
+    public let indirectSymbols: [ControlFlowIndirectSymbol]
+    public let dataInCode: [ControlFlowDataRange]
 
     public init(
         path: String,
         architecture: String,
         instructions: [ControlFlowInstruction],
         functions: [ControlFlowFunction],
-        externalCalls: [String]
+        externalCalls: [String],
+        indirectSymbols: [ControlFlowIndirectSymbol],
+        dataInCode: [ControlFlowDataRange]
     ) {
         self.path = path
         self.architecture = architecture
         self.instructions = instructions
         self.functions = functions
         self.externalCalls = externalCalls
+        self.indirectSymbols = indirectSymbols
+        self.dataInCode = dataInCode
     }
 }
 
@@ -134,31 +166,14 @@ public enum AppleControlFlowService {
             throw ControlFlowError.toolUnavailable
         }
 
-        let result: AppleProcessResult
-        do {
-            result = try AppleProcessRunner.run(
-                executable: objdump,
-                arguments: ["--macho", "--disassemble", "--arch=\(architecture)", path],
-                maximumOutputSize: maximumOutputSize
-            )
-        } catch AppleProcessRunnerError.outputTooLarge {
-            throw ControlFlowError.outputTooLarge
-        } catch AppleProcessRunnerError.launchFailed(let message) {
-            throw ControlFlowError.commandFailed(message)
-        } catch {
-            throw ControlFlowError.commandFailed(error.localizedDescription)
-        }
-        guard result.terminationStatus == 0 else {
-            let message = String(decoding: result.stderr, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw ControlFlowError.commandFailed(message.isEmpty ? "llvm-objdump failed." : message)
-        }
-        let output = String(decoding: result.stdout, as: UTF8.self)
+        let output = try runObjdump(executable: objdump, arguments: ["--macho", "--disassemble", "--arch=\(architecture)", path])
         let instructions = parseInstructions(output)
         guard !instructions.isEmpty else {
             throw ControlFlowError.commandFailed("No executable instructions were found for \(architecture).")
         }
         let functions = parseFunctions(path: path, architecture: architecture, instructions: instructions)
+        let indirectSymbols = parseIndirectSymbols(try runObjdump(executable: objdump, arguments: ["--macho", "--indirect-symbols", "--arch=\(architecture)", path]))
+        let dataInCode = parseDataInCode(try runObjdump(executable: objdump, arguments: ["--macho", "--data-in-code", "--arch=\(architecture)", path]))
         return ControlFlowReport(
             path: path,
             architecture: architecture,
@@ -166,8 +181,50 @@ public enum AppleControlFlowService {
             functions: functions,
             externalCalls: functions.flatMap(\.callees).filter { !$0.hasPrefix("0x") }.sorted().reduce(into: []) { result, value in
                 if !result.contains(value) { result.append(value) }
-            }
+            },
+            indirectSymbols: indirectSymbols,
+            dataInCode: dataInCode
         )
+    }
+
+    private static func runObjdump(executable: String, arguments: [String]) throws -> String {
+        let result: AppleProcessResult
+        do {
+            result = try AppleProcessRunner.run(executable: executable, arguments: arguments, maximumOutputSize: maximumOutputSize)
+        } catch AppleProcessRunnerError.outputTooLarge { throw ControlFlowError.outputTooLarge }
+        catch AppleProcessRunnerError.launchFailed(let message) { throw ControlFlowError.commandFailed(message) }
+        catch { throw ControlFlowError.commandFailed(error.localizedDescription) }
+        guard result.terminationStatus == 0 else {
+            let message = String(decoding: result.stderr, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            throw ControlFlowError.commandFailed(message.isEmpty ? "llvm-objdump failed." : message)
+        }
+        return String(decoding: result.stdout, as: UTF8.self)
+    }
+
+    private static func parseIndirectSymbols(_ output: String) -> [ControlFlowIndirectSymbol] {
+        var section = ""
+        var values: [ControlFlowIndirectSymbol] = []
+        for line in output.split(whereSeparator: \.isNewline) {
+            let text = String(line)
+            if let open = text.firstIndex(of: "("), let close = text.firstIndex(of: ")"), text.contains("Indirect symbols") {
+                section = String(text[text.index(after: open)..<close])
+                continue
+            }
+            let fields = text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+            guard fields.count >= 3, let address = parseAddress(fields[0]), let index = Int(fields[1]) else { continue }
+            values.append(ControlFlowIndirectSymbol(section: section, address: formatAddress(address), index: index, name: fields.dropFirst(2).joined(separator: " ")))
+        }
+        return values
+    }
+
+    private static func parseDataInCode(_ output: String) -> [ControlFlowDataRange] {
+        var values: [ControlFlowDataRange] = []
+        for line in output.split(whereSeparator: \.isNewline) {
+            let fields = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+            guard fields.count >= 3, let offset = UInt64(fields[0], radix: 16), let length = UInt64(fields[1]) else { continue }
+            values.append(ControlFlowDataRange(offset: offset, length: length, kind: fields.dropFirst(2).joined(separator: " ")))
+        }
+        return values
     }
 
     private static func parseInstructions(_ output: String) -> [ControlFlowInstruction] {

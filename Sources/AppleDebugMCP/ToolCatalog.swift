@@ -94,6 +94,11 @@ enum ToolCatalog {
             inputSchema: dyldSharedCacheObjectSchema
         ),
         Tool(
+            name: "apple_dyld_shared_cache_discover",
+            description: "Search bounded standard macOS/Xcode/CoreSimulator roots for mounted dyld shared-cache files and report whether the optional utility exists.",
+            inputSchema: emptyObjectSchema
+        ),
+        Tool(
             name: "apple_dwarf_inspect",
             description: "Query bounded DWARF source paths, types, declarations, statistics, and address lookups from a Mach-O or dSYM.",
             inputSchema: dwarfInspectObjectSchema
@@ -664,6 +669,8 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_dyld_shared_cache_discover":
+            return result(for: AppleDyldSharedCacheService.discover())
         case "apple_dwarf_inspect":
             guard let path = params.arguments?["path"]?.stringValue else {
                 return errorResult("Missing required path argument.")

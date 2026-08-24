@@ -103,11 +103,47 @@ public struct DyldSharedCacheReport: Codable, Equatable, Sendable {
     }
 }
 
+public struct DyldSharedCacheDiscovery: Codable, Equatable, Sendable {
+    public let searchedRoots: [String]
+    public let candidates: [String]
+    public let utilityAvailable: Bool
+
+    public init(searchedRoots: [String], candidates: [String], utilityAvailable: Bool) {
+        self.searchedRoots = searchedRoots
+        self.candidates = candidates
+        self.utilityAvailable = utilityAvailable
+    }
+}
+
 public enum AppleDyldSharedCacheService {
     private static let headerSize = 256
     private static let maximumMappings = 100_000
     private static let maximumImages = 100_000
     private static let maximumPathLength = 1_024
+
+    public static func discover() -> DyldSharedCacheDiscovery {
+        let roots = [
+            "/System/Library/dyld",
+            "/Library/Developer/CoreSimulator/Profiles/Runtimes",
+            "/Library/Developer/CoreSimulator/Volumes",
+            "/Applications/Xcode.app/Contents/Developer/Platforms"
+        ]
+        var candidates = Set<String>()
+        for root in roots where FileManager.default.fileExists(atPath: root) {
+            guard let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
+            var count = 0
+            for case let url as URL in enumerator {
+                count += 1
+                if count > 50_000 { break }
+                if url.lastPathComponent.hasPrefix("dyld_shared_cache") { candidates.insert(url.path) }
+            }
+        }
+        return DyldSharedCacheDiscovery(
+            searchedRoots: roots,
+            candidates: candidates.sorted(),
+            utilityAvailable: ToolchainProbe.path(for: "dyld_shared_cache_util") != nil
+        )
+    }
 
     public static func inspect(
         path: String,

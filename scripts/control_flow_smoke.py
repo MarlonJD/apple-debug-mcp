@@ -50,6 +50,8 @@ def main() -> int:
             raise RuntimeError("control-flow report did not contain basic blocks")
         if "_usleep" not in payload.get("externalCalls", []):
             raise RuntimeError("control-flow report did not contain the fixture external call")
+        if not any(symbol.get("name") == "_usleep" for symbol in payload.get("indirectSymbols", [])):
+            raise RuntimeError("control-flow report did not contain indirect symbol/xref evidence")
         print("control-flow-smoke: Mach-O instructions, basic blocks, and external call graph returned")
         return 0
     except Exception as error:
