@@ -64,7 +64,7 @@ Example MCP configuration after building:
 ## Roadmap
 
 1. LLDB/DAP target session management for local macOS targets.
-2. Mach-O headers, segments, symbols, strings, disassembly, and dSYM analysis.
+2. Mach-O headers and segments are available now; add symbols, strings, disassembly, and dSYM analysis.
 3. macOS crash/core analysis and controlled memory operations.
 4. iOS Simulator build, install, launch, logs, UI inspection, and debugging.
 5. Paired physical-device workflows for development-signed applications.

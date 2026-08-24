@@ -26,6 +26,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 - [x] (2026-08-24 01:44Z) Run build, test, whitespace, documentation, and project-native harness checks.
 - [x] (2026-08-24 02:00Z) Add DAP framing, LLDB-DAP initialization, and adapter cleanup tests.
 - [x] (2026-08-24 02:04Z) Commit the LLDB-DAP adapter foundation as 23dd183.
+- [x] (2026-08-24 02:10Z) Add read-only Mach-O/universal-binary inspection and commit it as f4d9724.
 - [x] (2026-08-24 01:53Z) Create the authorized source commit 48ce3c9 and direct-child harness attestation checkpoint f6d5348.
 - [x] (2026-08-24 01:53Z) Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
 
@@ -61,11 +62,11 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 
 ## Outcomes & Retrospective
 
-The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is now committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full target-session, Mach-O, Simulator, and device product remains active follow-up work.
+The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is now committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full target-session, symbol/static-analysis, Simulator, and device product remains active follow-up work.
 
 ## Context and Orientation
 
-The repository contains a library target AppleDebugCore and an executable target AppleDebugMCP. The core owns AppleDebugPlatform, AppleDebugCapability, CapabilityReport, CapabilityMatrix, ToolchainStatus, ToolchainProbe, DAPValue, DAPMessage, DAPFraming, and LLDBDAPSession. The executable registers apple_capabilities, apple_toolchain_status, and apple_lldb_dap_initialize through the official MCP Swift SDK over stdio. docs/product-specs/platform-scope.md defines the full staged product boundary; docs/SECURITY.md defines the authorization boundary.
+The repository contains a library target AppleDebugCore and an executable target AppleDebugMCP. The core owns AppleDebugPlatform, AppleDebugCapability, CapabilityReport, CapabilityMatrix, ToolchainStatus, ToolchainProbe, DAPValue, DAPMessage, DAPFraming, LLDBDAPSession, MachOReport, and MachOInspector. The executable registers capability, toolchain, LLDB-DAP, and Mach-O read-only tools through the official MCP Swift SDK over stdio. docs/product-specs/platform-scope.md defines the full staged product boundary; docs/SECURITY.md defines the authorization boundary.
 
 ## Plan of Work
 
@@ -120,3 +121,5 @@ The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool,
   Reason: Keep the living plan aligned with observed repository state while leaving the full product work active.
 - (2026-08-24 02:04Z) Change: Recorded the LLDB-DAP adapter foundation commit 23dd183 and its verified local behavior.
   Reason: Preserve the first debugger backend checkpoint and its Developer Mode boundary for the next target-session milestone.
+- (2026-08-24 02:10Z) Change: Recorded the initial Mach-O inspection commit f4d9724.
+  Reason: Preserve a reusable static-analysis foundation for macOS and iOS binaries before adding symbols and metadata.
