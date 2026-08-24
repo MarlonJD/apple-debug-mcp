@@ -15,6 +15,7 @@ The current implementation is intentionally read-only: it reports the supported 
 | Sources/AppleDebugCore/DAP.swift | DAP value model, Content-Length framing, and LLDB-DAP session lifecycle | Apple Debug MCP maintainers; update with DAP/backend behavior |
 | Sources/AppleDebugCore/MachO.swift | Read-only Mach-O and universal-binary header, architecture, load-command, and segment inspection | Apple Debug MCP maintainers; update with static-analysis behavior |
 | Sources/AppleDebugCore/DebugSessions.swift | Capability-aware LLDB-DAP session manager and launch policy | Apple Debug MCP maintainers; update when session permissions or cleanup changes |
+| Sources/AppleDebugCore/AppleSimulator.swift | Read-only Simulator inventory and policy-gated simctl lifecycle operations | Apple Debug MCP maintainers; update when Simulator/device operations change |
 | Sources/AppleDebugMCP/ | MCP server startup and tool dispatch | Apple Debug MCP maintainers; update when MCP surface changes |
 | Tests/AppleDebugCoreTests/ | Core behavior and platform-boundary tests | Update with core behavior changes |
 | scripts/ | Build, smoke, and repository-native harness commands | Update when verification or lifecycle commands change |
@@ -44,7 +45,8 @@ Backends may be added only behind capability checks. The MCP layer must not expo
 7. apple_debug_session_create/list/close manage initialized local LLDB-DAP adapter sessions.
 8. apple_debug_launch validates the explicit launch policy before sending a target launch request and tears down failed sessions.
 9. Breakpoint, continue, threads, stack trace, memory read, and disassembly tools route through an owned session.
-10. Future debugger calls select a backend, enforce policy, and return structured observations.
+10. apple_simulator_list reads available Simulator inventory; boot, shutdown, install, launch, and terminate require the explicit mutation policy.
+11. Future debugger calls select a backend, enforce policy, and return structured observations.
 
 ## Runtime topology
 

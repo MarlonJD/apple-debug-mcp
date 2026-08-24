@@ -10,7 +10,7 @@ The project is designed to cover:
 - Mach-O, Objective-C, and Swift binary analysis;
 - crash analysis and dSYM-based symbolication.
 
-The repository starts with a small, safe foundation. The server exposes read-only capability and toolchain discovery, Mach-O inspection, LLDB-DAP adapter initialization, owned session lifecycle management, and specialized debugger inspection commands. Target launch, attach, memory mutation, and device operations are behind explicit capability and permission boundaries.
+The repository starts with a small, safe foundation. The server exposes read-only capability and toolchain discovery, Mach-O inspection, LLDB-DAP adapter initialization, owned session lifecycle management, specialized debugger inspection commands, and iOS Simulator inventory/lifecycle adapters. Target launch, attach, memory mutation, and device operations are behind explicit capability and permission boundaries.
 
 ## Design
 
@@ -50,6 +50,8 @@ swift run apple-debug-mcp
 ```
 
 Target launch is disabled by default. Enable it only for an authorized local target by setting APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1 in the MCP server environment.
+
+Simulator mutation is disabled by default. Enable it only for an authorized local workflow by setting APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.
 
 Example MCP configuration after building:
 
