@@ -29,6 +29,34 @@ def main() -> int:
             raise RuntimeError("dyld cache discovery report was incomplete")
         if len(payload["searchedRoots"]) < 4 or not payload.get("notes") or not isinstance(payload.get("runtimeHelpers"), list):
             raise RuntimeError("dyld cache discovery did not explain bounded mount/helper state")
+        if payload["candidates"]:
+            process.stdin.write(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 3,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "apple_dyld_shared_cache_inspect",
+                            "arguments": {"path": payload["candidates"][0], "maximumImages": 100},
+                        },
+                    }
+                )
+                + "\n"
+            )
+            process.stdin.flush()
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    raise RuntimeError(process.stderr.read())
+                response = json.loads(line)
+                if response.get("id") == 3:
+                    if response.get("result", {}).get("isError"):
+                        raise RuntimeError(response)
+                    inspected = json.loads(response["result"]["content"][0]["text"])
+                    if inspected.get("mappingCount", 0) <= 0:
+                        raise RuntimeError("mounted dyld cache inspection returned no mappings")
+                    break
         print(
             "dyld-cache-smoke: searched %d bounded roots; candidates=%d, runtimeHelpers=%d, utilityAvailable=%s"
             % (
