@@ -43,6 +43,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 16:05Z) Add bounded memory search and expected-bytes transactional patch/rollback with explicit write authorization; verify search against the macOS fixture and keep patch policy-gated.
 - [x] (2026-08-24 16:15Z) Add read-only binary differential analysis for Mach-O files, `.app` bundles, and `.dSYM` bundles with signatures, dependencies, symbols, exports, hashes, metadata, and UUIDs.
 - [x] (2026-08-24 16:20Z) Complete the supported LLDB-DAP parity surface with source breakpoint locations, instruction breakpoints, completions, variable-write policy, and instruction-granularity stepping; verify it against the macOS fixture.
+- [x] (2026-08-24 16:26Z) Make `apple_symbolicate` resolve `.app` executables and `.dSYM` DWARF payloads; verify symbolication against a temporary dSYM bundle.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries

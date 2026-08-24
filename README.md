@@ -14,7 +14,7 @@ The current product surface includes:
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
 - Objective-C classes/protocols/selectors and demangled Swift symbol metadata;
 - read-only binary diffing for Mach-O files, `.app` bundles, and `.dSYM` bundles, including symbols, exports, dependencies, signatures, entitlements, hashes, and UUIDs;
-- `atos` symbolication and `.crash`/`.ips` crash-report inspection;
+- `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
 - Xcode project discovery and explicitly authorized builds;
 - CoreDevice physical-device inventory plus authorization-gated development-app install/launch.
