@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "9c79907a5cc8375d172e0eafd1756489f4de4566",
+  "repository_commit": "7015e3c189bebc211c45ee0220a056633776f6c2",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,7 +9,7 @@
   "environment": "local",
   "command": "make harness-check",
   "exit_code": 0,
-  "observed_at": "2026-08-24T19:19:09Z",
+  "observed_at": "2026-08-24T20:29:26Z",
   "result": "passed",
   "artifacts": [
     "scripts/harness_check.sh",
@@ -17,5 +17,5 @@
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "c5c2da1a89f46643de266083aa09314628877aa1455517827c170e2867fd70d7"
+  "signature": "24bbd62539e30c4f6f8cc37580b8cb9ce8d6f251302bd5ed9cad509577784453"
 }
