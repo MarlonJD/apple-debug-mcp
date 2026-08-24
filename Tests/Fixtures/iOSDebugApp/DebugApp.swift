@@ -11,9 +11,13 @@ struct DebugApp: App {
             VStack(spacing: 12) {
                 Text("Apple Debug MCP")
                     .font(.title)
+                    .accessibilityIdentifier("debug.fixture.title")
                 Text("iOS debugging fixture")
+                    .accessibilityIdentifier("debug.fixture.subtitle")
             }
             .padding()
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("debug.fixture.root")
         }
     }
 }

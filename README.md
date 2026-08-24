@@ -29,7 +29,7 @@ Apple Debug MCP
     └── Xcode, Simulator, CoreDevice, and unified-log adapters
 ```
 
-The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Physical-device remote LLDB attach remains restricted until a paired, development-authorized device fixture is available. Simulator screenshot capture is available; accessibility-tree inspection is not exposed yet.
+The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Physical-device remote LLDB attach remains restricted until a paired, development-authorized device fixture is available. Simulator screenshot capture is available, and the fixture exposes stable identifiers for XCTest/XcodeBuildMCP UI snapshots; the standalone MCP accessibility-tree tool is not exposed yet.
 
 ## Requirements
 

@@ -78,7 +78,7 @@ public enum CapabilityMatrix {
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
                     "Memory mutation is disabled by default and requires an explicit policy grant.",
-                    "Screenshot capture is available; accessibility-tree inspection is not exposed yet."
+                    "Screenshot capture is available and the fixture exposes stable accessibility identifiers for external XCTest/XcodeBuildMCP inspection; the standalone MCP UI-tree tool is not exposed yet."
                 ]
             ),
             CapabilityReport(
