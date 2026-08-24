@@ -18,6 +18,7 @@ The current implementation is intentionally read-only: it reports the supported 
 | Sources/AppleDebugCore/AppleSimulator.swift | Read-only Simulator inventory and policy-gated simctl lifecycle operations | Apple Debug MCP maintainers; update when Simulator/device operations change |
 | Sources/AppleDebugCore/AppleDevice.swift | CoreDevice JSON inventory and authorization-gated physical-device install/launch operations | Apple Debug MCP maintainers; update when pairing/device policy changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated xcodebuild execution | Apple Debug MCP maintainers; update when build/destination policy changes |
+| Tests/Fixtures/iOSDebugApp/ | Minimal SwiftUI app used to prove Xcode/iOS Simulator artifact production | Maintainers; update when Simulator app contract changes |
 | Sources/AppleDebugMCP/ | MCP server startup and tool dispatch | Apple Debug MCP maintainers; update when MCP surface changes |
 | Tests/AppleDebugCoreTests/ | Core behavior and platform-boundary tests | Update with core behavior changes |
 | scripts/ | Build, smoke, and repository-native harness commands | Update when verification or lifecycle commands change |

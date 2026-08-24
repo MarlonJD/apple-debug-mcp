@@ -42,6 +42,7 @@ swift build
 swift test
 make check
 make fixture
+make ios-fixture
 ```
 
 ## Run

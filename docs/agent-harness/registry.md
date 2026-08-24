@@ -21,4 +21,5 @@
 | Xcode project workflow | apple_xcode_discover and apple_xcode_build | Discover project schemes and run explicit destination builds | Structured discovery or policy-gated build output | Maintainers; Xcode tooling changes | candidate |
 | Authorized debug fixture | make fixture | Compile and ad-hoc sign the local macOS debugger target | Existing Mach-O binary with get-task-allow entitlement | Maintainers; fixture changes | candidate |
 | Debugger fixture behavior | python3 scripts/debug_fixture_smoke.py | Prove authorized launch and core debugger inspection end to end | Breakpoint, threads, stack, memory, disassembly, continue, and cleanup transcript | Maintainers; debugger surface changes | candidate |
+| iOS fixture build | make ios-fixture | Build the SwiftUI Simulator app and dSYM artifact | DebugApp.app and DebugApp.app.dSYM exist under .build/ios-fixture | Maintainers; fixture/project changes | candidate |
 | Logs, metrics, or traces | stderr transcript; metrics/traces N/A | Diagnose CLI failures | Actionable stderr or justified N/A | Maintainers; runtime changes | candidate |

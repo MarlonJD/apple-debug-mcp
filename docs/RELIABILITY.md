@@ -16,6 +16,7 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | Xcode project discovery/build fails | apple_xcode_discover or apple_xcode_build returns a typed error | Inspect xcodebuild output and preserve the selected destination; do not run arbitrary shell fallback | AppleXcodeTests and build transcript |
 | Debug fixture cannot be prepared | make fixture fails during clang or codesign | Inspect the first toolchain error; do not bypass signing or launch an unverified target | scripts/build_debug_fixture.sh |
 | Debugger fixture behavior regresses | debug_fixture_smoke.py fails or leaves a child process | Capture the first MCP/DAP response and rerun cleanup; keep the feature unverified until fixed | make check |
+| iOS fixture build regresses | make ios-fixture fails or app bundle/dSYM is missing | Inspect xcodebuild’s first error and preserve the selected Simulator destination | make ios-fixture |
 | Tool output becomes non-deterministic | Core tests or sorted JSON output changes unexpectedly | Reproduce with the same fixture and update the contract intentionally | swift test |
 | Future debugger operation leaves a target running | Session lifecycle and process cleanup tests fail | Use the session teardown path; do not kill unrelated processes | Candidate until debugger backend exists |
 | Hosted availability, failover, and production rollback | Not applicable to the current local CLI | N/A; define only when a hosted service is introduced | N/A |
