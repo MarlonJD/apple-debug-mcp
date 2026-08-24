@@ -30,8 +30,8 @@ The target is a paired device and an application that the user is authorized to 
 The product is successful in stages:
 
 1. A local MCP client can initialize the server and discover tools.
-2. macOS read-only LLDB inspection works against a fixture binary.
-3. macOS controlled process operations work behind policy and cleanup tests.
+2. macOS LLDB inspection and controlled process operations work against a signed fixture binary.
+3. macOS controlled process operations remain policy-gated and cleanup-tested.
 4. Simulator build/run/debug and UI/log evidence work against a fixture app.
 5. Physical-device workflows work only for paired, development-authorized fixtures.
 
