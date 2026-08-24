@@ -8,11 +8,16 @@
 
 /* Begin PBXBuildFile section */
 		100000000000000000000001 /* DebugApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000002 /* DebugApp.swift */; };
+		100000000000000000000020 /* DebugAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000022 /* DebugAppUITests.swift */; };
+		100000000000000000000021 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 100000000000000000000025 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		100000000000000000000002 /* DebugApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugApp.swift; sourceTree = "<group>"; };
 		100000000000000000000003 /* DebugApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DebugApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000022 /* DebugAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugAppUITests.swift; sourceTree = "<group>"; };
+		100000000000000000000024 /* DebugAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DebugAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000025 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -23,6 +28,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		100000000000000000000029 /* UI Tests Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000021 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -30,6 +43,7 @@
 			isa = PBXGroup;
 			children = (
 				100000000000000000000002 /* DebugApp.swift */,
+				100000000000000000000022 /* DebugAppUITests.swift */,
 			);
 			path = "";
 			sourceTree = "<group>";
@@ -46,6 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				100000000000000000000003 /* DebugApp.app */,
+				100000000000000000000024 /* DebugAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -69,6 +84,22 @@
 			productReference = 100000000000000000000003 /* DebugApp.app */;
 			productType = "com.apple.product-type.application";
 		};
+		100000000000000000000026 /* DebugAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000000027 /* Build configuration list for PBXNativeTarget "DebugAppUITests" */;
+			buildPhases = (
+				100000000000000000000028 /* UI Tests Sources */,
+				100000000000000000000029 /* UI Tests Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DebugAppUITests;
+			productName = DebugAppUITests;
+			productReference = 100000000000000000000024 /* DebugAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -79,6 +110,10 @@
 				TargetAttributes = {
 					100000000000000000000008 = {
 						CreatedOnToolsVersion = 26.6;
+					};
+					100000000000000000000026 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 100000000000000000000008;
 					};
 				};
 			};
@@ -96,6 +131,7 @@
 			projectRoot = "";
 			targets = (
 				100000000000000000000008 /* DebugApp */,
+				100000000000000000000026 /* DebugAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -116,6 +152,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				100000000000000000000001 /* DebugApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000028 /* UI Tests Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000020 /* DebugAppUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -178,6 +222,38 @@
 			};
 			name = Release;
 		};
+		10000000000000000000002B /* UI Tests Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.burakkarahan.AppleDebugFixtureUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = DebugApp;
+			};
+			name = Debug;
+		};
+		10000000000000000000002C /* UI Tests Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.burakkarahan.AppleDebugFixtureUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = DebugApp;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -195,6 +271,15 @@
 			buildConfigurations = (
 				100000000000000000000010 /* Project Debug */,
 				100000000000000000000011 /* Project Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		100000000000000000000027 /* Build configuration list for PBXNativeTarget "DebugAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				10000000000000000000002B /* UI Tests Debug */,
+				10000000000000000000002C /* UI Tests Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

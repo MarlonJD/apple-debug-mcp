@@ -27,6 +27,15 @@ final class CapabilitiesTests: XCTestCase {
         } == true)
     }
 
+    func testSimulatorUIInspectionIsSupported() throws {
+        let report = try XCTUnwrap(
+            CapabilityMatrix.reports().first { $0.platform == .iOSSimulator }
+        )
+
+        XCTAssertTrue(report.supported.contains(.uiInspection))
+        XCTAssertFalse(report.restricted.contains(.uiInspection))
+    }
+
     func testToolchainProbeUsesAnAllowlistedToolSet() {
         let status = ToolchainProbe.collect()
         let names = status.tools.map(\.name)

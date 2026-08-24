@@ -179,6 +179,11 @@ enum ToolCatalog {
             inputSchema: simulatorContainerObjectSchema
         ),
         Tool(
+            name: "apple_simulator_ui_snapshot",
+            description: "Run the project's XCUITest UI probe and return a structured accessibility tree. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorUISnapshotObjectSchema
+        ),
+        Tool(
             name: "apple_device_list",
             description: "List CoreDevice physical-device inventory and explicit pairing/tunnel authorization state.",
             inputSchema: emptyObjectSchema
@@ -601,6 +606,26 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_simulator_ui_snapshot":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue,
+                  let projectPath = params.arguments?["projectPath"]?.stringValue,
+                  let scheme = params.arguments?["scheme"]?.stringValue else {
+                return errorResult("Missing required udid, bundleID, projectPath, or scheme argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorUIService.snapshot(
+                        udid: udid,
+                        bundleID: bundleID,
+                        projectPath: projectPath,
+                        scheme: scheme,
+                        configuration: params.arguments?["configuration"]?.stringValue ?? "Debug"
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_device_list":
             do {
                 return result(for: try AppleDeviceService.list())
@@ -987,6 +1012,26 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("udid"), .string("bundleID")])
+    ])
+
+    private static let simulatorUISnapshotObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")]),
+            "projectPath": .object([
+                "type": .string("string"),
+                "description": .string("Path to an Xcode project or workspace with a UI-test-enabled scheme")
+            ]),
+            "scheme": .object(["type": .string("string")]),
+            "configuration": .object(["type": .string("string")])
+        ]),
+        "required": .array([
+            .string("udid"),
+            .string("bundleID"),
+            .string("projectPath"),
+            .string("scheme")
+        ])
     ])
 
     private static let deviceInstallObjectSchema: Value = .object([

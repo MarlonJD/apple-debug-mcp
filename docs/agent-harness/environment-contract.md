@@ -24,7 +24,7 @@
 
 | Surface | Access path | Useful queries or actions | Expected evidence | Status |
 | --- | --- | --- | --- | --- |
-| UI/accessibility tree | Restricted | Screenshot capture is available through Simulator tooling; accessibility-tree inspection is not exposed | Capability report and Simulator tool boundary | restricted |
+| UI/accessibility tree | XCUITest attachment through apple_simulator_ui_snapshot | Structured accessibility tree with stable fixture identifiers | make ios-ui-tree-smoke | verified |
 | API/CLI behavior | MCP stdio via scripts/smoke_mcp.sh | Initialize, list tools, and call analysis/discovery tools | JSON-RPC response with tool content | verified |
 | Logs | Process stderr and smoke transcript | Capture launch/build failures | Non-empty actionable error | candidate |
 | Metrics | N/A for the short-lived foundation CLI | Add only for a hosted service | N/A | N/A |

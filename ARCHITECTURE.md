@@ -18,6 +18,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleSymbolication.swift | `atos` address resolution | Maintainers; update with symbolication inputs or output contract |
 | Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
+| Sources/AppleDebugCore/AppleSimulatorUI.swift | XCUITest accessibility-tree probe and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
 | Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
 | Sources/AppleDebugCore/AppleDevice.swift | CoreDevice inventory and authorization-gated development-app operations | Maintainers; update with pairing/tunnel policy changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
@@ -34,7 +35,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `DebugSessionManager`: owns session IDs and routes launch, attach, breakpoints, inspection, stepping, watchpoints, evaluation, and memory writes through policy checks. Physical sessions initialize LLDB with a validated `device select <UUID>` command and remain separately gated.
 - `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
-- `AppleSimulatorService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results.
+- `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
 No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.
@@ -51,8 +52,9 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 8. `apple_macho_inspect`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
 9. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
 10. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
-11. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-12. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+11. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
+12. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+13. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 

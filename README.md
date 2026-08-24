@@ -29,7 +29,7 @@ Apple Debug MCP
     └── Xcode, Simulator, CoreDevice, and unified-log adapters
 ```
 
-The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Physical-device remote LLDB attach remains restricted until a paired, development-authorized device fixture is available. Simulator screenshot capture is available, and the fixture exposes stable identifiers for XCTest/XcodeBuildMCP UI snapshots; the standalone MCP accessibility-tree tool is not exposed yet.
+The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Physical-device remote LLDB attach remains restricted until a paired, development-authorized device fixture is available. Simulator screenshot capture and the policy-gated standalone MCP accessibility-tree bridge are available.
 
 ## Requirements
 
@@ -51,9 +51,10 @@ make ios-fixture
 make ios-fixture-smoke
 make ios-debug-fixture-smoke
 make ios-mcp-tool-smoke
+make ios-ui-tree-smoke
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP boot/install/launch/app-info/container/screenshot/terminate path end to end.
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle and `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end.
 
 ## Run
 
@@ -88,7 +89,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Signing/notarization and accessibility-tree inspection are not included yet.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Signing/notarization remains separate release work.
 
 ## License
 

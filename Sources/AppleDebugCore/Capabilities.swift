@@ -72,13 +72,13 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
-                    .crashAnalysis, .simulatorControl, .logs
+                    .crashAnalysis, .simulatorControl, .uiInspection, .logs
                 ],
-                restricted: [.uiInspection],
+                restricted: [],
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
                     "Memory mutation is disabled by default and requires an explicit policy grant.",
-                    "Screenshot capture is available and the fixture exposes stable accessibility identifiers for external XCTest/XcodeBuildMCP inspection; the standalone MCP UI-tree tool is not exposed yet."
+                    "UI inspection runs an explicit XCUITest probe and returns a bounded accessibility tree; Simulator mutation permission is required."
                 ]
             ),
             CapabilityReport(
