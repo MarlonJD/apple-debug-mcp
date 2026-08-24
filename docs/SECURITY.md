@@ -32,6 +32,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Simulator environment | Fixed simctl operations validate enum values, paths, payload sizes, and mutation policy; arbitrary spawn/shell is not exposed | `AppleSimulatorEnvironmentService` | simulator-environment-smoke |
 | Repro bundles | Evidence capture writes to an explicit new directory with bounded copied trace/crash inputs and no device erase/pairing | `AppleReproBundleService` | repro-bundle-smoke |
 | Plugin boundary | External JSON manifests are read-only metadata; no arbitrary dylib or executable plugin is loaded by MCP | `AppleDebugPluginManifestService`, `AppleDebugPluginRegistry` | plugin-smoke |
+| Plugin host | Candidate executables must pass codesign audit and optional team-ID matching; the current tool returns `executionSupported=false` and never launches them | `ApplePluginHostService` | plugin-smoke |
 | Session cleanup | Failed launch, explicit close, and server shutdown terminate only owned adapters | `DebugSessionManager`, `LLDBDAPSession.stop` | Session tests and fixture smoke |
 | Simulator mutation | Known UDID and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` are required | `SimulatorService.mutate` | `AppleSimulatorTests`, iOS smoke |
 | Arbitrary Simulator UI probe | Generated XCUITest project may launch/interact only with the explicitly supplied installed bundle ID and selected Simulator; no target app source or binary is modified | `SimulatorUIService`, fixed generated project, mutation gate | `ios-arbitrary-ui-smoke` |

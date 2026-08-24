@@ -12,6 +12,7 @@ The current product surface includes:
 - authorized macOS `vmmap` memory-region reporting (attach permission required);
 - bounded `xctrace` Time Profiler, Allocations, and System Trace capture for macOS or Simulator targets;
 - parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
+- semantic performance summaries for allocation bytes/events, running/blocked samples, hitches, signposts, and Swift concurrency task/actor/continuation rows;
 - Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
 - bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
 - Mach-O CFG/basic-block/call-graph/xref reports and a direct dyld shared-cache header/mapping/image parser;
@@ -19,6 +20,7 @@ The current product surface includes:
 - Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
 - read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;
 - a native SwiftUI macOS workbench plus safe plugin manifest/registry APIs that never load external dylibs;
+- signed plugin-host validation and sandbox-required execution plans that remain non-executing until a separately reviewed host exists;
 - explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;

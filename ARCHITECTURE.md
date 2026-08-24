@@ -28,6 +28,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleSigningAudit.swift | codesign, entitlements, provisioning, and Gatekeeper audit reports | Maintainers; update with signing tool output |
 | Sources/AppleDebugCore/ApplePatchWorkflow.swift | Non-destructive file patch previews and release-authority re-sign plans | Maintainers; update with packaging/signing policy |
 | Sources/AppleDebugCore/AppleDebugPlugins.swift | In-process plugin protocol, bounded manifest discovery, and registry | Maintainers; update only with a reviewed extension boundary |
+| Sources/AppleDebugCore/ApplePluginHost.swift | Signed executable validation and sandbox-required, non-executing plugin-host plans | Maintainers; update only with a reviewed sandbox/IPC boundary |
 | Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench | Maintainers; update with GUI panels and core API changes |
 | Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
 | Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
@@ -60,6 +61,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `ReverseExecutionService` and `AppleKernelCapabilityService`: expose the installed backend’s actual reverse/time-travel and kernel-debugging boundary instead of claiming Windows/x64dbg semantics on Apple.
 - `AppleControlFlowService`, `AppleDyldSharedCacheService`, `AppleMemoryMapService`, `AppleSimulatorEnvironmentService`, `AppleReproBundleService`, `AppleSigningAuditService`, and `ApplePatchWorkflowService` provide the next Apple-native reverse-engineering and reproducibility layer.
 - `AppleDebugPlugin` is an in-process extension contract; `AppleDebugPluginManifestService` only discovers explicit JSON manifests. Dynamic dylib loading and arbitrary plugin process execution are deliberately outside the MCP trust boundary.
+- `ApplePluginHostService` verifies a candidate executable’s Apple signature and optional team identity but returns a plan only; a future host must be separately signed, sandboxed, and explicitly authorized.
 - `AppleDebugWorkbench` is a SwiftUI macOS executable that consumes read-only core analyzers directly; the MCP server remains the automation surface.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
