@@ -184,6 +184,11 @@ enum ToolCatalog {
             inputSchema: simulatorUISnapshotObjectSchema
         ),
         Tool(
+            name: "apple_simulator_ui_action",
+            description: "Run a bounded XCUITest tap, text entry, swipe, or wait action and return the resulting accessibility tree. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorUIActionObjectSchema
+        ),
+        Tool(
             name: "apple_device_list",
             description: "List CoreDevice physical-device inventory and explicit pairing/tunnel authorization state.",
             inputSchema: emptyObjectSchema
@@ -626,6 +631,33 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_simulator_ui_action":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue,
+                  let projectPath = params.arguments?["projectPath"]?.stringValue,
+                  let scheme = params.arguments?["scheme"]?.stringValue,
+                  let action = params.arguments?["action"]?.stringValue else {
+                return errorResult("Missing required udid, bundleID, projectPath, scheme, or action argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorUIService.performAction(
+                        udid: udid,
+                        bundleID: bundleID,
+                        projectPath: projectPath,
+                        scheme: scheme,
+                        configuration: params.arguments?["configuration"]?.stringValue ?? "Debug",
+                        action: .init(
+                            action: action,
+                            identifier: params.arguments?["identifier"]?.stringValue,
+                            text: params.arguments?["text"]?.stringValue,
+                            direction: params.arguments?["direction"]?.stringValue
+                        )
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_device_list":
             do {
                 return result(for: try AppleDeviceService.list())
@@ -1031,6 +1063,44 @@ enum ToolCatalog {
             .string("bundleID"),
             .string("projectPath"),
             .string("scheme")
+        ])
+    ])
+
+    private static let simulatorUIActionObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")]),
+            "projectPath": .object(["type": .string("string")]),
+            "scheme": .object(["type": .string("string")]),
+            "configuration": .object(["type": .string("string")]),
+            "action": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("tap"),
+                    .string("typeText"),
+                    .string("swipe"),
+                    .string("wait")
+                ])
+            ]),
+            "identifier": .object(["type": .string("string")]),
+            "text": .object(["type": .string("string")]),
+            "direction": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("up"),
+                    .string("down"),
+                    .string("left"),
+                    .string("right")
+                ])
+            ])
+        ]),
+        "required": .array([
+            .string("udid"),
+            .string("bundleID"),
+            .string("projectPath"),
+            .string("scheme"),
+            .string("action")
         ])
     ])
 

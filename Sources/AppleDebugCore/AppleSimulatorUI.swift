@@ -8,6 +8,7 @@ public enum SimulatorUIError: Error, Equatable, LocalizedError, Sendable {
     case mutationDisabled
     case invalidProject
     case invalidRequest
+    case invalidAction
     case unknownSimulator(String)
     case commandFailed(String)
     case attachmentNotFound
@@ -22,6 +23,8 @@ public enum SimulatorUIError: Error, Equatable, LocalizedError, Sendable {
             return "UI inspection requires an existing .xcodeproj or .xcworkspace with a UI-test-enabled scheme."
         case .invalidRequest:
             return "Simulator UI inspection request is invalid."
+        case .invalidAction:
+            return "Simulator UI action is unsupported or missing its required fields."
         case .unknownSimulator(let udid):
             return "Simulator is not in the available inventory: \(udid)"
         case .commandFailed(let message):
@@ -89,6 +92,30 @@ public struct SimulatorUISnapshot: Codable, Equatable, Sendable {
     }
 }
 
+public struct SimulatorUIActionRequest: Codable, Equatable, Sendable {
+    public let action: String
+    public let identifier: String?
+    public let text: String?
+    public let direction: String?
+
+    public init(action: String, identifier: String? = nil, text: String? = nil, direction: String? = nil) {
+        self.action = action
+        self.identifier = identifier
+        self.text = text
+        self.direction = direction
+    }
+}
+
+public struct SimulatorUIActionResult: Codable, Equatable, Sendable {
+    public let action: String
+    public let snapshot: SimulatorUISnapshot
+
+    public init(action: String, snapshot: SimulatorUISnapshot) {
+        self.action = action
+        self.snapshot = snapshot
+    }
+}
+
 public enum SimulatorUIService {
     private static let maximumCommandOutput = 8 * 1024 * 1024
     private static let maximumSnapshotSize = 4 * 1024 * 1024
@@ -99,6 +126,44 @@ public enum SimulatorUIService {
         projectPath: String,
         scheme: String,
         configuration: String = "Debug"
+    ) throws -> SimulatorUISnapshot {
+        try runProbe(
+            udid: udid,
+            bundleID: bundleID,
+            projectPath: projectPath,
+            scheme: scheme,
+            configuration: configuration,
+            action: nil
+        )
+    }
+
+    public static func performAction(
+        udid: String,
+        bundleID: String,
+        projectPath: String,
+        scheme: String,
+        configuration: String = "Debug",
+        action: SimulatorUIActionRequest
+    ) throws -> SimulatorUIActionResult {
+        try validate(action: action)
+        let snapshot = try runProbe(
+            udid: udid,
+            bundleID: bundleID,
+            projectPath: projectPath,
+            scheme: scheme,
+            configuration: configuration,
+            action: action
+        )
+        return SimulatorUIActionResult(action: action.action, snapshot: snapshot)
+    }
+
+    private static func runProbe(
+        udid: String,
+        bundleID: String,
+        projectPath: String,
+        scheme: String,
+        configuration: String,
+        action: SimulatorUIActionRequest?
     ) throws -> SimulatorUISnapshot {
         guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION"] == "1" else {
             throw SimulatorUIError.mutationDisabled
@@ -125,18 +190,25 @@ public enum SimulatorUIService {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let projectFlag = projectURL.pathExtension == "xcodeproj" ? "-project" : "-workspace"
+        var xcodebuildArguments = [
+            projectFlag, projectURL.path,
+            "-scheme", scheme,
+            "-configuration", configuration,
+            "-destination", "platform=iOS Simulator,id=\(udid)",
+            "-derivedDataPath", derivedData.path,
+            "-resultBundlePath", resultBundle.path,
+            "CODE_SIGNING_ALLOWED=NO"
+        ]
+        if let action {
+            let actionData = try JSONEncoder().encode(action)
+            xcodebuildArguments.append(
+                "APPLE_DEBUG_UI_ACTION_BASE64=\(actionData.base64EncodedString())"
+            )
+        }
+        xcodebuildArguments.append("test")
         let buildResult = try run(
             executable: "/usr/bin/xcodebuild",
-            arguments: [
-                projectFlag, projectURL.path,
-                "-scheme", scheme,
-                "-configuration", configuration,
-                "-destination", "platform=iOS Simulator,id=\(udid)",
-                "-derivedDataPath", derivedData.path,
-                "-resultBundlePath", resultBundle.path,
-                "CODE_SIGNING_ALLOWED=NO",
-                "test"
-            ]
+            arguments: xcodebuildArguments
         )
         _ = buildResult
 
@@ -185,10 +257,39 @@ public enum SimulatorUIService {
         throw SimulatorUIError.attachmentNotFound
     }
 
+    private static func validate(action: SimulatorUIActionRequest) throws {
+        guard ["tap", "typeText", "swipe", "wait"].contains(action.action) else {
+            throw SimulatorUIError.invalidAction
+        }
+        if let identifier = action.identifier {
+            guard !identifier.isEmpty, identifier.utf8.count <= 256, !identifier.contains("\0") else {
+                throw SimulatorUIError.invalidAction
+            }
+        }
+        switch action.action {
+        case "tap", "wait":
+            guard action.identifier != nil else { throw SimulatorUIError.invalidAction }
+        case "typeText":
+            guard action.identifier != nil,
+                  let text = action.text,
+                  !text.contains("\0"),
+                  text.utf8.count <= 4096 else {
+                throw SimulatorUIError.invalidAction
+            }
+        case "swipe":
+            guard ["up", "down", "left", "right"].contains(action.direction ?? "up") else {
+                throw SimulatorUIError.invalidAction
+            }
+        default:
+            throw SimulatorUIError.invalidAction
+        }
+    }
+
     private struct AccessibilityPayload: Codable {
         let bundleID: String
         let debugDescription: String
         let elements: [SimulatorUIElement]
+        let action: String?
     }
 
     private struct CommandResult {

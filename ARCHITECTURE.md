@@ -53,8 +53,9 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 9. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
 10. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 11. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
-12. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-13. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+12. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
+13. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+14. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 

@@ -97,8 +97,27 @@ def main() -> int:
             raise RuntimeError(f"UI tree did not contain required identifiers: {sorted(identifiers)}")
         if not snapshot.get("debugDescription"):
             raise RuntimeError("UI tree did not contain XCTest debugDescription")
+        for action in (
+            {"action": "typeText", "identifier": "debug.fixture.input", "text": "hello"},
+            {"action": "tap", "identifier": "debug.fixture.button"},
+            {"action": "swipe", "direction": "up"},
+            {"action": "wait", "identifier": "debug.fixture.status"},
+        ):
+            action_result = tool(
+                "apple_simulator_ui_action",
+                {
+                    "udid": simulator_id,
+                    "bundleID": "com.burakkarahan.AppleDebugFixture",
+                    "projectPath": str(root / "Tests/Fixtures/iOSDebugApp/DebugApp.xcodeproj"),
+                    "scheme": "DebugApp",
+                    "configuration": "Debug",
+                    **action,
+                },
+            )
+            if action_result.get("action") != action["action"]:
+                raise RuntimeError("UI action result did not preserve the requested action")
         print(
-            "ios-ui-tree-smoke: standalone MCP XCUITest bridge returned %d elements with stable identifiers for %s"
+            "ios-ui-tree-smoke: standalone MCP XCUITest bridge returned %d elements and completed tap, typeText, swipe, and wait actions for %s"
             % (len(snapshot["elements"]), simulator_id)
         )
         return 0
