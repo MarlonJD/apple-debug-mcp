@@ -30,6 +30,37 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testTransactionalMemoryPatchRequiresExplicitPolicy() async {
+        let manager = DebugSessionManager()
+        do {
+            _ = try await manager.patchMemory(
+                sessionID: "missing",
+                memoryReference: "0x0",
+                offset: 0,
+                expectedData: nil,
+                data: Data([0x01])
+            )
+            XCTFail("Memory patch unexpectedly bypassed its policy gate")
+        } catch {
+            XCTAssertEqual(error as? DebugPolicyError, .memoryWriteDisabled)
+        }
+    }
+
+    func testMemoryWriteRejectsNegativeOffsetBeforeSessionLookup() async {
+        let manager = DebugSessionManager()
+        do {
+            _ = try await manager.writeMemory(
+                sessionID: "missing",
+                memoryReference: "0x0",
+                offset: -1,
+                data: Data([0x01])
+            )
+            XCTFail("Negative memory offset unexpectedly reached the session")
+        } catch {
+            XCTAssertEqual(error as? DebugPolicyError, .invalidRequest("Memory offset must not be negative."))
+        }
+    }
+
     func testExpressionEvaluationRequiresExplicitPolicy() {
         XCTAssertThrowsError(
             try DebugPolicy.validateEvaluate()

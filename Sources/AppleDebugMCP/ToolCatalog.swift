@@ -174,6 +174,16 @@ enum ToolCatalog {
             inputSchema: writeMemoryObjectSchema
         ),
         Tool(
+            name: "apple_debug_search_memory",
+            description: "Search a bounded readable memory range for a base64 byte pattern.",
+            inputSchema: searchMemoryObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_patch_memory",
+            description: "Transactionally patch stopped target memory after optional expected-byte validation. Disabled unless APPLE_DEBUG_ALLOW_MEMORY_WRITE=1.",
+            inputSchema: patchMemoryObjectSchema
+        ),
+        Tool(
             name: "apple_debug_terminate",
             description: "Request target termination through LLDB-DAP.",
             inputSchema: terminateObjectSchema
@@ -677,6 +687,56 @@ enum ToolCatalog {
                         sessionID: sessionID,
                         memoryReference: memoryReference,
                         offset: intValue(from: params.arguments?["offset"]) ?? 0,
+                        data: data
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_search_memory":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let memoryReference = params.arguments?["memoryReference"]?.stringValue,
+                  let encodedPattern = params.arguments?["pattern"]?.stringValue,
+                  let pattern = Data(base64Encoded: encodedPattern),
+                  let count = intValue(from: params.arguments?["count"]) else {
+                return errorResult("Missing required sessionID, memoryReference, count, or valid base64 pattern argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.searchMemory(
+                        sessionID: sessionID,
+                        memoryReference: memoryReference,
+                        offset: intValue(from: params.arguments?["offset"]) ?? 0,
+                        count: count,
+                        pattern: pattern
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_patch_memory":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let memoryReference = params.arguments?["memoryReference"]?.stringValue,
+                  let encodedData = params.arguments?["data"]?.stringValue,
+                  let data = Data(base64Encoded: encodedData) else {
+                return errorResult("Missing required sessionID, memoryReference, or valid base64 data argument.")
+            }
+            let expectedData: Data?
+            if let encoded = params.arguments?["expectedData"]?.stringValue {
+                guard let decoded = Data(base64Encoded: encoded) else {
+                    return errorResult("expectedData must be valid base64.")
+                }
+                expectedData = decoded
+            } else {
+                expectedData = nil
+            }
+            do {
+                return result(
+                    for: try await sessions.patchMemory(
+                        sessionID: sessionID,
+                        memoryReference: memoryReference,
+                        offset: intValue(from: params.arguments?["offset"]) ?? 0,
+                        expectedData: expectedData,
                         data: data
                     )
                 )
@@ -1200,6 +1260,48 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("sessionID"), .string("memoryReference"), .string("data")])
+    ])
+
+    private static let searchMemoryObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "memoryReference": .object(["type": .string("string")]),
+            "offset": .object(["type": .string("integer")]),
+            "count": .object(["type": .string("integer")]),
+            "pattern": .object([
+                "type": .string("string"),
+                "description": .string("Base64-encoded byte pattern")
+            ])
+        ]),
+        "required": .array([
+            .string("sessionID"),
+            .string("memoryReference"),
+            .string("count"),
+            .string("pattern")
+        ])
+    ])
+
+    private static let patchMemoryObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "memoryReference": .object(["type": .string("string")]),
+            "offset": .object(["type": .string("integer")]),
+            "expectedData": .object([
+                "type": .string("string"),
+                "description": .string("Optional base64 bytes that must match before writing")
+            ]),
+            "data": .object([
+                "type": .string("string"),
+                "description": .string("Base64 bytes to write; maximum 4096 bytes")
+            ])
+        ]),
+        "required": .array([
+            .string("sessionID"),
+            .string("memoryReference"),
+            .string("data")
+        ])
     ])
 
     private static let terminateObjectSchema: Value = .object([

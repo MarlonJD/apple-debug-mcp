@@ -8,6 +8,7 @@ The current product surface includes:
 - source/function/exception breakpoints, threads, stack traces, scopes, registers, variables, modules, stepping, pause/continue, disassembly, and bounded memory reads;
 - watchpoint plumbing through DAP data breakpoints;
 - explicitly authorized expression evaluation and memory writes, plus target terminate/disconnect control;
+- bounded memory pattern search and expected-bytes transactional patch/rollback (write permission required);
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;

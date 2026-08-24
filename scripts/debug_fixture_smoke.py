@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the authorized macOS fixture through the MCP debugger surface."""
 
+import base64
 import json
 import os
 from pathlib import Path
@@ -157,10 +158,25 @@ def main() -> int:
             {"sessionID": session_id, "expression": "1 + 1", "frameID": frame_id},
         )
 
-        tool(
+        memory_response = tool(
             "apple_debug_read_memory",
             {"sessionID": session_id, "memoryReference": instruction_reference, "count": 16},
         )
+        memory_body = json.loads(memory_response["result"]["content"][0]["text"])["body"]
+        memory_bytes = base64.b64decode(memory_body["data"])
+        search_result = json.loads(
+            tool(
+                "apple_debug_search_memory",
+                {
+                    "sessionID": session_id,
+                    "memoryReference": instruction_reference,
+                    "count": 16,
+                    "pattern": base64.b64encode(memory_bytes[:2]).decode("ascii"),
+                },
+            )["result"]["content"][0]["text"]
+        )
+        if not search_result.get("matches"):
+            raise RuntimeError("memory search did not find the bytes returned by readMemory")
         tool(
             "apple_debug_disassemble",
             {"sessionID": session_id, "memoryReference": instruction_reference, "instructionCount": 4},

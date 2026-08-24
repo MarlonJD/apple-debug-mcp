@@ -40,6 +40,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 15:50Z) Add the correlated `apple_debug_stop_snapshot` observation and verify it against the stopped macOS fixture.
 - [x] (2026-08-24 15:55Z) Add `apple_binary_inspect` for code signatures, entitlements, linked libraries, nm symbols, and dyld exports; verify against `/bin/echo`.
 - [x] (2026-08-24 16:00Z) Add `apple_runtime_metadata` for Objective-C classes/protocols/selectors and demangled Swift symbols; verify against `/usr/bin/shortcuts`.
+- [x] (2026-08-24 16:05Z) Add bounded memory search and expected-bytes transactional patch/rollback with explicit write authorization; verify search against the macOS fixture and keep patch policy-gated.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries

@@ -156,6 +156,59 @@ public struct DebugStopSnapshot: Codable, Equatable, Sendable {
     }
 }
 
+public struct MemorySearchResult: Codable, Equatable, Sendable {
+    public let sessionID: String
+    public let memoryReference: String
+    public let offset: Int
+    public let count: Int
+    public let pattern: String
+    public let matches: [Int]
+
+    public init(
+        sessionID: String,
+        memoryReference: String,
+        offset: Int,
+        count: Int,
+        pattern: String,
+        matches: [Int]
+    ) {
+        self.sessionID = sessionID
+        self.memoryReference = memoryReference
+        self.offset = offset
+        self.count = count
+        self.pattern = pattern
+        self.matches = matches
+    }
+}
+
+public struct MemoryPatchResult: Codable, Equatable, Sendable {
+    public let sessionID: String
+    public let memoryReference: String
+    public let offset: Int
+    public let originalData: String
+    public let requestedData: String
+    public let verified: Bool
+    public let rolledBack: Bool
+
+    public init(
+        sessionID: String,
+        memoryReference: String,
+        offset: Int,
+        originalData: String,
+        requestedData: String,
+        verified: Bool,
+        rolledBack: Bool
+    ) {
+        self.sessionID = sessionID
+        self.memoryReference = memoryReference
+        self.offset = offset
+        self.originalData = originalData
+        self.requestedData = requestedData
+        self.verified = verified
+        self.rolledBack = rolledBack
+    }
+}
+
 public actor DebugSessionManager {
     private struct SessionRecord {
         let session: LLDBDAPSession
@@ -576,6 +629,7 @@ public actor DebugSessionManager {
         offset: Int,
         data: Data
     ) async throws -> DAPMessage {
+        try DebugPolicy.validateNonNegative(offset, label: "Memory offset")
         try DebugPolicy.validateMemoryWrite(data: data)
         return try await session(for: sessionID).send(
             command: "writeMemory",
@@ -584,6 +638,125 @@ public actor DebugSessionManager {
                 "offset": .integer(offset),
                 "data": .string(data.base64EncodedString())
             ])
+        )
+    }
+
+    public func searchMemory(
+        sessionID: String,
+        memoryReference: String,
+        offset: Int,
+        count: Int,
+        pattern: Data
+    ) async throws -> MemorySearchResult {
+        try DebugPolicy.validatePositive(count, label: "Search count", maximum: 1_048_576)
+        try DebugPolicy.validateNonNegative(offset, label: "Search offset")
+        guard !pattern.isEmpty, pattern.count <= 1_024 else {
+            throw DebugPolicyError.invalidRequest("Search pattern must contain between 1 and 1024 bytes.")
+        }
+        let session = try session(for: sessionID)
+        let response = try await session.send(
+            command: "readMemory",
+            arguments: .object([
+                "memoryReference": .string(memoryReference),
+                "offset": .integer(offset),
+                "count": .integer(count)
+            ])
+        )
+        let bytes = try memoryData(from: response)
+        var matches: [Int] = []
+        guard bytes.count >= pattern.count else {
+            return MemorySearchResult(
+                sessionID: sessionID,
+                memoryReference: memoryReference,
+                offset: offset,
+                count: count,
+                pattern: pattern.base64EncodedString(),
+                matches: []
+            )
+        }
+        for index in 0...(bytes.count - pattern.count) {
+            if bytes[index..<(index + pattern.count)].elementsEqual(pattern) {
+                matches.append(offset + index)
+            }
+            if matches.count == 10_000 { break }
+        }
+        return MemorySearchResult(
+            sessionID: sessionID,
+            memoryReference: memoryReference,
+            offset: offset,
+            count: count,
+            pattern: pattern.base64EncodedString(),
+            matches: matches
+        )
+    }
+
+    public func patchMemory(
+        sessionID: String,
+        memoryReference: String,
+        offset: Int,
+        expectedData: Data?,
+        data: Data
+    ) async throws -> MemoryPatchResult {
+        try DebugPolicy.validateMemoryWrite(data: data)
+        try DebugPolicy.validateNonNegative(offset, label: "Patch offset")
+        let session = try session(for: sessionID)
+        let originalResponse = try await session.send(
+            command: "readMemory",
+            arguments: .object([
+                "memoryReference": .string(memoryReference),
+                "offset": .integer(offset),
+                "count": .integer(data.count)
+            ])
+        )
+        let original = try memoryData(from: originalResponse)
+        guard original.count == data.count else {
+            throw DebugPolicyError.invalidRequest("LLDB-DAP returned fewer bytes than the requested patch length.")
+        }
+        if let expectedData, original != expectedData {
+            throw DebugPolicyError.invalidRequest("Patch expected bytes do not match the target.")
+        }
+        _ = try await sendWriteMemory(
+            session: session,
+            memoryReference: memoryReference,
+            offset: offset,
+            data: data
+        )
+        let verificationResponse = try await session.send(
+            command: "readMemory",
+            arguments: .object([
+                "memoryReference": .string(memoryReference),
+                "offset": .integer(offset),
+                "count": .integer(data.count)
+            ])
+        )
+        let verifiedData = try memoryData(from: verificationResponse)
+        guard verifiedData == data else {
+            var rolledBack = false
+            do {
+                _ = try await sendWriteMemory(
+                    session: session,
+                    memoryReference: memoryReference,
+                    offset: offset,
+                    data: original
+                )
+                rolledBack = true
+            } catch {
+                rolledBack = false
+            }
+            throw DebugPolicyError.invalidRequest(
+                rolledBack
+                    ? "Memory patch readback failed; original bytes were restored."
+                    : "Memory patch readback failed and rollback could not be confirmed."
+            )
+        }
+        return MemoryPatchResult(
+            sessionID: sessionID,
+            memoryReference: memoryReference,
+            offset: offset,
+            originalData: original.base64EncodedString(),
+            requestedData: data.base64EncodedString(),
+            verified: true,
+            rolledBack: false
         )
     }
 
@@ -639,6 +812,31 @@ public actor DebugSessionManager {
             arguments: .object(["variablesReference": .integer(registerReference)])
         )
         return RegisterSnapshot(scopes: scopes, variables: variables)
+    }
+
+    private func sendWriteMemory(
+        session: LLDBDAPSession,
+        memoryReference: String,
+        offset: Int,
+        data: Data
+    ) async throws -> DAPMessage {
+        try await session.send(
+            command: "writeMemory",
+            arguments: .object([
+                "memoryReference": .string(memoryReference),
+                "offset": .integer(offset),
+                "data": .string(data.base64EncodedString())
+            ])
+        )
+    }
+
+    private func memoryData(from message: DAPMessage) throws -> Data {
+        guard case .object(let body) = message.body,
+              case .string(let encoded) = body["data"],
+              let data = Data(base64Encoded: encoded) else {
+            throw DAPError.requestFailed("LLDB-DAP did not return readable memory data.")
+        }
+        return data
     }
 
     private func firstThreadID(from message: DAPMessage) -> Int? {
