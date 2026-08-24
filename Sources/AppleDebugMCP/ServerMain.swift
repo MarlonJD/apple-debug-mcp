@@ -27,5 +27,6 @@ struct AppleDebugMCPMain {
         let transport = StdioTransport()
         try await server.start(transport: transport)
         await server.waitUntilCompleted()
+        await ToolCatalog.shutdown()
     }
 }

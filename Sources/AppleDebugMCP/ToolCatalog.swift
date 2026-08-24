@@ -47,6 +47,36 @@ enum ToolCatalog {
             name: "apple_debug_launch",
             description: "Launch an authorized target in an existing LLDB-DAP session. Disabled unless APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1.",
             inputSchema: launchObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_set_breakpoint",
+            description: "Set a source-line breakpoint in an active debug session.",
+            inputSchema: breakpointObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_threads",
+            description: "List threads in an active debug session.",
+            inputSchema: sessionObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_stack_trace",
+            description: "Read a thread stack trace in an active debug session.",
+            inputSchema: stackTraceObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_read_memory",
+            description: "Read memory from a stopped target through LLDB-DAP.",
+            inputSchema: memoryObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_disassemble",
+            description: "Disassemble instructions from a stopped target through LLDB-DAP.",
+            inputSchema: disassembleObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_continue",
+            description: "Continue an active debug session for a selected thread.",
+            inputSchema: threadObjectSchema
         )
     ]
 
@@ -135,6 +165,71 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_debug_set_breakpoint":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let file = params.arguments?["file"]?.stringValue,
+                  let line = intValue(from: params.arguments?["line"]) else {
+                return errorResult("Missing required sessionID, file, or line argument.")
+            }
+            do {
+                return result(for: try await sessions.setBreakpoint(sessionID: sessionID, file: file, line: line))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_threads":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            do {
+                return result(for: try await sessions.threads(sessionID: sessionID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_stack_trace":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let threadID = intValue(from: params.arguments?["threadID"]) else {
+                return errorResult("Missing required sessionID or threadID argument.")
+            }
+            let levels = intValue(from: params.arguments?["levels"]) ?? 100
+            do {
+                return result(for: try await sessions.stackTrace(sessionID: sessionID, threadID: threadID, levels: levels))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_read_memory":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let memoryReference = params.arguments?["memoryReference"]?.stringValue,
+                  let count = intValue(from: params.arguments?["count"]) else {
+                return errorResult("Missing required sessionID, memoryReference, or count argument.")
+            }
+            let offset = intValue(from: params.arguments?["offset"]) ?? 0
+            do {
+                return result(for: try await sessions.readMemory(sessionID: sessionID, memoryReference: memoryReference, offset: offset, count: count))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_disassemble":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let memoryReference = params.arguments?["memoryReference"]?.stringValue,
+                  let instructionCount = intValue(from: params.arguments?["instructionCount"]) else {
+                return errorResult("Missing required sessionID, memoryReference, or instructionCount argument.")
+            }
+            let instructionOffset = intValue(from: params.arguments?["instructionOffset"]) ?? 0
+            do {
+                return result(for: try await sessions.disassemble(sessionID: sessionID, memoryReference: memoryReference, instructionOffset: instructionOffset, instructionCount: instructionCount))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_continue":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let threadID = intValue(from: params.arguments?["threadID"]) else {
+                return errorResult("Missing required sessionID or threadID argument.")
+            }
+            do {
+                return result(for: try await sessions.continueExecution(sessionID: sessionID, threadID: threadID))
+            } catch {
+                return errorResult(error)
+            }
 
         default:
             return .init(
@@ -142,6 +237,10 @@ enum ToolCatalog {
                 isError: true
             )
         }
+    }
+
+    static func shutdown() async {
+        await sessions.closeAll()
     }
 
     private struct DAPProbeResult: Encodable {
@@ -200,6 +299,57 @@ enum ToolCatalog {
         "required": .array([.string("sessionID"), .string("program")])
     ])
 
+    private static let breakpointObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "file": .object(["type": .string("string")]),
+            "line": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("file"), .string("line")])
+    ])
+
+    private static let threadObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "threadID": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("threadID")])
+    ])
+
+    private static let stackTraceObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "threadID": .object(["type": .string("integer")]),
+            "levels": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("threadID")])
+    ])
+
+    private static let memoryObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "memoryReference": .object(["type": .string("string")]),
+            "offset": .object(["type": .string("integer")]),
+            "count": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("memoryReference"), .string("count")])
+    ])
+
+    private static let disassembleObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "memoryReference": .object(["type": .string("string")]),
+            "instructionOffset": .object(["type": .string("integer")]),
+            "instructionCount": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("memoryReference"), .string("instructionCount")])
+    ])
+
     private static func errorResult(_ error: Error) -> CallTool.Result {
         errorResult(error.localizedDescription)
     }
@@ -227,6 +377,15 @@ enum ToolCatalog {
             return defaultValue
         }
         return boolean
+    }
+
+    private static func intValue(from value: Value?) -> Int? {
+        guard let value,
+              let data = try? JSONEncoder().encode(value),
+              let number = try? JSONSerialization.jsonObject(with: data) as? NSNumber else {
+            return nil
+        }
+        return number.intValue
     }
 
     private static func result<T: Encodable>(for value: T) -> CallTool.Result {

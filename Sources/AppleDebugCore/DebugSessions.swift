@@ -92,6 +92,73 @@ public actor DebugSessionManager {
         }
     }
 
+    public func setBreakpoint(sessionID: String, file: String, line: Int) async throws -> DAPMessage {
+        let session = try session(for: sessionID)
+        return try await session.send(
+            command: "setBreakpoints",
+            arguments: .object([
+                "source": .object(["path": .string(file)]),
+                "breakpoints": .array([
+                    .object(["line": .integer(line)])
+                ])
+            ])
+        )
+    }
+
+    public func threads(sessionID: String) async throws -> DAPMessage {
+        try await session(for: sessionID).send(command: "threads")
+    }
+
+    public func stackTrace(sessionID: String, threadID: Int, levels: Int) async throws -> DAPMessage {
+        try await session(for: sessionID).send(
+            command: "stackTrace",
+            arguments: .object([
+                "threadId": .integer(threadID),
+                "levels": .integer(levels)
+            ])
+        )
+    }
+
+    public func readMemory(
+        sessionID: String,
+        memoryReference: String,
+        offset: Int,
+        count: Int
+    ) async throws -> DAPMessage {
+        try await session(for: sessionID).send(
+            command: "readMemory",
+            arguments: .object([
+                "memoryReference": .string(memoryReference),
+                "offset": .integer(offset),
+                "count": .integer(count)
+            ])
+        )
+    }
+
+    public func disassemble(
+        sessionID: String,
+        memoryReference: String,
+        instructionOffset: Int,
+        instructionCount: Int
+    ) async throws -> DAPMessage {
+        try await session(for: sessionID).send(
+            command: "disassemble",
+            arguments: .object([
+                "memoryReference": .string(memoryReference),
+                "instructionOffset": .integer(instructionOffset),
+                "instructionCount": .integer(instructionCount),
+                "resolveSymbols": .boolean(true)
+            ])
+        )
+    }
+
+    public func continueExecution(sessionID: String, threadID: Int) async throws -> DAPMessage {
+        try await session(for: sessionID).send(
+            command: "continue",
+            arguments: .object(["threadId": .integer(threadID)])
+        )
+    }
+
     public func close(sessionID: String) async -> Bool {
         guard let session = sessions.removeValue(forKey: sessionID) else {
             return false
@@ -106,5 +173,12 @@ public actor DebugSessionManager {
         for session in sessions.values {
             await session.stop()
         }
+    }
+
+    private func session(for sessionID: String) throws -> LLDBDAPSession {
+        guard let session = sessions[sessionID] else {
+            throw DAPError.requestFailed("Unknown debug session: \(sessionID)")
+        }
+        return session
     }
 }
