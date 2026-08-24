@@ -77,6 +77,16 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testStopWaitTimeoutIsBoundedBeforeSessionLookup() async {
+        let manager = DebugSessionManager()
+        do {
+            _ = try await manager.waitForStop(sessionID: "missing", timeoutMilliseconds: 0)
+            XCTFail("Zero stop wait timeout unexpectedly reached the session")
+        } catch {
+            XCTAssertEqual(error as? DebugPolicyError, .invalidRequest("Stop wait timeout must be positive."))
+        }
+    }
+
     func testExpressionEvaluationRequiresExplicitPolicy() {
         XCTAssertThrowsError(
             try DebugPolicy.validateEvaluate()

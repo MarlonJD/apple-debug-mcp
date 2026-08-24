@@ -100,7 +100,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Signing/notarization remains separate release work.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization.
 
 ## License
 

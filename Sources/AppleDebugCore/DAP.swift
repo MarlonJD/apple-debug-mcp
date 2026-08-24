@@ -144,6 +144,16 @@ public struct DAPMessage: Codable, Equatable, Sendable {
     }
 }
 
+public struct DAPEventWaitResult: Codable, Equatable, Sendable {
+    public let events: [DAPMessage]
+    public let timedOut: Bool
+
+    public init(events: [DAPMessage], timedOut: Bool) {
+        self.events = events
+        self.timedOut = timedOut
+    }
+}
+
 public enum DAPError: Error, Equatable, LocalizedError, Sendable {
     case invalidHeader
     case missingContentLength
@@ -342,6 +352,41 @@ public actor LLDBDAPSession {
         return events
     }
 
+    public func waitForStop(timeoutMilliseconds: Int) throws -> DAPEventWaitResult {
+        try startProcessIfNeeded()
+        guard let output else {
+            throw DAPError.processUnavailable
+        }
+        let deadline = Date().addingTimeInterval(Double(timeoutMilliseconds) / 1_000.0)
+        while true {
+            if hasStopEvent(events) {
+                return DAPEventWaitResult(events: drainEvents(), timedOut: false)
+            }
+            let remaining = Int(deadline.timeIntervalSinceNow * 1_000)
+            if remaining <= 0 {
+                return DAPEventWaitResult(events: drainEvents(), timedOut: true)
+            }
+            do {
+                let data = try readChunk(
+                    from: output,
+                    timeoutMilliseconds: min(remaining, 10_000)
+                )
+                if data.isEmpty {
+                    let status = process?.terminationStatus ?? -1
+                    throw DAPError.processExited(status)
+                }
+                buffer.append(data)
+                while let message = try DAPFraming.nextMessage(from: &buffer) {
+                    if message.type == "event" {
+                        events.append(message)
+                    }
+                }
+            } catch DAPError.timeout {
+                return DAPEventWaitResult(events: drainEvents(), timedOut: true)
+            }
+        }
+    }
+
     public func stop() {
         if let process {
             try? input?.close()
@@ -399,13 +444,23 @@ public actor LLDBDAPSession {
         return "Unknown LLDB-DAP failure"
     }
 
-    private func readChunk(from output: FileHandle) throws -> Data {
+    private func hasStopEvent(_ messages: [DAPMessage]) -> Bool {
+        messages.contains { message in
+            guard let event = message.event else { return false }
+            return event == "stopped" || event == "terminated" || event == "exited"
+        }
+    }
+
+    private func readChunk(
+        from output: FileHandle,
+        timeoutMilliseconds: Int = 10_000
+    ) throws -> Data {
         var descriptor = pollfd(
             fd: output.fileDescriptor,
             events: Int16(POLLIN),
             revents: 0
         )
-        let ready = Darwin.poll(&descriptor, 1, 10_000)
+        let ready = Darwin.poll(&descriptor, 1, Int32(max(1, timeoutMilliseconds)))
         guard ready > 0 else {
             if ready == 0 {
                 throw DAPError.timeout

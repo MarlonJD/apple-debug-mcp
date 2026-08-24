@@ -63,7 +63,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 
 ## Runtime topology
 
-The topology is local macOS only: one short-lived MCP process, zero listening ports, no hosted service, and no persistent database. Build artifacts remain under `.build`; `make package` creates an unsigned archive under ignored `dist/`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows. Signing/notarization and remote HTTP transport are outside the current repository boundary.
+The topology is local macOS only: one short-lived MCP process, zero listening ports, no hosted service, and no persistent database. Build artifacts remain under `.build`; `make package` creates an unsigned archive and `make release-package` creates an explicitly authorized signed/notarized app archive under ignored `dist/`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows. Remote HTTP transport remains outside the current repository boundary.
 
 ## Cross-cutting concerns
 

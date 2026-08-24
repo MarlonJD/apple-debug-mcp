@@ -169,6 +169,34 @@ public struct DebugStopSnapshot: Codable, Equatable, Sendable {
     }
 }
 
+public struct DebugWaitForStopResult: Codable, Equatable, Sendable {
+    public let sessionID: String
+    public let stopReason: String?
+    public let stoppedThreadID: Int?
+    public let stopped: Bool
+    public let terminated: Bool
+    public let timedOut: Bool
+    public let events: [DAPMessage]
+
+    public init(
+        sessionID: String,
+        stopReason: String?,
+        stoppedThreadID: Int?,
+        stopped: Bool,
+        terminated: Bool,
+        timedOut: Bool,
+        events: [DAPMessage]
+    ) {
+        self.sessionID = sessionID
+        self.stopReason = stopReason
+        self.stoppedThreadID = stoppedThreadID
+        self.stopped = stopped
+        self.terminated = terminated
+        self.timedOut = timedOut
+        self.events = events
+    }
+}
+
 public struct MemorySearchResult: Codable, Equatable, Sendable {
     public let sessionID: String
     public let memoryReference: String
@@ -656,6 +684,46 @@ public actor DebugSessionManager {
             scopes: scopes,
             registers: registers,
             modules: modules
+        )
+    }
+
+    public func waitForStop(
+        sessionID: String,
+        timeoutMilliseconds: Int
+    ) async throws -> DebugWaitForStopResult {
+        try DebugPolicy.validatePositive(
+            timeoutMilliseconds,
+            label: "Stop wait timeout",
+            maximum: 120_000
+        )
+        let result = try await session(for: sessionID).waitForStop(
+            timeoutMilliseconds: timeoutMilliseconds
+        )
+        var reason: String?
+        var threadID: Int?
+        var stopped = false
+        var terminated = false
+        for event in result.events.reversed() {
+            if event.event == "stopped" {
+                stopped = true
+                if case .object(let body) = event.body {
+                    if case .string(let value) = body["reason"] { reason = value }
+                    if case .integer(let value) = body["threadId"] { threadID = value }
+                }
+                break
+            }
+            if event.event == "terminated" || event.event == "exited" {
+                terminated = true
+            }
+        }
+        return DebugWaitForStopResult(
+            sessionID: sessionID,
+            stopReason: reason,
+            stoppedThreadID: threadID,
+            stopped: stopped,
+            terminated: terminated,
+            timedOut: result.timedOut,
+            events: result.events
         )
     }
 

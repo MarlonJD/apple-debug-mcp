@@ -198,13 +198,21 @@ def main() -> int:
             {"sessionID": session_id, "threadID": thread_id, "kind": "next", "granularity": "instruction"},
         )
         tool("apple_debug_continue", {"sessionID": session_id, "threadID": thread_id})
+        wait_result = json.loads(
+            tool(
+                "apple_debug_wait_for_stop",
+                {"sessionID": session_id, "timeoutMilliseconds": 10_000},
+            )["result"]["content"][0]["text"]
+        )
+        if not wait_result.get("stopped") and not wait_result.get("terminated"):
+            raise RuntimeError("wait_for_stop did not observe a stopped or terminated event")
         closed = json.loads(
             tool("apple_debug_session_close", {"sessionID": session_id})["result"]["content"][0]["text"]
         )
         if not closed.get("closed"):
             raise RuntimeError("debug session did not close")
         session_id = None
-        print("fixture-smoke: launch, source/instruction breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, completions, evaluate, memory, disassembly, instruction stepping, continue, and cleanup passed")
+        print("fixture-smoke: launch, source/instruction breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, completions, evaluate, memory, disassembly, instruction stepping, continue, stop-event wait, and cleanup passed")
         return 0
     except Exception as error:
         print(f"fixture-smoke: {error}", file=sys.stderr)

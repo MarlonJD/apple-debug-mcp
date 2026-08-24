@@ -169,6 +169,11 @@ enum ToolCatalog {
             inputSchema: stopSnapshotObjectSchema
         ),
         Tool(
+            name: "apple_debug_wait_for_stop",
+            description: "Wait for the next stopped, exited, or terminated LLDB-DAP event after continue or step.",
+            inputSchema: waitForStopObjectSchema
+        ),
+        Tool(
             name: "apple_debug_modules",
             description: "List loaded modules/images in an active debug session.",
             inputSchema: moduleObjectSchema
@@ -720,6 +725,20 @@ enum ToolCatalog {
                         sessionID: sessionID,
                         threadID: intValue(from: params.arguments?["threadID"]),
                         levels: intValue(from: params.arguments?["levels"]) ?? 20
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_wait_for_stop":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.waitForStop(
+                        sessionID: sessionID,
+                        timeoutMilliseconds: intValue(from: params.arguments?["timeoutMilliseconds"]) ?? 10_000
                     )
                 )
             } catch {
@@ -1412,6 +1431,18 @@ enum ToolCatalog {
             "levels": .object([
                 "type": .string("integer"),
                 "description": .string("Maximum stack depth; defaults to 20")
+            ])
+        ]),
+        "required": .array([.string("sessionID")])
+    ])
+
+    private static let waitForStopObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "timeoutMilliseconds": .object([
+                "type": .string("integer"),
+                "description": .string("Positive timeout in milliseconds; maximum 120000; defaults to 10000")
             ])
         ]),
         "required": .array([.string("sessionID")])
