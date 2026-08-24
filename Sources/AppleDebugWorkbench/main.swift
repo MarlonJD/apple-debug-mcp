@@ -22,6 +22,7 @@ struct AppleDebugWorkbenchApp: App {
 private final class WorkbenchModel: ObservableObject {
     enum Panel: String, CaseIterable, Identifiable {
         case overview = "Overview"
+        case debugger = "Debugger"
         case assembler = "Assembler"
         case controlFlow = "Control Flow"
         case boundaries = "Boundaries"
@@ -29,6 +30,9 @@ private final class WorkbenchModel: ObservableObject {
     }
 
     @Published var panel: Panel = .overview
+    @Published var targetPath = ""
+    @Published var sessionID: String?
+    @Published var debuggerOutput = ""
     @Published var architecture = "arm64"
     @Published var assemblySource = "mov x0, x0\nret\n"
     @Published var assemblyOutput = ""
@@ -37,6 +41,7 @@ private final class WorkbenchModel: ObservableObject {
     @Published var errorMessage: String?
 
     let capabilities = CapabilityMatrix.reports()
+    private let sessions = DebugSessionManager()
 
     func assemble() {
         do {
@@ -59,6 +64,37 @@ private final class WorkbenchModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
+
+    func createSession() {
+        Task {
+            do {
+                let summary = try await sessions.create()
+                sessionID = summary.sessionID
+                debuggerOutput = "Created session \(summary.sessionID)"
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func launchTarget() {
+        guard let sessionID else { errorMessage = "Create a debugger session first."; return }
+        Task {
+            do {
+                let response = try await sessions.launch(sessionID: sessionID, program: targetPath, arguments: [], stopOnEntry: true)
+                debuggerOutput = String(describing: response)
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func closeSession() {
+        guard let sessionID else { return }
+        Task {
+            _ = await sessions.close(sessionID: sessionID)
+            self.sessionID = nil
+            debuggerOutput = "Session closed"
+        }
+    }
 }
 
 private struct WorkbenchView: View {
@@ -75,6 +111,7 @@ private struct WorkbenchView: View {
             VStack(alignment: .leading, spacing: 0) {
                 switch model.panel {
                 case .overview: OverviewPanel(model: model)
+                case .debugger: DebuggerPanel(model: model)
                 case .assembler: AssemblerPanel(model: model)
                 case .controlFlow: ControlFlowPanel(model: model)
                 case .boundaries: BoundaryPanel(model: model)
@@ -96,9 +133,44 @@ private struct WorkbenchView: View {
     private func icon(for panel: WorkbenchModel.Panel) -> String {
         switch panel {
         case .overview: return "square.grid.2x2"
+        case .debugger: return "ladybug"
         case .assembler: return "chevron.left.forwardslash.chevron.right"
         case .controlFlow: return "point.3.connected.trianglepath.dotted"
         case .boundaries: return "shield.lefthalf.filled"
+        }
+    }
+}
+
+private struct DebuggerPanel: View {
+    @ObservedObject var model: WorkbenchModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("LLDB-DAP Debugger").font(.title.bold())
+            Text("Session control is backed by the same policy-gated DebugSessionManager as the MCP server.")
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("Create session") { model.createSession() }
+                Button("Launch stopped target") { model.launchTarget() }
+                    .disabled(model.sessionID == nil)
+                Button("Close") { model.closeSession() }
+                    .disabled(model.sessionID == nil)
+            }
+            TextField("Absolute signed target path", text: $model.targetPath)
+                .textFieldStyle(.roundedBorder)
+            if let sessionID = model.sessionID {
+                Label("Session: \(sessionID)", systemImage: "circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.caption)
+            }
+            ScrollView {
+                Text(model.debuggerOutput.isEmpty ? "No debugger response yet." : model.debuggerOutput)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(10)
+            .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
         }
     }
 }
