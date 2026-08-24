@@ -24,12 +24,19 @@ public enum AppleDebugCapability: String, Codable, CaseIterable, Sendable {
     case machOAnalysis = "macho-analysis"
     case binaryIntelligence = "binary-intelligence"
     case runtimeMetadata = "runtime-metadata"
+    case dwarfAnalysis = "dwarf-analysis"
+    case performanceAnalysis = "performance-analysis"
+    case runtimeDiagnostics = "runtime-diagnostics"
+    case assembler
     case binaryDiff = "binary-diff"
     case symbolication
     case crashAnalysis = "crash-analysis"
     case simulatorControl = "simulator-control"
     case deviceControl = "device-control"
     case uiInspection = "ui-inspection"
+    case forwardExecutionTrace = "forward-execution-trace"
+    case reverseExecution = "reverse-execution"
+    case kernelInspection = "kernel-inspection"
     case logs
 }
 
@@ -61,13 +68,16 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
-                    .binaryIntelligence, .runtimeMetadata, .binaryDiff,
-                    .crashAnalysis, .logs
+                    .binaryIntelligence, .runtimeMetadata, .dwarfAnalysis,
+                    .performanceAnalysis, .runtimeDiagnostics, .assembler,
+                    .binaryDiff, .crashAnalysis, .forwardExecutionTrace, .logs
                 ],
-                restricted: [],
+                restricted: [.reverseExecution, .kernelInspection],
                 notes: [
                     "Attach and memory mutation depend on macOS debugger permissions and target entitlements.",
-                    "Memory and variable mutation are disabled by default and require separate explicit policy grants."
+                    "Memory and variable mutation are disabled by default and require separate explicit policy grants.",
+                    "Apple LLDB reverse execution/time-travel is not available in the installed toolchain; forward stop tracing is supported.",
+                    "Kernel memory/debugging remains restricted by SIP, entitlements, and privileged Apple tooling; user-process vmmap and runtime diagnostics are the supported boundary."
                 ]
             ),
             CapabilityReport(
@@ -76,26 +86,32 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
-                    .binaryIntelligence, .runtimeMetadata, .binaryDiff,
-                    .crashAnalysis, .simulatorControl, .uiInspection, .logs
+                    .binaryIntelligence, .runtimeMetadata, .dwarfAnalysis,
+                    .performanceAnalysis, .assembler, .binaryDiff,
+                    .crashAnalysis, .simulatorControl, .uiInspection,
+                    .forwardExecutionTrace, .logs
                 ],
-                restricted: [],
+                restricted: [.reverseExecution, .kernelInspection, .runtimeDiagnostics],
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
                     "Memory and variable mutation are disabled by default and require separate explicit policy grants.",
-                    "UI inspection and bounded actions run through project-backed or generated XCUITest probes; the generated path targets an installed bundle ID and requires Simulator mutation permission."
+                    "UI inspection and bounded actions run through project-backed or generated XCUITest probes; the generated path targets an installed bundle ID and requires Simulator mutation permission.",
+                    "Apple LLDB reverse execution/time-travel is not available; use forward stop tracing, xctrace export, and crash/DWARF evidence instead."
                 ]
             ),
             CapabilityReport(
                 platform: .iOSDevice,
                 supported: [
                     .launch, .machOAnalysis, .symbolication, .crashAnalysis,
-                    .binaryIntelligence, .runtimeMetadata, .binaryDiff, .deviceControl
+                    .binaryIntelligence, .runtimeMetadata, .dwarfAnalysis,
+                    .assembler, .binaryDiff, .deviceControl
                 ],
                 restricted: [
                     .sessionLifecycle, .attach, .breakpoints, .watchpoints,
                     .stepControl, .registers, .stack, .memoryRead,
-                    .memoryWrite, .uiInspection, .logs
+                    .memoryWrite, .uiInspection, .logs, .performanceAnalysis,
+                    .runtimeDiagnostics, .forwardExecutionTrace,
+                    .reverseExecution, .kernelInspection
                 ],
                 notes: [
                     "Physical-device debugging is limited to paired, authorized development targets.",
@@ -132,7 +148,8 @@ public enum ToolchainProbe {
     public static func collect() -> ToolchainStatus {
         let toolNames = [
             "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
-            "codesign", "otool", "nm", "dyld_info", "swift-demangle", "dwarfdump", "vmmap", "xctrace"
+            "codesign", "otool", "nm", "dyld_info", "swift-demangle", "dwarfdump", "vmmap", "xctrace",
+            "heap", "leaks", "malloc_history", "sample", "clang", "llvm-objdump"
         ]
         let tools = toolNames.map { name in
             ToolchainToolStatus(name: name, path: path(for: name))

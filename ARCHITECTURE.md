@@ -19,6 +19,10 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleBinaryIntelligence.swift | Code signatures, entitlements, linked libraries, nm symbols, and dyld exports | Maintainers; update with Apple toolchain output changes |
 | Sources/AppleDebugCore/AppleRuntimeMetadata.swift | Objective-C metadata parsing and Swift symbol demangling | Maintainers; update with Objective-C/Swift ABI/toolchain changes |
 | Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
+| Sources/AppleDebugCore/AppleAssembler.swift | Self-contained arm64/x86_64 assembly, Mach-O text extraction, disassembly, and patch payload generation | Maintainers; update with clang/LLVM output changes |
+| Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
+| Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
+| Sources/AppleDebugCore/AppleKernelCapabilities.swift | Kernel-debugging boundary report and supported user-process alternatives | Maintainers; update with SIP/KDK/entitlement boundary changes |
 | Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
 | Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
@@ -42,6 +46,9 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
 - `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates and parses allowlisted Time Profiler export tables into typed rows, hotspots, and folded flame-stack data; the trace bundle remains the source artifact.
+- `AppleAssemblerService`: compiles bounded self-contained assembly to a temporary Mach-O object, extracts `__TEXT,__text`, and returns LLVM disassembly; `apple_debug_patch_assembly` feeds only those bytes into the existing expected-bytes transactional memory patch path.
+- `RuntimeDiagnosticsService`: runs fixed `heap`, `leaks`, `malloc_history`, and `sample` argument shapes against an attach-authorized process with bounded output; it never accepts shell fragments or arbitrary tool arguments.
+- `ReverseExecutionService` and `AppleKernelCapabilityService`: expose the installed backend’s actual reverse/time-travel and kernel-debugging boundary instead of claiming Windows/x64dbg semantics on Apple.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
 No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.
@@ -62,8 +69,10 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
 13. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
 14. `apple_simulator_ui_probe` and `apple_simulator_ui_probe_action` generate a temporary UI-testing-only Xcode project and use `XCUIApplication(bundleIdentifier:)` to inspect an installed Simulator application; they never need to build or inject code into that application.
-15. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-16. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+15. `apple_debug_runtime_diagnose` invokes bounded Apple heap/runtime tools for authorized host processes; `apple_assemble` produces static code bytes, and `apple_debug_patch_assembly` applies them only through the existing write grant and readback/rollback path.
+16. `apple_debug_forward_trace` records bounded forward stop events; `apple_debug_reverse_capabilities` and `apple_kernel_capabilities` report unsupported reverse/time-travel and kernel-memory operations explicitly.
+17. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+18. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 

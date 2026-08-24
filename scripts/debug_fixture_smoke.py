@@ -4,6 +4,8 @@
 import base64
 import json
 import os
+import platform
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -21,6 +23,7 @@ def main() -> int:
     environment = dict(os.environ)
     environment["APPLE_DEBUG_ALLOW_TARGET_LAUNCH"] = "1"
     environment["APPLE_DEBUG_ALLOW_EVALUATE"] = "1"
+    environment["APPLE_DEBUG_ALLOW_MEMORY_WRITE"] = "1"
     process = subprocess.Popen(
         [str(server)],
         cwd=root,
@@ -178,6 +181,15 @@ def main() -> int:
             "apple_debug_evaluate",
             {"sessionID": session_id, "expression": "1 + 1", "frameID": frame_id},
         )
+        stack_pointer_evaluation = tool(
+            "apple_debug_evaluate",
+            {"sessionID": session_id, "expression": "$sp", "frameID": frame_id},
+        )
+        stack_pointer_text = stack_pointer_evaluation["result"]["content"][0]["text"]
+        stack_pointer_match = re.search(r"0x[0-9a-fA-F]+", stack_pointer_text)
+        if stack_pointer_match is None:
+            raise RuntimeError("debugger did not return a stack pointer for assembly patch evidence")
+        stack_reference = stack_pointer_match.group(0)
         tool(
             "apple_debug_completions",
             {"sessionID": session_id, "frameID": frame_id, "text": "debug_", "column": 7, "line": 10},
@@ -202,6 +214,59 @@ def main() -> int:
         )
         if not search_result.get("matches"):
             raise RuntimeError("memory search did not find the bytes returned by readMemory")
+        architecture = "arm64" if platform.machine() in {"arm64", "aarch64"} else "x86_64"
+        assembly_source = "nop\n"
+        assembled = json.loads(
+            tool(
+                "apple_assemble",
+                {"architecture": architecture, "source": assembly_source},
+            )["result"]["content"][0]["text"]
+        )
+        assembled_bytes = base64.b64decode(assembled["bytesBase64"])
+        stack_memory = json.loads(
+            tool(
+                "apple_debug_read_memory",
+                {"sessionID": session_id, "memoryReference": stack_reference, "count": len(assembled_bytes)},
+            )["result"]["content"][0]["text"]
+        )["body"]
+        original_bytes = base64.b64decode(stack_memory["data"])
+        assembly_patch = json.loads(
+            tool(
+                "apple_debug_patch_assembly",
+                {
+                    "sessionID": session_id,
+                    "memoryReference": stack_reference,
+                    "architecture": architecture,
+                    "source": assembly_source,
+                    "expectedData": base64.b64encode(original_bytes).decode("ascii"),
+                },
+            )["result"]["content"][0]["text"]
+        )
+        if not assembly_patch.get("patch", {}).get("verified"):
+            raise RuntimeError("assembly patch was not verified")
+        tool(
+            "apple_debug_patch_memory",
+            {
+                "sessionID": session_id,
+                "memoryReference": stack_reference,
+                "data": assembly_patch["patch"]["originalData"],
+                "expectedData": base64.b64encode(assembled_bytes).decode("ascii"),
+            },
+        )
+        forward_trace = json.loads(
+            tool(
+                "apple_debug_forward_trace",
+                {
+                    "sessionID": session_id,
+                    "threadID": thread_id,
+                    "steps": 1,
+                    "kind": "next",
+                    "granularity": "instruction",
+                },
+            )["result"]["content"][0]["text"]
+        )
+        if forward_trace.get("reverseExecutionSupported") or forward_trace.get("completedSteps") != 1:
+            raise RuntimeError("forward execution trace did not return one explicit non-reversible stop point")
         tool(
             "apple_debug_disassemble",
             {"sessionID": session_id, "memoryReference": instruction_reference, "instructionCount": 4},
@@ -225,7 +290,7 @@ def main() -> int:
         if not closed.get("closed"):
             raise RuntimeError("debug session did not close")
         session_id = None
-        print("fixture-smoke: launch, source/instruction breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, completions, evaluate, memory, disassembly, instruction stepping, continue, stop-event wait, and cleanup passed")
+        print("fixture-smoke: launch, source/instruction breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, completions, evaluate, memory, assembler patch/rollback, disassembly, instruction stepping, continue, stop-event wait, and cleanup passed")
         return 0
     except Exception as error:
         print(f"fixture-smoke: {error}", file=sys.stderr)

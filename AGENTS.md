@@ -34,6 +34,9 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Arbitrary installed-app UI smoke | make ios-arbitrary-ui-smoke | Generate a UI-test-only project and inspect/action an installed Simulator app by bundle ID |
 | DWARF smoke | make dwarf-smoke | Build the generic iOS fixture and verify typed dSYM DIE/source/line/statistics output |
 | Performance analysis smoke | make performance-analysis-smoke | Capture a short Time Profiler trace and verify parsed rows, hotspots, and folded flame stacks |
+| Runtime diagnostics smoke | make runtime-diagnostics-smoke | Run bounded heap, leaks, and sample reports against an authorized local process |
+| Assembler smoke | make assembler-smoke | Assemble arm64/x86_64 source and verify bytes plus disassembly |
+| Reverse boundary smoke | make reverse-capability-smoke | Verify Apple LLDB reverse/time-travel and kernel memory capabilities fail closed |
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |

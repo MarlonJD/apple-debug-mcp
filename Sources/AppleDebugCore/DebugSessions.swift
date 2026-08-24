@@ -197,6 +197,31 @@ public struct DebugWaitForStopResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct ForwardExecutionTraceResult: Codable, Equatable, Sendable {
+    public let sessionID: String
+    public let threadID: Int
+    public let requestedSteps: Int
+    public let completedSteps: Int
+    public let reverseExecutionSupported: Bool
+    public let points: [DebugWaitForStopResult]
+
+    public init(
+        sessionID: String,
+        threadID: Int,
+        requestedSteps: Int,
+        completedSteps: Int,
+        reverseExecutionSupported: Bool,
+        points: [DebugWaitForStopResult]
+    ) {
+        self.sessionID = sessionID
+        self.threadID = threadID
+        self.requestedSteps = requestedSteps
+        self.completedSteps = completedSteps
+        self.reverseExecutionSupported = reverseExecutionSupported
+        self.points = points
+    }
+}
+
 public struct DebugMemoryMapResult: Codable, Equatable, Sendable {
     public let processID: Int
     public let output: String
@@ -777,6 +802,52 @@ public actor DebugSessionManager {
             terminated: terminated,
             timedOut: result.timedOut,
             events: result.events
+        )
+    }
+
+    public func traceForward(
+        sessionID: String,
+        threadID: Int,
+        steps: Int,
+        kind: DebugStepKind,
+        granularity: DebugStepGranularity?,
+        timeoutMilliseconds: Int
+    ) async throws -> ForwardExecutionTraceResult {
+        try DebugPolicy.validatePositive(threadID, label: "Thread ID")
+        try DebugPolicy.validatePositive(steps, label: "Forward trace steps", maximum: 100)
+        try DebugPolicy.validatePositive(
+            timeoutMilliseconds,
+            label: "Forward trace stop timeout",
+            maximum: 120_000
+        )
+        var points: [DebugWaitForStopResult] = []
+        var activeThreadID = threadID
+        for _ in 0..<steps {
+            _ = try await step(
+                sessionID: sessionID,
+                threadID: activeThreadID,
+                kind: kind,
+                granularity: granularity
+            )
+            let point = try await waitForStop(
+                sessionID: sessionID,
+                timeoutMilliseconds: timeoutMilliseconds
+            )
+            points.append(point)
+            if let stoppedThreadID = point.stoppedThreadID {
+                activeThreadID = stoppedThreadID
+            }
+            if point.terminated || point.timedOut {
+                break
+            }
+        }
+        return ForwardExecutionTraceResult(
+            sessionID: sessionID,
+            threadID: threadID,
+            requestedSteps: steps,
+            completedSteps: points.count,
+            reverseExecutionSupported: false,
+            points: points
         )
     }
 

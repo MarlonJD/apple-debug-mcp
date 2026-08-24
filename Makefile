@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke performance-smoke performance-analysis-smoke package release-package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke performance-smoke performance-analysis-smoke runtime-diagnostics-smoke assembler-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -41,6 +41,15 @@ performance-smoke: build
 
 performance-analysis-smoke: build
 	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/performance_analysis_smoke.py
+
+runtime-diagnostics-smoke: build
+	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/runtime_diagnostics_smoke.py
+
+assembler-smoke: build
+	python3 ./scripts/assembler_smoke.py
+
+reverse-capability-smoke: build
+	python3 ./scripts/reverse_capability_smoke.py
 
 package:
 	./scripts/package_macos.sh

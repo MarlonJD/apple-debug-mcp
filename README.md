@@ -12,6 +12,9 @@ The current product surface includes:
 - authorized macOS `vmmap` memory-region reporting (attach permission required);
 - bounded `xctrace` Time Profiler, Allocations, and System Trace capture for macOS or Simulator targets;
 - parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
+- Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
+- bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
+- explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
@@ -68,9 +71,12 @@ make ios-ui-tree-smoke
 make ios-arbitrary-ui-smoke
 make dwarf-smoke
 make performance-analysis-smoke
+make runtime-diagnostics-smoke
+make assembler-smoke
+make reverse-capability-smoke
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, and `performance-analysis-smoke` verifies xctrace XML rows, hotspots, and folded flame stacks.
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation.
 
 Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
 
@@ -110,7 +116,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
 
 ## License
 

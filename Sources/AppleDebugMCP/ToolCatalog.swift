@@ -24,6 +24,16 @@ enum ToolCatalog {
             inputSchema: emptyObjectSchema
         ),
         Tool(
+            name: "apple_debug_reverse_capabilities",
+            description: "Report whether the installed Apple LLDB supports process recording, reverse stepping, reverse continue, or time-travel replay; unsupported features fail closed.",
+            inputSchema: emptyObjectSchema
+        ),
+        Tool(
+            name: "apple_kernel_capabilities",
+            description: "Report the fail-closed Apple kernel-debugging boundary and supported user-process alternatives such as vmmap, heap, leaks, and xctrace.",
+            inputSchema: emptyObjectSchema
+        ),
+        Tool(
             name: "apple_macho_inspect",
             description: "Inspect a Mach-O or universal Mach-O file and return architectures, header metadata, load-command count, and segments without executing it.",
             inputSchema: pathObjectSchema
@@ -42,6 +52,11 @@ enum ToolCatalog {
             name: "apple_runtime_metadata",
             description: "Extract Objective-C classes/protocols/selectors and demangled Swift symbols from an authorized Apple binary.",
             inputSchema: binaryInspectObjectSchema
+        ),
+        Tool(
+            name: "apple_assemble",
+            description: "Assemble bounded arm64 or x86_64 Apple assembly into bytes and llvm-objdump disassembly without executing or patching it.",
+            inputSchema: assembleObjectSchema
         ),
         Tool(
             name: "apple_dwarf_inspect",
@@ -134,6 +149,11 @@ enum ToolCatalog {
             inputSchema: processObjectSchema
         ),
         Tool(
+            name: "apple_debug_runtime_diagnose",
+            description: "Run bounded Apple heap, leaks, malloc-history, or live-sample diagnostics for an explicitly authorized local process.",
+            inputSchema: runtimeDiagnosticObjectSchema
+        ),
+        Tool(
             name: "apple_performance_record",
             description: "Capture a bounded xctrace Time Profiler, Allocations, or System Trace artifact for an authorized macOS PID or Simulator.",
             inputSchema: performanceRecordObjectSchema
@@ -162,6 +182,11 @@ enum ToolCatalog {
             name: "apple_debug_step",
             description: "Step into, over, or out of the selected thread in a stopped debug session.",
             inputSchema: stepObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_forward_trace",
+            description: "Record a bounded sequence of forward LLDB-DAP stop events after stepping; this is not reverse execution and reports that boundary explicitly.",
+            inputSchema: forwardTraceObjectSchema
         ),
         Tool(
             name: "apple_debug_scopes",
@@ -237,6 +262,11 @@ enum ToolCatalog {
             name: "apple_debug_patch_memory",
             description: "Transactionally patch stopped target memory after optional expected-byte validation. Disabled unless APPLE_DEBUG_ALLOW_MEMORY_WRITE=1.",
             inputSchema: patchMemoryObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_patch_assembly",
+            description: "Assemble bounded arm64 or x86_64 code and transactionally patch it into a stopped authorized target. Requires memory-write authorization and expected-byte validation when supplied.",
+            inputSchema: patchAssemblyObjectSchema
         ),
         Tool(
             name: "apple_debug_terminate",
@@ -376,6 +406,10 @@ enum ToolCatalog {
         switch params.name {
         case "apple_capabilities":
             return result(for: CapabilityMatrix.reports())
+        case "apple_debug_reverse_capabilities":
+            return result(for: ReverseExecutionService.capabilities())
+        case "apple_kernel_capabilities":
+            return result(for: AppleKernelCapabilityService.report())
         case "apple_toolchain_status":
             return result(for: ToolchainProbe.collect())
         case "apple_lldb_dap_initialize":
@@ -457,6 +491,16 @@ enum ToolCatalog {
                         architecture: params.arguments?["architecture"]?.stringValue
                     )
                 )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_assemble":
+            guard let source = params.arguments?["source"]?.stringValue,
+                  let architecture = params.arguments?["architecture"]?.stringValue else {
+                return errorResult("Missing required source or architecture argument.")
+            }
+            do {
+                return result(for: try AppleAssemblerService.assemble(source: source, architecture: architecture))
             } catch {
                 return errorResult(error)
             }
@@ -730,6 +774,26 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_debug_runtime_diagnose":
+            guard let processID = intValue(from: params.arguments?["processID"]),
+                  let toolName = params.arguments?["tool"]?.stringValue,
+                  let tool = RuntimeDiagnosticTool(rawValue: toolName) else {
+                return errorResult("Missing or invalid processID/tool argument.")
+            }
+            do {
+                return result(
+                    for: try RuntimeDiagnosticsService.inspect(
+                        processID: processID,
+                        tool: tool,
+                        mode: params.arguments?["mode"]?.stringValue ?? (tool == .sample ? "sample" : "summary"),
+                        pattern: params.arguments?["pattern"]?.stringValue,
+                        durationSeconds: intValue(from: params.arguments?["durationSeconds"]) ?? 5,
+                        sampleIntervalMilliseconds: intValue(from: params.arguments?["sampleIntervalMilliseconds"]) ?? 10
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_performance_record":
             do {
                 return result(
@@ -808,6 +872,28 @@ enum ToolCatalog {
                         threadID: threadID,
                         kind: stepKind,
                         granularity: params.arguments?["granularity"]?.stringValue.flatMap(DebugStepGranularity.init(rawValue:))
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_forward_trace":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let threadID = intValue(from: params.arguments?["threadID"]),
+                  let steps = intValue(from: params.arguments?["steps"]),
+                  let kindValue = params.arguments?["kind"]?.stringValue,
+                  let kind = DebugStepKind(rawValue: kindValue) else {
+                return errorResult("Missing or invalid sessionID, threadID, steps, or kind argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.traceForward(
+                        sessionID: sessionID,
+                        threadID: threadID,
+                        steps: steps,
+                        kind: kind,
+                        granularity: params.arguments?["granularity"]?.stringValue.flatMap(DebugStepGranularity.init(rawValue:)),
+                        timeoutMilliseconds: intValue(from: params.arguments?["timeoutMilliseconds"]) ?? 10_000
                     )
                 )
             } catch {
@@ -1060,6 +1146,41 @@ enum ToolCatalog {
                         data: data
                     )
                 )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_patch_assembly":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let memoryReference = params.arguments?["memoryReference"]?.stringValue,
+                  let source = params.arguments?["source"]?.stringValue,
+                  let architecture = params.arguments?["architecture"]?.stringValue else {
+                return errorResult("Missing required sessionID, memoryReference, source, or architecture argument.")
+            }
+            let expectedData: Data?
+            if let encoded = params.arguments?["expectedData"]?.stringValue {
+                guard let decoded = Data(base64Encoded: encoded) else {
+                    return errorResult("expectedData must be valid base64.")
+                }
+                expectedData = decoded
+            } else {
+                expectedData = nil
+            }
+            do {
+                let assembled = try AppleAssemblerService.assemble(
+                    source: source,
+                    architecture: architecture
+                )
+                guard let data = Data(base64Encoded: assembled.bytesBase64) else {
+                    return errorResult("Assembler returned invalid bytes.")
+                }
+                let patch = try await sessions.patchMemory(
+                    sessionID: sessionID,
+                    memoryReference: memoryReference,
+                    offset: intValue(from: params.arguments?["offset"]) ?? 0,
+                    expectedData: expectedData,
+                    data: data
+                )
+                return result(for: AssemblerPatchResult(assembled: assembled, patch: patch))
             } catch {
                 return errorResult(error)
             }
@@ -1489,6 +1610,21 @@ enum ToolCatalog {
         "required": .array([.string("path")])
     ])
 
+    private static let assembleObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "architecture": .object([
+                "type": .string("string"),
+                "enum": .array([.string("arm64"), .string("x86_64")])
+            ]),
+            "source": .object([
+                "type": .string("string"),
+                "description": .string("Bounded self-contained Apple assembly source; maximum 64 KiB")
+            ])
+        ]),
+        "required": .array([.string("architecture"), .string("source")])
+    ])
+
     private static let binaryDiffObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1648,6 +1784,36 @@ enum ToolCatalog {
         "required": .array([.string("processID")])
     ])
 
+    private static let runtimeDiagnosticObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "processID": .object(["type": .string("integer")]),
+            "tool": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("heap"), .string("leaks"), .string("malloc_history"), .string("sample")
+                ])
+            ]),
+            "mode": .object([
+                "type": .string("string"),
+                "description": .string("heap: summary/addresses/layouts/zones; leaks: summary/list/fullStacks; malloc_history: callTree/allBySize/allByCount/allEvents; sample: sample")
+            ]),
+            "pattern": .object([
+                "type": .string("string"),
+                "description": .string("Optional bounded class/symbol pattern for heap or malloc_history")
+            ]),
+            "durationSeconds": .object([
+                "type": .string("integer"),
+                "description": .string("sample duration from 1 to 30 seconds; defaults to 5")
+            ]),
+            "sampleIntervalMilliseconds": .object([
+                "type": .string("integer"),
+                "description": .string("sample interval from 1 to 1000 milliseconds; defaults to 10")
+            ])
+        ]),
+        "required": .array([.string("processID"), .string("tool")])
+    ])
+
     private static let performanceRecordObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1793,6 +1959,33 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("sessionID"), .string("threadID"), .string("kind")])
+    ])
+
+    private static let forwardTraceObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "threadID": .object(["type": .string("integer")]),
+            "steps": .object([
+                "type": .string("integer"),
+                "description": .string("Number of forward steps from 1 to 100")
+            ]),
+            "kind": .object([
+                "type": .string("string"),
+                "enum": .array([.string("stepIn"), .string("next"), .string("stepOut")])
+            ]),
+            "granularity": .object([
+                "type": .string("string"),
+                "enum": .array([.string("statement"), .string("line"), .string("instruction")])
+            ]),
+            "timeoutMilliseconds": .object([
+                "type": .string("integer"),
+                "description": .string("Per-step stop timeout up to 120000 milliseconds")
+            ])
+        ]),
+        "required": .array([
+            .string("sessionID"), .string("threadID"), .string("steps"), .string("kind")
+        ])
     ])
 
     private static let frameObjectSchema: Value = .object([
@@ -1966,6 +2159,31 @@ enum ToolCatalog {
             .string("sessionID"),
             .string("memoryReference"),
             .string("data")
+        ])
+    ])
+
+    private static let patchAssemblyObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "memoryReference": .object(["type": .string("string")]),
+            "offset": .object(["type": .string("integer")]),
+            "architecture": .object([
+                "type": .string("string"),
+                "enum": .array([.string("arm64"), .string("x86_64")])
+            ]),
+            "source": .object([
+                "type": .string("string"),
+                "description": .string("Bounded self-contained Apple assembly source; emitted code is limited to 4096 bytes")
+            ]),
+            "expectedData": .object([
+                "type": .string("string"),
+                "description": .string("Optional base64 bytes required at the target before patching")
+            ])
+        ]),
+        "required": .array([
+            .string("sessionID"), .string("memoryReference"),
+            .string("architecture"), .string("source")
         ])
     ])
 
