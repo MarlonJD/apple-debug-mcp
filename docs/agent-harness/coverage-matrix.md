@@ -2,7 +2,7 @@
 
 Status values are verified, candidate, blocked, or N/A. A future harness attestation must link every verified or justified N/A row to one fresh evidence record.
 
-Current attestation source commit: 4f6bd20e4c1b7ed09f5b4554636ca691b00201cf.
+Current attestation source commit: fc74fc21dfb1ede3b4d9214cb5e21a2a9ca747a7.
 
 ## Coverage
 
