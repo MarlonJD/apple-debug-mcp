@@ -8,11 +8,11 @@ Provide an MCP-native Apple debugging and reverse-engineering workbench that let
 
 ### macOS
 
-The target is a local macOS process or binary for which the user has debugging authority. The implemented surface includes LLDB-DAP session control, launch/attach, breakpoints, stepping, scopes/variables, stack, bounded memory read, explicitly gated expression evaluation and memory write, Mach-O headers/segments/symbols/strings, crash analysis, `atos` symbolication, and unified logs. Objective-C/Swift metadata extraction remains a future static-analysis increment.
+The target is a local macOS process or binary for which the user has debugging authority. The implemented surface includes LLDB-DAP session control, launch/attach, breakpoints, stepping, scopes/variables, stack, bounded memory read, explicitly gated expression evaluation and memory write, Mach-O headers/segments/symbols/strings, crash analysis, `atos` symbolication, unified logs, Apple binary intelligence, Objective-C/Swift metadata extraction, and read-only binary diffing for local Mach-O and bundle artifacts.
 
 ### iOS Simulator
 
-The target is an application installed in a local Simulator. The implemented surface includes Xcode build/discovery, install, launch, terminate, screenshot, logs, LLDB-DAP attach/inspection, Mach-O analysis, crash analysis, symbolication, and policy-gated XCUITest accessibility-tree and fixture UI-action bridges. Simulator results do not replace physical-device evidence.
+The target is an application installed in a local Simulator. The implemented surface includes Xcode build/discovery, install, launch, terminate, screenshot, logs, LLDB-DAP attach/inspection, Mach-O and binary-diff analysis, crash analysis, symbolication, Objective-C/Swift metadata, and policy-gated XCUITest accessibility-tree and fixture UI-action bridges. Simulator results do not replace physical-device evidence.
 
 ### Physical iOS device
 

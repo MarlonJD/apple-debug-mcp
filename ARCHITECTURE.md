@@ -36,6 +36,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `LLDBDAPSession`: owns one LLDB-DAP subprocess, DAP framing, request/response matching, event draining, and teardown.
 - `DebugSessionManager`: owns session IDs and routes launch, attach, source/function/exception breakpoints, inspection, registers, modules, stepping, watchpoints, evaluation, memory writes, and target lifecycle through policy checks. Physical sessions initialize LLDB with a validated `device select <UUID>` command and remain separately gated.
 - `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
+- `AppleBinaryIntelligenceService`, `AppleRuntimeMetadataService`, and `AppleBinaryDiffService`: inspect signed Apple binaries, recover Objective-C/Swift metadata, and compare regular Mach-O files or `.app`/`.dSYM` bundles without executing them.
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
@@ -52,7 +53,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 6. `apple_debug_session_create` creates an owned persistent adapter session.
 7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, stack, scopes, variables, memory, disassembly, stepping, watchpoints, evaluation, memory search/patch, and continuation.
 8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
-9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
+9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_binary_diff`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
 10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
@@ -68,7 +69,7 @@ The topology is local macOS only: one short-lived MCP process, zero listening po
 
 - Authentication: stdio inherits the MCP client process boundary; a future HTTP transport must bind locally and require explicit authentication.
 - Authorization: capability reports and environment-gated policy checks guard process control, expression evaluation, memory writes, Simulator mutation, device mutation, and Xcode builds.
-- Filesystem safety: analyzers accept regular files only and enforce size limits; debugger launch currently requires a regular target and explicit user authorization.
+- Filesystem safety: Mach-O/crash analyzers accept bounded regular files; binary diff accepts only a regular Mach-O, an `.app`, or a `.dSYM` with a discovered Mach-O payload; debugger launch requires a regular target and explicit user authorization.
 - Cleanup: failed launches remove their session; explicit close, server shutdown, and adapter failures close pipes and terminate only the owned LLDB-DAP process.
 - Reliability: external-tool failures become typed MCP errors; no arbitrary-shell fallback is permitted.
 - Licensing: project code is GPL-3.0-or-later under Burak Karahan; upstream dependencies retain their own licenses.

@@ -22,6 +22,9 @@ public enum AppleDebugCapability: String, Codable, CaseIterable, Sendable {
     case memoryRead = "memory-read"
     case memoryWrite = "memory-write"
     case machOAnalysis = "macho-analysis"
+    case binaryIntelligence = "binary-intelligence"
+    case runtimeMetadata = "runtime-metadata"
+    case binaryDiff = "binary-diff"
     case symbolication
     case crashAnalysis = "crash-analysis"
     case simulatorControl = "simulator-control"
@@ -58,6 +61,7 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
+                    .binaryIntelligence, .runtimeMetadata, .binaryDiff,
                     .crashAnalysis, .logs
                 ],
                 restricted: [],
@@ -72,6 +76,7 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
+                    .binaryIntelligence, .runtimeMetadata, .binaryDiff,
                     .crashAnalysis, .simulatorControl, .uiInspection, .logs
                 ],
                 restricted: [],
@@ -85,7 +90,7 @@ public enum CapabilityMatrix {
                 platform: .iOSDevice,
                 supported: [
                     .launch, .machOAnalysis, .symbolication, .crashAnalysis,
-                    .deviceControl
+                    .binaryIntelligence, .runtimeMetadata, .binaryDiff, .deviceControl
                 ],
                 restricted: [
                     .sessionLifecycle, .attach, .breakpoints, .watchpoints,
@@ -127,7 +132,7 @@ public enum ToolchainProbe {
     public static func collect() -> ToolchainStatus {
         let toolNames = [
             "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
-            "codesign", "otool", "nm", "dyld_info", "swift-demangle"
+            "codesign", "otool", "nm", "dyld_info", "swift-demangle", "dwarfdump"
         ]
         let tools = toolNames.map { name in
             ToolchainToolStatus(name: name, path: path(for: name))

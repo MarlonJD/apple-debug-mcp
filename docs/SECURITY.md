@@ -16,7 +16,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | --- | --- | --- | --- |
 | MCP tools | Unknown tools fail closed | `ToolCatalog.call` | `make check` |
 | Toolchain | Only fixed executable paths and explicit argument arrays are used | `ToolchainProbe`, adapters | `CapabilitiesTests` and code review |
-| Artifact files | Mach-O and crash inputs are regular files with bounded size | `MachOInspector`, `CrashReportAnalyzer` | `MachOTests`, `CrashReportTests` |
+| Artifact files | Mach-O and crash inputs are bounded; binary diff additionally resolves only `.app` and `.dSYM` bundle layouts | `MachOInspector`, `CrashReportAnalyzer`, `AppleBinaryDiffService` | `MachOTests`, `CrashReportTests`, `AppleBinaryDiffTests` |
 | Target launch | Requires `APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1` and a regular target | `DebugPolicy.validateLaunchTarget` | `DebugSessionTests`, macOS fixture smoke |
 | Target attach | Requires `APPLE_DEBUG_ALLOW_TARGET_ATTACH=1` and a positive process ID | `DebugPolicy.validateAttach` | `DebugSessionTests`, iOS Simulator smoke |
 | Expression evaluation | Requires `APPLE_DEBUG_ALLOW_EVALUATE=1` and a 16 KiB expression limit | `DebugPolicy.validateEvaluate` | `DebugSessionTests` and fixture smoke |

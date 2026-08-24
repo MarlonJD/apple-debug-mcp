@@ -34,6 +34,11 @@ enum ToolCatalog {
             inputSchema: binaryInspectObjectSchema
         ),
         Tool(
+            name: "apple_binary_diff",
+            description: "Compare two authorized Mach-O files, .app bundles, or .dSYM bundles without executing them.",
+            inputSchema: binaryDiffObjectSchema
+        ),
+        Tool(
             name: "apple_runtime_metadata",
             description: "Extract Objective-C classes/protocols/selectors and demangled Swift symbols from an authorized Apple binary.",
             inputSchema: binaryInspectObjectSchema
@@ -334,6 +339,22 @@ enum ToolCatalog {
                 return result(
                     for: try AppleBinaryIntelligenceService.inspect(
                         path: path,
+                        architecture: params.arguments?["architecture"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_binary_diff":
+            guard let leftPath = params.arguments?["leftPath"]?.stringValue,
+                  let rightPath = params.arguments?["rightPath"]?.stringValue else {
+                return errorResult("Missing required leftPath or rightPath argument.")
+            }
+            do {
+                return result(
+                    for: try AppleBinaryDiffService.diff(
+                        leftPath: leftPath,
+                        rightPath: rightPath,
                         architecture: params.arguments?["architecture"]?.stringValue
                     )
                 )
@@ -1043,6 +1064,25 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("path")])
+    ])
+
+    private static let binaryDiffObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "leftPath": .object([
+                "type": .string("string"),
+                "description": .string("Regular Mach-O path, .app bundle, or .dSYM bundle")
+            ]),
+            "rightPath": .object([
+                "type": .string("string"),
+                "description": .string("Regular Mach-O path, .app bundle, or .dSYM bundle")
+            ]),
+            "architecture": .object([
+                "type": .string("string"),
+                "description": .string("Optional Mach-O architecture such as arm64 or x86_64")
+            ])
+        ]),
+        "required": .array([.string("leftPath"), .string("rightPath")])
     ])
 
     private static let sessionCreateObjectSchema: Value = .object([
