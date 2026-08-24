@@ -95,6 +95,22 @@ public struct ControlFlowDataRange: Codable, Equatable, Sendable {
     }
 }
 
+public struct ControlFlowXref: Codable, Equatable, Sendable {
+    public let fromAddress: String
+    public let fromFunction: String?
+    public let kind: String
+    public let targetAddress: String?
+    public let targetSymbol: String?
+
+    public init(fromAddress: String, fromFunction: String?, kind: String, targetAddress: String?, targetSymbol: String?) {
+        self.fromAddress = fromAddress
+        self.fromFunction = fromFunction
+        self.kind = kind
+        self.targetAddress = targetAddress
+        self.targetSymbol = targetSymbol
+    }
+}
+
 public struct ControlFlowFunction: Codable, Equatable, Sendable {
     public let name: String
     public let startAddress: String
@@ -128,6 +144,7 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
     public let externalCalls: [String]
     public let indirectSymbols: [ControlFlowIndirectSymbol]
     public let dataInCode: [ControlFlowDataRange]
+    public let xrefs: [ControlFlowXref]
 
     public init(
         path: String,
@@ -136,7 +153,8 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
         functions: [ControlFlowFunction],
         externalCalls: [String],
         indirectSymbols: [ControlFlowIndirectSymbol],
-        dataInCode: [ControlFlowDataRange]
+        dataInCode: [ControlFlowDataRange],
+        xrefs: [ControlFlowXref]
     ) {
         self.path = path
         self.architecture = architecture
@@ -145,6 +163,7 @@ public struct ControlFlowReport: Codable, Equatable, Sendable {
         self.externalCalls = externalCalls
         self.indirectSymbols = indirectSymbols
         self.dataInCode = dataInCode
+        self.xrefs = xrefs
     }
 }
 
@@ -172,6 +191,7 @@ public enum AppleControlFlowService {
             throw ControlFlowError.commandFailed("No executable instructions were found for \(architecture).")
         }
         let functions = parseFunctions(path: path, architecture: architecture, instructions: instructions)
+        let xrefs = parseXrefs(instructions: instructions, functions: functions)
         let indirectSymbols = parseIndirectSymbols(try runObjdump(executable: objdump, arguments: ["--macho", "--indirect-symbols", "--arch=\(architecture)", path]))
         let dataInCode = parseDataInCode(try runObjdump(executable: objdump, arguments: ["--macho", "--data-in-code", "--arch=\(architecture)", path]))
         return ControlFlowReport(
@@ -183,7 +203,8 @@ public enum AppleControlFlowService {
                 if !result.contains(value) { result.append(value) }
             },
             indirectSymbols: indirectSymbols,
-            dataInCode: dataInCode
+            dataInCode: dataInCode,
+            xrefs: xrefs
         )
     }
 
@@ -287,7 +308,7 @@ public enum AppleControlFlowService {
             guard !body.isEmpty else { continue }
             let blocks = makeBlocks(body: body, functionEnd: range.end)
             var callees: [String] = []
-            for instruction in body where instruction.branchKind == "call" {
+            for instruction in body where instruction.branchKind?.hasSuffix("call") == true {
                 let callee = instruction.targetSymbol ?? instruction.targetAddress ?? "unknown"
                 if !callees.contains(callee) { callees.append(callee) }
                 callEdges.append((range.name, callee))
@@ -314,6 +335,31 @@ public enum AppleControlFlowService {
                 callers: callEdges.filter { $0.to == function.name || $0.to == function.startAddress }.map(\.from).sorted()
             )
             return updated
+        }
+    }
+
+    private static func parseXrefs(instructions: [ControlFlowInstruction], functions: [ControlFlowFunction]) -> [ControlFlowXref] {
+        instructions.compactMap { instruction in
+            guard let kind = instruction.branchKind else { return nil }
+            let address = parseAddress(instruction.address) ?? 0
+            let function = functions.first {
+                let start = parseAddress($0.startAddress) ?? UInt64.max
+                let end = parseAddress($0.endAddress) ?? UInt64.min
+                return address >= start && address < end
+            }?.name
+            guard instruction.targetAddress != nil || instruction.targetSymbol != nil || kind.hasPrefix("indirect") else { return nil }
+            return ControlFlowXref(
+                fromAddress: instruction.address.hasPrefix("0x") ? instruction.address : formatAddress(address),
+                fromFunction: function,
+                kind: kind,
+                targetAddress: instruction.targetAddress,
+                targetSymbol: instruction.targetSymbol
+            )
+        }
+        .sorted {
+            if $0.fromAddress != $1.fromAddress { return $0.fromAddress < $1.fromAddress }
+            if $0.kind != $1.kind { return $0.kind < $1.kind }
+            return ($0.targetAddress ?? $0.targetSymbol ?? "") < ($1.targetAddress ?? $1.targetSymbol ?? "")
         }
     }
 
@@ -400,6 +446,12 @@ public enum AppleControlFlowService {
         }
         if lower == "bl" || lower == "blx" || lower.hasPrefix("call") {
             return ("call", target, targetSymbol)
+        }
+        if lower == "blr" {
+            return ("indirect-call", nil, nil)
+        }
+        if lower == "br" {
+            return ("indirect-branch", nil, nil)
         }
         if lower == "b" || lower == "jmp" || lower == "bra" {
             return ("unconditional", target, targetSymbol)

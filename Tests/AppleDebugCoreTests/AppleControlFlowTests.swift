@@ -12,5 +12,7 @@ final class AppleControlFlowTests: XCTestCase {
         XCTAssertFalse(report.instructions.isEmpty)
         XCTAssertFalse(report.functions.isEmpty)
         XCTAssertTrue(report.functions.contains { !$0.blocks.isEmpty })
+        XCTAssertFalse(report.xrefs.isEmpty)
+        XCTAssertTrue(report.xrefs.contains { $0.kind == "call" })
     }
 }
