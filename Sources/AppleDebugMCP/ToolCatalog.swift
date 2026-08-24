@@ -22,6 +22,11 @@ enum ToolCatalog {
             name: "apple_lldb_dap_initialize",
             description: "Start the local LLDB-DAP adapter, complete initialization, and return its advertised capabilities without launching a debug target.",
             inputSchema: emptyObjectSchema
+        ),
+        Tool(
+            name: "apple_macho_inspect",
+            description: "Inspect a Mach-O or universal Mach-O file and return architectures, header metadata, load-command count, and segments without executing it.",
+            inputSchema: pathObjectSchema
         )
     ]
 
@@ -48,11 +53,28 @@ enum ToolCatalog {
                 await session.stop()
                 return result(for: DAPProbeResult(response: response, events: events))
             } catch {
+                await session.stop()
                 return .init(
                     content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
                     isError: true
                 )
             }
+        case "apple_macho_inspect":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return .init(
+                    content: [.text(text: "Missing required path argument.", annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
+            do {
+                return result(for: try MachOInspector.inspect(path: path))
+            } catch {
+                return .init(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
+
         default:
             return .init(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
@@ -69,6 +91,17 @@ enum ToolCatalog {
     private static let emptyObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([:])
+    ])
+
+    private static let pathObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute path to an authorized Mach-O file")
+            ])
+        ]),
+        "required": .array([.string("path")])
     ])
 
     private static func result<T: Encodable>(for value: T) -> CallTool.Result {
