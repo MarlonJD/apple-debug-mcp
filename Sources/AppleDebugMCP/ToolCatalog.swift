@@ -34,6 +34,11 @@ enum ToolCatalog {
             inputSchema: binaryInspectObjectSchema
         ),
         Tool(
+            name: "apple_runtime_metadata",
+            description: "Extract Objective-C classes/protocols/selectors and demangled Swift symbols from an authorized Apple binary.",
+            inputSchema: binaryInspectObjectSchema
+        ),
+        Tool(
             name: "apple_crash_inspect",
             description: "Parse an Apple .crash or .ips report into process, exception, thread, and image metadata without executing it.",
             inputSchema: crashObjectSchema
@@ -318,6 +323,20 @@ enum ToolCatalog {
             do {
                 return result(
                     for: try AppleBinaryIntelligenceService.inspect(
+                        path: path,
+                        architecture: params.arguments?["architecture"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_runtime_metadata":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(
+                    for: try AppleRuntimeMetadataService.inspect(
                         path: path,
                         architecture: params.arguments?["architecture"]?.stringValue
                     )

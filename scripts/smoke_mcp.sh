@@ -51,5 +51,6 @@ grep -q '"id":9.*"isError":false' "$output_file"
 grep -q '"id":10.*"isError":false' "$output_file"
 grep -q 'codeSignature' "$output_file"
 grep -q 'dyldExports' "$output_file"
+grep -q 'apple_runtime_metadata' "$output_file"
 
 printf '%s\n' 'smoke: MCP initialize, tool discovery, capability, and toolchain calls passed'

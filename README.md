@@ -11,6 +11,7 @@ The current product surface includes:
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
+- Objective-C classes/protocols/selectors and demangled Swift symbol metadata;
 - `atos` symbolication and `.crash`/`.ips` crash-report inspection;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
 - Xcode project discovery and explicitly authorized builds;
