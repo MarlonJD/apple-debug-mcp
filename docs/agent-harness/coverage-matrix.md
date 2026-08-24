@@ -2,7 +2,7 @@
 
 Status values are verified, candidate, blocked, or N/A. Every verified or justified N/A row is linked to a fresh evidence record at attestation time.
 
-Current attestation source commit: 8b066d203af6721a0847d30cfb97e1a5ae7739ea.
+Current attestation source commit: bb88d6919ea04f6733511af5eff1899c1524aaad.
 
 ## Coverage
 
