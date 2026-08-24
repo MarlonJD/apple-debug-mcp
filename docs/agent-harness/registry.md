@@ -13,5 +13,5 @@
 | Dependency/API references | docs/references/mcp-swift-sdk.md | Make upstream MCP behavior discoverable | Package and SDK contract agree | Maintainers; SDK update | candidate |
 | Runtime start | swift run apple-debug-mcp | Launch local MCP process | Stdio process accepts MCP initialize | Maintainers; runtime changes | candidate |
 | Runtime reset | Close stdin; make clean for build state | Stop process and remove local build artifacts | Process exits; .build reset | Maintainers; lifecycle changes | candidate |
-| UI or API exercise | scripts/smoke_mcp.sh | Exercise MCP protocol behavior | Initialize, tools/list, and tool call responses | Maintainers; tool surface changes | candidate |
+| UI or API exercise | scripts/smoke_mcp.sh | Exercise MCP protocol and LLDB-DAP initialization | Initialize, tools/list, read-only tool calls, and adapter response | Maintainers; tool surface changes | candidate |
 | Logs, metrics, or traces | stderr transcript; metrics/traces N/A | Diagnose CLI failures | Actionable stderr or justified N/A | Maintainers; runtime changes | candidate |

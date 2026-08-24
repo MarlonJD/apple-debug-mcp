@@ -10,7 +10,7 @@ The project is designed to cover:
 - Mach-O, Objective-C, and Swift binary analysis;
 - crash analysis and dSYM-based symbolication.
 
-The repository starts with a small, safe foundation. The first server tools are read-only capability and toolchain discovery. Process launch, attach, memory mutation, and device operations will be added behind explicit capability and permission boundaries.
+The repository starts with a small, safe foundation. The server exposes read-only capability and toolchain discovery plus LLDB-DAP adapter initialization. Process launch, attach, memory mutation, and device operations will be added behind explicit capability and permission boundaries.
 
 ## Design
 
@@ -63,7 +63,7 @@ Example MCP configuration after building:
 
 ## Roadmap
 
-1. LLDB/DAP session management for local macOS targets.
+1. LLDB/DAP target session management for local macOS targets.
 2. Mach-O headers, segments, symbols, strings, disassembly, and dSYM analysis.
 3. macOS crash/core analysis and controlled memory operations.
 4. iOS Simulator build, install, launch, logs, UI inspection, and debugging.

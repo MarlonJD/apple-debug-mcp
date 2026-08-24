@@ -21,7 +21,7 @@ struct AppleDebugMCPMain {
         }
 
         await server.withMethodHandler(CallTool.self) { params in
-            ToolCatalog.call(params)
+            await ToolCatalog.call(params)
         }
 
         let transport = StdioTransport()

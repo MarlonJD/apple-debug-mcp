@@ -4,7 +4,7 @@
 
 Apple Debug MCP is a local macOS command-line server that exposes safe, capability-aware Apple debugging operations through MCP. An MCP client launches it over stdio. The server will eventually coordinate LLDB/DAP, Mach-O analysis, Xcode, Simulator, and authorized physical-device workflows.
 
-The current implementation is intentionally read-only: it reports the supported platform boundary and discovers allowlisted Xcode command-line tools. No process is launched, attached, terminated, or modified.
+The current implementation is intentionally read-only: it reports the supported platform boundary, discovers allowlisted Xcode command-line tools, and initializes the local LLDB-DAP adapter. No debug target is launched, attached, terminated, or modified.
 
 ## Repository map
 
@@ -12,6 +12,7 @@ The current implementation is intentionally read-only: it reports the supported 
 | --- | --- | --- |
 | Package.swift | SwiftPM products and official MCP SDK dependency | Update when products or upstream SDK version changes |
 | Sources/AppleDebugCore/ | Platform-neutral capability reports and safe toolchain probing | Apple Debug MCP maintainers; update when a platform capability changes |
+| Sources/AppleDebugCore/DAP.swift | DAP value model, Content-Length framing, and LLDB-DAP session lifecycle | Apple Debug MCP maintainers; update with DAP/backend behavior |
 | Sources/AppleDebugMCP/ | MCP server startup and tool dispatch | Apple Debug MCP maintainers; update when MCP surface changes |
 | Tests/AppleDebugCoreTests/ | Core behavior and platform-boundary tests | Update with core behavior changes |
 | scripts/ | Build, smoke, and repository-native harness commands | Update when verification or lifecycle commands change |
@@ -36,7 +37,8 @@ Backends may be added only behind capability checks. The MCP layer must not expo
 2. The server completes MCP initialization and advertises read-only tools.
 3. apple_capabilities returns the platform capability matrix and explicit restrictions.
 4. apple_toolchain_status runs only fixed, allowlisted Xcode discovery commands without a shell.
-5. Future debugger calls create a session in the core, select a backend, enforce policy, and return structured observations.
+5. apple_lldb_dap_initialize starts LLDB-DAP, completes the initialize handshake, drains adapter events, and tears down the adapter.
+6. Future debugger calls create a target session in the core, select a backend, enforce policy, and return structured observations.
 
 ## Runtime topology
 
@@ -48,7 +50,7 @@ The current topology is local macOS only. There is no hosted service, persistent
 - Authorization: capability reports and SecurityPolicy gate target selection and mutating operations.
 - Configuration: no secrets or persistent configuration are required by the current foundation.
 - Telemetry: current tools return structured MCP results; long-lived logging, metrics, and traces are not yet applicable.
-- Reliability: failed discovery returns an absent tool path rather than throwing or invoking an unsafe fallback.
+- Reliability: failed discovery returns an absent tool path, and DAP probe failures tear down the adapter rather than invoking an unsafe fallback.
 - Licensing: project code is GPL-3.0-or-later under Burak Karahan; upstream dependencies retain their own licenses.
 
 ## Mechanically enforced invariants

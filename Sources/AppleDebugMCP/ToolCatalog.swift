@@ -17,21 +17,53 @@ enum ToolCatalog {
             name: "apple_toolchain_status",
             description: "Discover the local Xcode, LLDB, Simulator, and device tooling without launching or attaching to a process.",
             inputSchema: emptyObjectSchema
+        ),
+        Tool(
+            name: "apple_lldb_dap_initialize",
+            description: "Start the local LLDB-DAP adapter, complete initialization, and return its advertised capabilities without launching a debug target.",
+            inputSchema: emptyObjectSchema
         )
     ]
 
-    static func call(_ params: CallTool.Parameters) -> CallTool.Result {
+    static func call(_ params: CallTool.Parameters) async -> CallTool.Result {
         switch params.name {
         case "apple_capabilities":
             return result(for: CapabilityMatrix.reports())
         case "apple_toolchain_status":
             return result(for: ToolchainProbe.collect())
+        case "apple_lldb_dap_initialize":
+            let session: LLDBDAPSession
+            do {
+                session = try LLDBDAPSession()
+            } catch {
+                return .init(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
+
+            do {
+                let response = try await session.start()
+                let events = await session.drainEvents()
+                await session.stop()
+                return result(for: DAPProbeResult(response: response, events: events))
+            } catch {
+                return .init(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
         default:
             return .init(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
                 isError: true
             )
         }
+    }
+
+    private struct DAPProbeResult: Encodable {
+        let response: DAPMessage
+        let events: [DAPMessage]
     }
 
     private static let emptyObjectSchema: Value = .object([

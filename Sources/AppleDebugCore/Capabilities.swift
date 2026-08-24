@@ -123,7 +123,7 @@ public enum ToolchainProbe {
     public static func collect() -> ToolchainStatus {
         let toolNames = ["lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild"]
         let tools = toolNames.map { name in
-            ToolchainToolStatus(name: name, path: locate(name))
+            ToolchainToolStatus(name: name, path: path(for: name))
         }
 
         return ToolchainStatus(
@@ -135,7 +135,7 @@ public enum ToolchainProbe {
         )
     }
 
-    private static func locate(_ name: String) -> String? {
+    public static func path(for name: String) -> String? {
         run(
             executable: "/usr/bin/xcrun",
             arguments: ["--find", name]

@@ -13,7 +13,7 @@ Maintain this plan according to the [configured planning policy](../../PLANS.md)
 
 ## Purpose / Big Picture
 
-After this milestone, an MCP client can launch the SwiftPM server, complete MCP initialization, discover two safe read-only tools, inspect the macOS Xcode toolchain, and read explicit capability restrictions for macOS, iOS Simulator, and authorized physical iOS targets. Agents can resume work from this plan without relying on conversation history.
+After this milestone, an MCP client can launch the SwiftPM server, complete MCP initialization, discover three safe read-only tools, inspect the macOS Xcode toolchain, initialize LLDB-DAP, and read explicit capability restrictions for macOS, iOS Simulator, and authorized physical iOS targets. Agents can resume work from this plan without relying on conversation history.
 
 ## Progress
 
@@ -24,6 +24,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 - [x] (2026-08-24 01:30Z) Add the SwiftPM package, official MCP SDK dependency, core capability model, and MCP tool registry.
 - [x] (2026-08-24 01:42Z) Add and exercise the MCP smoke fixture.
 - [x] (2026-08-24 01:44Z) Run build, test, whitespace, documentation, and project-native harness checks.
+- [x] (2026-08-24 02:00Z) Add DAP framing, LLDB-DAP initialization, and adapter cleanup tests.
 - [x] (2026-08-24 01:53Z) Create the authorized source commit 48ce3c9 and direct-child harness attestation checkpoint f6d5348.
 - [x] (2026-08-24 01:53Z) Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
 
@@ -39,6 +40,8 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
   Evidence: The smoke fixture adds a bounded 0.5 second drain window before EOF and observes all four responses.
 - Observation: SwiftPM resolved the official SDK to 0.12.1 under the declared 0.11.0 lower bound.
   Evidence: Package.resolved and successful swift build output.
+- Observation: LLDB-DAP initialization works, but target launch against a system binary was denied because macOS Developer Mode is disabled.
+  Evidence: LLDB-DAP returned an attach-failed response; DevToolsSecurity -status reported Developer mode disabled. No system setting was changed.
 
 ## Decision Log
 
@@ -61,11 +64,11 @@ The foundation checkpoint is complete: the MCP smoke, project-native checks, har
 
 ## Context and Orientation
 
-The repository contains a library target AppleDebugCore and an executable target AppleDebugMCP. The core owns AppleDebugPlatform, AppleDebugCapability, CapabilityReport, CapabilityMatrix, ToolchainStatus, and ToolchainProbe. The executable registers apple_capabilities and apple_toolchain_status through the official MCP Swift SDK over stdio. docs/product-specs/platform-scope.md defines the full staged product boundary; docs/SECURITY.md defines the authorization boundary.
+The repository contains a library target AppleDebugCore and an executable target AppleDebugMCP. The core owns AppleDebugPlatform, AppleDebugCapability, CapabilityReport, CapabilityMatrix, ToolchainStatus, ToolchainProbe, DAPValue, DAPMessage, DAPFraming, and LLDBDAPSession. The executable registers apple_capabilities, apple_toolchain_status, and apple_lldb_dap_initialize through the official MCP Swift SDK over stdio. docs/product-specs/platform-scope.md defines the full staged product boundary; docs/SECURITY.md defines the authorization boundary.
 
 ## Plan of Work
 
-The first milestone establishes a transport-correct MCP process and a deterministic policy core. The next milestone will add an LLDB/DAP backend only after a fixture can prove session creation, inspection, and cleanup. Mach-O and iOS adapters remain explicit follow-up work in the debt tracker.
+The first milestone establishes a transport-correct MCP process, a deterministic policy core, and a verified LLDB-DAP adapter handshake. The next milestone will add target launch/session inspection only after a signed fixture and cleanup proof are available. Mach-O and iOS adapters remain explicit follow-up work in the debt tracker.
 
 ## Concrete Steps
 
@@ -74,7 +77,7 @@ Work from /Users/marlonjd/Developer/monorepos/apple-debug-mcp.
 1. Resolve dependencies with swift package resolve. Expected result: SwiftPM resolves the official MCP product.
 2. Build with swift build. Expected result: executable apple-debug-mcp is produced.
 3. Run swift test. Expected result: capability and allowlist tests pass.
-4. Run scripts/smoke_mcp.sh. Expected result: initialize, tools/list, and read-only tools/call each return a JSON-RPC response.
+4. Run scripts/smoke_mcp.sh. Expected result: initialize, tools/list, read-only tools/call, and LLDB-DAP initialization each return a JSON-RPC response.
 5. Run make check. Expected result: build, tests, smoke, whitespace, and placeholder checks pass.
 6. Run make harness-check. Expected result: project-native checks and harness structural checks pass after certification evidence is current.
 7. Review git diff --check, git status --short --branch, and the staged diff before each authorized commit.
@@ -86,7 +89,7 @@ Work from /Users/marlonjd/Developer/monorepos/apple-debug-mcp.
 Acceptance requires:
 
 - make check exits 0.
-- The MCP smoke output contains successful initialize, tools/list, apple_capabilities, and apple_toolchain_status responses.
+- The MCP smoke output contains successful initialize, tools/list, apple_capabilities, apple_toolchain_status, and apple_lldb_dap_initialize responses.
 - Capability reports include all three Apple target classes and explicitly restrict physical-device attach and memory mutation.
 - Toolchain probing uses only the five allowlisted tool names.
 - No unresolved harness placeholders remain.
@@ -106,7 +109,7 @@ All build and test commands are safe to rerun. make clean removes only SwiftPM b
 
 ## Interfaces and Dependencies
 
-The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool, MCP.Tool, and MCP.Value from the official Swift SDK. ToolCatalog.tools is the source for the current tool list, and ToolCatalog.call(_:) dispatches calls. CapabilityMatrix.reports() is the stable policy interface. ToolchainProbe.collect() returns a ToolchainStatus containing developer directory and allowlisted tool paths.
+The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool, MCP.Tool, and MCP.Value from the official Swift SDK. ToolCatalog.tools is the source for the current tool list, and ToolCatalog.call(_:) dispatches calls. CapabilityMatrix.reports() is the stable policy interface. ToolchainProbe.collect() returns a ToolchainStatus containing developer directory and allowlisted tool paths. LLDBDAPSession owns the adapter process; DAPFraming owns Content-Length framing; DAPValue and DAPMessage own the typed JSON boundary.
 
 ## Revision History
 
