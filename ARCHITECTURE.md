@@ -17,6 +17,7 @@ The current implementation is intentionally read-only: it reports the supported 
 | Sources/AppleDebugCore/DebugSessions.swift | Capability-aware LLDB-DAP session manager and launch policy | Apple Debug MCP maintainers; update when session permissions or cleanup changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Read-only Simulator inventory and policy-gated simctl lifecycle operations | Apple Debug MCP maintainers; update when Simulator/device operations change |
 | Sources/AppleDebugCore/AppleDevice.swift | CoreDevice JSON inventory and authorization-gated physical-device install/launch operations | Apple Debug MCP maintainers; update when pairing/device policy changes |
+| Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated xcodebuild execution | Apple Debug MCP maintainers; update when build/destination policy changes |
 | Sources/AppleDebugMCP/ | MCP server startup and tool dispatch | Apple Debug MCP maintainers; update when MCP surface changes |
 | Tests/AppleDebugCoreTests/ | Core behavior and platform-boundary tests | Update with core behavior changes |
 | scripts/ | Build, smoke, and repository-native harness commands | Update when verification or lifecycle commands change |
@@ -48,7 +49,8 @@ Backends may be added only behind capability checks. The MCP layer must not expo
 9. Breakpoint, continue, threads, stack trace, memory read, and disassembly tools route through an owned session.
 10. apple_simulator_list reads available Simulator inventory; boot, shutdown, install, launch, and terminate require the explicit mutation policy.
 11. apple_device_list reads physical-device pairing and tunnel state; install and launch require a paired, tunnel-ready development target plus explicit mutation policy.
-12. Future debugger calls select a backend, enforce policy, and return structured observations.
+12. apple_xcode_discover reads schemes/targets from an Xcode project or workspace; apple_xcode_build requires explicit build policy.
+13. Future debugger calls select a backend, enforce policy, and return structured observations.
 
 ## Runtime topology
 

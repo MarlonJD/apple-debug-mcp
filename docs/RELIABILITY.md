@@ -13,6 +13,7 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | Debug session leaks an adapter process | DebugSessionTests or process inspection finds lldb-dap after close | Close pipes, terminate, force-kill only the owned adapter, and wait | DebugSessionTests |
 | Simulator inventory is unavailable or malformed | apple_simulator_list returns a typed error | Verify Xcode/CoreSimulator availability; do not mutate state as fallback | AppleSimulatorTests and smoke |
 | Physical-device inventory is unavailable or malformed | apple_device_list returns a typed error | Verify CoreDevice pairing/tunnel state; do not attempt install/launch as fallback | AppleDeviceTests |
+| Xcode project discovery/build fails | apple_xcode_discover or apple_xcode_build returns a typed error | Inspect xcodebuild output and preserve the selected destination; do not run arbitrary shell fallback | AppleXcodeTests and build transcript |
 | Tool output becomes non-deterministic | Core tests or sorted JSON output changes unexpectedly | Reproduce with the same fixture and update the contract intentionally | swift test |
 | Future debugger operation leaves a target running | Session lifecycle and process cleanup tests fail | Use the session teardown path; do not kill unrelated processes | Candidate until debugger backend exists |
 | Hosted availability, failover, and production rollback | Not applicable to the current local CLI | N/A; define only when a hosted service is introduced | N/A |

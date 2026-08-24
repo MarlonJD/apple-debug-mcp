@@ -31,6 +31,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 - [x] (2026-08-24 02:27Z) Add DAP breakpoint, continue, threads, stack, memory-read, and disassembly operations and commit them as 05dbc60.
 - [x] (2026-08-24 02:35Z) Add Simulator inventory and policy-gated lifecycle operations and commit them as 073806c.
 - [x] (2026-08-24 02:42Z) Add CoreDevice inventory and authorization-gated physical-device operations and commit them as 05adea3.
+- [x] (2026-08-24 02:50Z) Add Xcode project discovery and policy-gated build adapter and commit it as ab45863.
 - [x] (2026-08-24 01:53Z) Create the authorized source commit 48ce3c9 and direct-child harness attestation checkpoint f6d5348.
 - [x] (2026-08-24 01:53Z) Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
 
@@ -66,7 +67,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 
 ## Outcomes & Retrospective
 
-The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. Owned LLDB-DAP session lifecycle is committed as d101ae7 and proves create/initialize/close cleanup. Specialized debugger inspection operations are committed as 05dbc60 and map breakpoint, continue, threads, stack, memory-read, and disassembly requests. Simulator inventory and policy-gated lifecycle operations are committed as 073806c. CoreDevice inventory and authorization-gated physical-device operations are committed as 05adea3. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full target launch, symbol/static-analysis, Simulator app-debug, and authorized physical-device session remains active follow-up work.
+The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. Owned LLDB-DAP session lifecycle is committed as d101ae7 and proves create/initialize/close cleanup. Specialized debugger inspection operations are committed as 05dbc60 and map breakpoint, continue, threads, stack, memory-read, and disassembly requests. Simulator inventory and policy-gated lifecycle operations are committed as 073806c. CoreDevice inventory and authorization-gated physical-device operations are committed as 05adea3. Xcode discovery and policy-gated build execution are committed as ab45863. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full target launch, symbol/static-analysis, Simulator app-debug, and authorized physical-device session remains active follow-up work.
 
 ## Context and Orientation
 
@@ -135,3 +136,5 @@ The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool,
   Reason: Establish the iOS host tooling boundary before adding app install, UI, and physical-device workflows.
 - (2026-08-24 02:42Z) Change: Recorded the CoreDevice inventory and physical-device policy commit 05adea3.
   Reason: Make pairing/tunnel authorization observable before enabling device mutation or debugger attach.
+- (2026-08-24 02:50Z) Change: Recorded the Xcode discovery/build adapter commit ab45863.
+  Reason: Connect explicit Xcode project workflows to the Simulator and debugger layers without enabling arbitrary shell execution.
