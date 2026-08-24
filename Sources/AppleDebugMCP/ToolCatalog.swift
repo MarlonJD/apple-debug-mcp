@@ -124,6 +124,11 @@ enum ToolCatalog {
             inputSchema: memoryObjectSchema
         ),
         Tool(
+            name: "apple_debug_memory_map",
+            description: "Read a bounded macOS vmmap region report for an explicitly authorized local process. Requires APPLE_DEBUG_ALLOW_TARGET_ATTACH=1.",
+            inputSchema: processObjectSchema
+        ),
+        Tool(
             name: "apple_debug_disassemble",
             description: "Disassemble instructions from a stopped target through LLDB-DAP.",
             inputSchema: disassembleObjectSchema
@@ -638,6 +643,15 @@ enum ToolCatalog {
             let offset = intValue(from: params.arguments?["offset"]) ?? 0
             do {
                 return result(for: try await sessions.readMemory(sessionID: sessionID, memoryReference: memoryReference, offset: offset, count: count))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_memory_map":
+            guard let processID = intValue(from: params.arguments?["processID"]) else {
+                return errorResult("Missing required processID argument.")
+            }
+            do {
+                return result(for: try await sessions.memoryMap(processID: processID))
             } catch {
                 return errorResult(error)
             }
@@ -1432,6 +1446,14 @@ enum ToolCatalog {
             "processID": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("sessionID"), .string("processID")])
+    ])
+
+    private static let processObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "processID": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("processID")])
     ])
 
     private static let breakpointObjectSchema: Value = .object([

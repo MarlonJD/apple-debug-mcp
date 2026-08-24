@@ -9,6 +9,7 @@ The current product surface includes:
 - watchpoint plumbing through DAP data breakpoints;
 - explicitly authorized expression evaluation and memory writes, plus target terminate/disconnect control;
 - bounded memory pattern search and expected-bytes transactional patch/rollback (write permission required);
+- authorized macOS `vmmap` memory-region reporting (attach permission required);
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;

@@ -87,6 +87,16 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testMemoryMapRequiresExplicitAttachPolicy() async {
+        let manager = DebugSessionManager()
+        do {
+            _ = try await manager.memoryMap(processID: 1)
+            XCTFail("Memory map unexpectedly bypassed attach policy")
+        } catch {
+            XCTAssertEqual(error as? DebugPolicyError, .attachDisabled)
+        }
+    }
+
     func testExpressionEvaluationRequiresExplicitPolicy() {
         XCTAssertThrowsError(
             try DebugPolicy.validateEvaluate()

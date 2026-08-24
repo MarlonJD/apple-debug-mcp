@@ -197,6 +197,16 @@ public struct DebugWaitForStopResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct DebugMemoryMapResult: Codable, Equatable, Sendable {
+    public let processID: Int
+    public let output: String
+
+    public init(processID: Int, output: String) {
+        self.processID = processID
+        self.output = output
+    }
+}
+
 public struct MemorySearchResult: Codable, Equatable, Sendable {
     public let sessionID: String
     public let memoryReference: String
@@ -724,6 +734,36 @@ public actor DebugSessionManager {
             terminated: terminated,
             timedOut: result.timedOut,
             events: result.events
+        )
+    }
+
+    public func memoryMap(processID: Int) throws -> DebugMemoryMapResult {
+        try DebugPolicy.validateAttach(processID: processID)
+        guard let vmmapPath = ToolchainProbe.path(for: "vmmap") else {
+            throw DAPError.toolUnavailable
+        }
+        let result: AppleProcessResult
+        do {
+            result = try AppleProcessRunner.run(
+                executable: vmmapPath,
+                arguments: ["-wide", "-interleaved", String(processID)],
+                maximumOutputSize: 8 * 1024 * 1024
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw DAPError.requestFailed("vmmap output exceeds the 8 MB analysis limit.")
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw DAPError.requestFailed(message)
+        } catch {
+            throw DAPError.requestFailed(error.localizedDescription)
+        }
+        guard result.terminationStatus == 0 else {
+            let message = String(decoding: result.stderr, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw DAPError.requestFailed(message.isEmpty ? "vmmap failed." : message)
+        }
+        return DebugMemoryMapResult(
+            processID: processID,
+            output: String(decoding: result.stdout, as: UTF8.self)
         )
     }
 

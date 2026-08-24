@@ -44,7 +44,7 @@ final class CapabilitiesTests: XCTestCase {
             names,
             [
                 "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
-                "codesign", "otool", "nm", "dyld_info", "swift-demangle", "dwarfdump"
+                "codesign", "otool", "nm", "dyld_info", "swift-demangle", "dwarfdump", "vmmap"
             ]
         )
     }
