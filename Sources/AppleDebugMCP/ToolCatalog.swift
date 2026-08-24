@@ -137,6 +137,11 @@ enum ToolCatalog {
             name: "apple_xcode_build",
             description: "Build an Xcode project or workspace for a destination. Disabled unless APPLE_DEBUG_ALLOW_XCODE_BUILD=1.",
             inputSchema: xcodeBuildObjectSchema
+        ),
+        Tool(
+            name: "apple_symbolicate",
+            description: "Resolve a Mach-O address with atos using a binary or dSYM-backed binary.",
+            inputSchema: symbolicateObjectSchema
         )
     ]
 
@@ -401,6 +406,24 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_symbolicate":
+            guard let binaryPath = params.arguments?["binaryPath"]?.stringValue,
+                  let architecture = params.arguments?["architecture"]?.stringValue,
+                  let address = params.arguments?["address"]?.stringValue else {
+                return errorResult("Missing required binaryPath, architecture, or address argument.")
+            }
+            do {
+                return result(
+                    for: try SymbolicationService.symbolize(
+                        binaryPath: binaryPath,
+                        architecture: architecture,
+                        address: address,
+                        loadAddress: params.arguments?["loadAddress"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
 
         default:
             return .init(
@@ -595,6 +618,17 @@ enum ToolCatalog {
             "destination": .object(["type": .string("string")])
         ]),
         "required": .array([.string("path"), .string("scheme"), .string("destination")])
+    ])
+
+    private static let symbolicateObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "binaryPath": .object(["type": .string("string")]),
+            "architecture": .object(["type": .string("string")]),
+            "address": .object(["type": .string("string")]),
+            "loadAddress": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("binaryPath"), .string("architecture"), .string("address")])
     ])
 
     private static func errorResult(_ error: Error) -> CallTool.Result {
