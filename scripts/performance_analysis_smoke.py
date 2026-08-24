@@ -118,7 +118,38 @@ def main() -> int:
             if semantic_report.get("domain") != "time-profile" or semantic_report.get("eventCount", 0) <= 0:
                 raise RuntimeError("template-specific Time Profiler semantic report was incomplete")
 
-        print("performance-analysis-smoke: xctrace XML produced rows, hotspots, flame stacks, and a template-specific semantic report")
+            response = request(
+                "tools/call",
+                {
+                    "name": "apple_performance_timeline",
+                    "arguments": {"tracePath": str(trace_path), "schema": "time-profile", "maximumRows": 100},
+                },
+            )
+            if response.get("result", {}).get("isError"):
+                raise RuntimeError(response)
+            timeline = json.loads(response["result"]["content"][0]["text"])
+            if not timeline or timeline[0].get("index") != 0:
+                raise RuntimeError("xctrace timeline tool returned no bounded points")
+
+            response = request(
+                "tools/call",
+                {
+                    "name": "apple_performance_diff",
+                    "arguments": {
+                        "leftTracePath": str(trace_path),
+                        "rightTracePath": str(trace_path),
+                        "schema": "time-profile",
+                        "maximumRows": 100,
+                    },
+                },
+            )
+            if response.get("result", {}).get("isError"):
+                raise RuntimeError(response)
+            diff = json.loads(response["result"]["content"][0]["text"])
+            if diff.get("leftSampleCount") != diff.get("rightSampleCount") or diff.get("hotspotChanges"):
+                raise RuntimeError("identical xctrace diff was not empty")
+
+        print("performance-analysis-smoke: xctrace XML produced semantic report, timeline, and identical-trace diff evidence")
         return 0
     except Exception as error:
         print(f"performance-analysis-smoke: {error}", file=sys.stderr)

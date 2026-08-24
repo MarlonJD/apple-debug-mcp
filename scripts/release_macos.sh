@@ -7,6 +7,7 @@ cd "$root"
 identity=${CODESIGN_IDENTITY:-}
 notary_profile=${NOTARY_PROFILE:-general-notary}
 version=${RELEASE_VERSION:-0.1.0}
+plugin_xpc_bundle=${PLUGIN_XPC_BUNDLE:-}
 architecture=$(uname -m)
 output_path=${1:-"$root/dist/apple-debug-mcp-macos-$architecture-notarized.zip"}
 
@@ -42,6 +43,20 @@ cp Resources/AppleDebugMCP-Info.plist "$contents_path/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$version" "$contents_path/Info.plist"
 plutil -replace CFBundleVersion -string "$version" "$contents_path/Info.plist"
 cp LICENSE README.md ARCHITECTURE.md "$contents_path/Resources/"
+
+if [ -n "$plugin_xpc_bundle" ]; then
+    case "$plugin_xpc_bundle" in
+        *.xpc) ;;
+        *) printf '%s\n' 'release: PLUGIN_XPC_BUNDLE must point to an .xpc bundle' >&2; exit 1 ;;
+    esac
+    if [ ! -d "$plugin_xpc_bundle" ]; then
+        printf 'release: plugin XPC bundle does not exist: %s\n' "$plugin_xpc_bundle" >&2
+        exit 1
+    fi
+    mkdir -p "$contents_path/XPCServices"
+    cp -R "$plugin_xpc_bundle" "$contents_path/XPCServices/$(basename -- "$plugin_xpc_bundle")"
+    codesign --force --options runtime --timestamp --sign "$identity" "$contents_path/XPCServices/$(basename -- "$plugin_xpc_bundle")"
+fi
 
 codesign --force --options runtime --timestamp --sign "$identity" "$app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"

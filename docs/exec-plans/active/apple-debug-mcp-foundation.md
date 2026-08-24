@@ -2,7 +2,7 @@
 id: apple-debug-mcp-foundation
 status: active
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-25
 completed:
 owner: Apple Debug MCP maintainers
 -->
@@ -74,6 +74,10 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-25 01:05Z) Add coordinateTap/coordinateLongPress/coordinateSwipe actions to project-backed and arbitrary installed-app XCUITest probes for custom-drawn UI surfaces.
 - [x] (2026-08-24 23:25Z) Expand the native workbench debugger panel with pause/continue/instruction stepping and explicitly grant-gated expression evaluation; verify the SwiftUI product build.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
+- [x] (2026-08-25 02:05Z) Add dyld chained-fixup/import decoding plus bounded ObjC/Swift runtime strings and direct pointer cross-reference evidence for selected shared-cache images.
+- [x] (2026-08-25 02:10Z) Add xctrace timeline points, trace-to-trace semantic/hotspot diffs, CFG annotated pseudo-code, and native workbench graph/timeline/diff panels.
+- [x] (2026-08-25 02:15Z) Add bounded multi-file Swift AST inspection and Xcode project/scheme target context with SDK and target-triple resolution.
+- [x] (2026-08-25 02:20Z) Replace production plugin execution transport with an independently signed App Sandbox XPC plugin protocol; retain sandbox-exec only as explicit legacy diagnostics and verify a signed XPC fixture.
 
 ## Surprises & Discoveries
 
@@ -89,6 +93,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - The installed Apple LLDB (`lldb-2100.0.17.203`) exposes `process trace start/stop` but `apropos reverse`, `apropos replay`, and `process record` are unavailable; a forward DAP stop trace is therefore the strongest truthful execution-history feature on this host.
 - Apple `heap`, `leaks`, `malloc_history`, `sample`, and `vmmap` provide strong user-process runtime counterparts, while SIP/KDK/entitlement requirements keep kernel task and kext debugging outside the supported boundary.
 - The current Xcode template catalog includes Power Profiler, Animation Hitches, Swift Concurrency, Processor Trace, CPU Profiler, Network, File Activity, and Game Performance; the xctrace parser now accepts bounded allowlisted schema names and preserves generic row fields when a template emits a different table shape.
+- The Swift compiler can emit a multi-file `-dump-ast` to stderr for some temporary source sets; the public AST service uses stdout first and stderr only when stdout is empty, while preserving the compiler output as bounded evidence.
+- An Xcode scheme's `CURRENT_ARCH` can be `undefined_arch` during `-showBuildSettings`; target-triple resolution therefore falls back to the first concrete `ARCHS` entry before invoking `swiftc`.
+- A sandboxed XPC service cannot be treated as a generic child-process launcher on this host; the production plugin contract is therefore service-to-service XPC with each third-party plugin independently signed and App Sandbox enabled.
 - The Swift Concurrency template exposes several public `swift-task-*` and `swift-actor-*` tables rather than one `swift-concurrency` table. The virtual analysis distributes its bounded row budget across available tables, resolves deduplicated references, and reports only public export evidence; task creation, actor execution, and continuation-state rows are not private runtime memory inspection.
 - `dyld_shared_cache_util` is not installed on this host, so shared-cache inspection uses the public header/mapping/image table layout and keeps live-tool absence visible rather than inventing a utility result.
 
@@ -106,6 +113,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - Decision: Keep the project separate from AviaWorkspace.
   Rationale: AviaWorkspace owns platform composition; this repository owns the Apple debugger lifecycle and its release boundary.
   Date/Author: 2026-08-24 / Apple Debug MCP maintainers
+- Decision: Treat third-party plugin code as an independently signed App Sandbox XPC service, not as an executable child of a sandboxed broker.
+  Rationale: The host environment rejects generic child-process launch from the sandboxed XPC service; service-to-service XPC is the Apple-supported isolation boundary and keeps plugin code out of the MCP process.
+  Date/Author: 2026-08-25 / Apple Debug MCP maintainers
 
 ## Outcomes & Retrospective
 

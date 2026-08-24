@@ -46,7 +46,7 @@ def main() -> int:
                     break
             if not host.get("executionSupported") or not host.get("sandboxRequired"):
                 raise RuntimeError("plugin host plan did not report the available sandbox boundary")
-            process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "apple_plugin_host_execute", "arguments": {"executablePath": "/bin/cat", "manifestPath": str(Path(directory, "example.appledebugplugin.json")), "input": "{\"hello\":\"sandbox\"}\n"}}}) + "\n")
+            process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "apple_plugin_host_execute", "arguments": {"executablePath": "/bin/cat", "manifestPath": str(Path(directory, "example.appledebugplugin.json")), "input": "{\"hello\":\"sandbox\"}\n", "transport": "profile"}}}) + "\n")
             process.stdin.flush()
             while True:
                 line = process.stdout.readline()

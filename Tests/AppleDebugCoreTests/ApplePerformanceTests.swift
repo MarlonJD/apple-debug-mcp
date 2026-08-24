@@ -81,6 +81,19 @@ final class ApplePerformanceTests: XCTestCase {
         )
     }
 
+    func testBuildsBoundedTimelinePoints() {
+        let rows = [
+            makeRow(fields: ["symbol": "first"]),
+            makeRow(fields: ["symbol": "second"])
+        ]
+
+        let timeline = ApplePerformanceService.buildTimeline(rows: rows, maximumPoints: 1)
+
+        XCTAssertEqual(timeline.count, 1)
+        XCTAssertEqual(timeline.first?.index, 0)
+        XCTAssertEqual(timeline.first?.label, "first")
+    }
+
     private func makeRow(fields: [String: String]) -> ApplePerformanceTraceRow {
         ApplePerformanceTraceRow(
             timeNanoseconds: 1,

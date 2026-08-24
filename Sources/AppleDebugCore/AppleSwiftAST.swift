@@ -47,6 +47,10 @@ public struct SwiftASTNode: Codable, Equatable, Sendable {
 
 public struct SwiftASTReport: Codable, Equatable, Sendable {
     public let path: String
+    public let sourcePaths: [String]
+    public let projectPath: String?
+    public let scheme: String?
+    public let targetName: String?
     public let moduleName: String
     public let nodeCount: Int
     public let declarationCount: Int
@@ -63,8 +67,12 @@ public struct SwiftASTReport: Codable, Equatable, Sendable {
     public let rawAST: String?
     public let notes: [String]
 
-    public init(path: String, moduleName: String, nodeCount: Int, declarationCount: Int, typeCount: Int, functionCount: Int, variableCount: Int, importCount: Int, nodes: [SwiftASTNode], declarations: [String], types: [String], functions: [String], variables: [String], imports: [String], rawAST: String?, notes: [String]) {
+    public init(path: String, sourcePaths: [String], projectPath: String? = nil, scheme: String? = nil, targetName: String? = nil, moduleName: String, nodeCount: Int, declarationCount: Int, typeCount: Int, functionCount: Int, variableCount: Int, importCount: Int, nodes: [SwiftASTNode], declarations: [String], types: [String], functions: [String], variables: [String], imports: [String], rawAST: String?, notes: [String]) {
         self.path = path
+        self.sourcePaths = sourcePaths
+        self.projectPath = projectPath
+        self.scheme = scheme
+        self.targetName = targetName
         self.moduleName = moduleName
         self.nodeCount = nodeCount
         self.declarationCount = declarationCount
@@ -93,15 +101,85 @@ public enum SwiftASTService {
         moduleName: String = "AppleDebugSource",
         includeRaw: Bool = false
     ) throws -> SwiftASTReport {
-        guard !path.isEmpty, path.utf8.count <= 4_096,
-              !path.contains("\0"), path.hasSuffix(".swift"),
-              URL(fileURLWithPath: path).path.hasPrefix("/"),
-              validModuleName(moduleName) else {
+        try inspect(paths: [path], moduleName: moduleName, includeRaw: includeRaw)
+    }
+
+    public static func inspect(
+        paths: [String],
+        moduleName: String = "AppleDebugSource",
+        includeRaw: Bool = false
+    ) throws -> SwiftASTReport {
+        try inspect(
+            paths: paths,
+            moduleName: moduleName,
+            includeRaw: includeRaw,
+            compilerArguments: [],
+            projectPath: nil,
+            scheme: nil,
+            targetName: nil,
+            contextNotes: []
+        )
+    }
+
+    public static func inspect(
+        projectPath: String,
+        scheme: String,
+        configuration: String = "Debug",
+        destination: String = "generic/platform=macOS",
+        includeRaw: Bool = false
+    ) throws -> SwiftASTReport {
+        let context: XcodeSwiftTargetContext
+        do {
+            context = try XcodeService.swiftTargetContext(
+                path: projectPath,
+                scheme: scheme,
+                configuration: configuration,
+                destination: destination
+            )
+        } catch {
+            throw SwiftASTError.commandFailed(error.localizedDescription)
+        }
+        var compilerArguments: [String] = []
+        if let sdkRoot = context.sdkRoot {
+            compilerArguments += ["-sdk", sdkRoot]
+        }
+        if let targetTriple = context.targetTriple {
+            compilerArguments += ["-target", targetTriple]
+        }
+        return try inspect(
+            paths: context.sourcePaths,
+            moduleName: context.moduleName,
+            includeRaw: includeRaw,
+            compilerArguments: compilerArguments,
+            projectPath: context.projectPath,
+            scheme: context.scheme,
+            targetName: context.targetName,
+            contextNotes: context.notes
+        )
+    }
+
+    private static func inspect(
+        paths: [String],
+        moduleName: String,
+        includeRaw: Bool,
+        compilerArguments: [String],
+        projectPath: String?,
+        scheme: String?,
+        targetName: String?,
+        contextNotes: [String]
+    ) throws -> SwiftASTReport {
+        guard !paths.isEmpty, paths.count <= 256, validModuleName(moduleName),
+              paths.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 4_096 && !$0.contains("\0") && $0.hasSuffix(".swift") && URL(fileURLWithPath: $0).path.hasPrefix("/") }) else {
             throw SwiftASTError.invalidRequest
         }
-        guard FileManager.default.fileExists(atPath: path) else { throw SwiftASTError.inputNotFound }
-        let attributes = try FileManager.default.attributesOfItem(atPath: path)
-        guard let size = attributes[.size] as? NSNumber, size.intValue <= maximumSourceSize else {
+        var totalSourceSize = 0
+        for path in paths {
+            guard FileManager.default.fileExists(atPath: path) else { throw SwiftASTError.inputNotFound }
+            let attributes = try FileManager.default.attributesOfItem(atPath: path)
+            guard let size = attributes[.size] as? NSNumber else { throw SwiftASTError.invalidRequest }
+            totalSourceSize += size.intValue
+        }
+        guard totalSourceSize <= maximumSourceSize * 4 else {
             throw SwiftASTError.invalidRequest
         }
         guard ToolchainProbe.path(for: "swiftc") != nil else { throw SwiftASTError.toolUnavailable }
@@ -109,7 +187,7 @@ public enum SwiftASTService {
         do {
             result = try AppleProcessRunner.run(
                 executable: "/usr/bin/xcrun",
-                arguments: ["swiftc", "-dump-ast", "-parse-as-library", "-module-name", moduleName, path],
+                arguments: ["swiftc", "-dump-ast", "-parse-as-library", "-module-name", moduleName] + compilerArguments + paths,
                 maximumOutputSize: maximumOutputSize
             )
         } catch AppleProcessRunnerError.outputTooLarge {
@@ -124,7 +202,10 @@ public enum SwiftASTService {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             throw SwiftASTError.commandFailed(message.isEmpty ? "swiftc failed." : message)
         }
-        let raw = String(decoding: result.stdout, as: UTF8.self)
+        // swiftc has emitted dump-ast to stderr on some toolchain/source-set combinations;
+        // retain stdout as the primary stream and use stderr only when stdout is empty.
+        let rawData = result.stdout.isEmpty ? result.stderr : result.stdout
+        let raw = String(decoding: rawData, as: UTF8.self)
         let nodes = parseNodes(raw)
         let declarations = uniqueNames(nodes.filter { $0.kind.hasSuffix("_decl") && $0.kind != "import_decl" })
         let types = uniqueNames(nodes.filter { ["struct_decl", "class_decl", "enum_decl", "protocol_decl", "actor_decl", "typealias_decl"].contains($0.kind) })
@@ -132,7 +213,11 @@ public enum SwiftASTService {
         let variables = uniqueNames(nodes.filter { ["var_decl", "pattern_binding_decl", "param_decl"].contains($0.kind) })
         let imports = uniqueNames(nodes.filter { $0.kind == "import_decl" })
         return SwiftASTReport(
-            path: path,
+            path: paths[0],
+            sourcePaths: paths,
+            projectPath: projectPath,
+            scheme: scheme,
+            targetName: targetName,
             moduleName: moduleName,
             nodeCount: nodes.count,
             declarationCount: declarations.count,
@@ -147,9 +232,10 @@ public enum SwiftASTService {
             variables: variables,
             imports: imports,
             rawAST: includeRaw ? raw : nil,
-            notes: [
+            notes: contextNotes + [
                 "This report is source-backed public swiftc -dump-ast output; compiled binaries without source are covered by Mach-O, Swift metadata, and DWARF tools instead.",
-                "AST nodes and compiler output are bounded; no private compiler database or runtime state is accessed."
+                "AST nodes and compiler output are bounded; no private compiler database or runtime state is accessed.",
+                paths.count > 1 ? "The AST was emitted for a bounded multi-file source set in one Swift module." : "The AST was emitted for one Swift source file."
             ]
         )
     }

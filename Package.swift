@@ -27,6 +27,10 @@ let package = Package(
         .executable(
             name: "apple-debug-plugin-host",
             targets: ["AppleDebugPluginHost"]
+        ),
+        .executable(
+            name: "apple-debug-plugin-xpc-service",
+            targets: ["AppleDebugPluginXPCService"]
         )
     ],
     dependencies: [
@@ -52,6 +56,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "AppleDebugPluginHost",
+            dependencies: ["AppleDebugCore"]
+        ),
+        .executableTarget(
+            name: "AppleDebugPluginXPCService",
             dependencies: ["AppleDebugCore"]
         ),
         .testTarget(

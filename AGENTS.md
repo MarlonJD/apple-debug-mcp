@@ -44,6 +44,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Signing audit smoke | make signing-audit-smoke | Audit codesign identity, entitlements, authorities, and Gatekeeper output |
 | Patch workflow smoke | make patch-workflow-smoke | Verify non-destructive assembly preview and re-sign plan generation |
 | Plugin smoke | make plugin-smoke | Discover explicit plugin manifests without executing code |
+| Plugin XPC smoke | make plugin-xpc-smoke | Build a signed App Sandbox XPC plugin fixture and verify bounded protocol execution |
 | Workbench build smoke | make workbench-build-smoke | Build the native macOS SwiftUI workbench executable |
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |

@@ -203,6 +203,64 @@ public struct ApplePerformanceFlameStack: Codable, Equatable, Sendable {
     }
 }
 
+public struct ApplePerformanceTimelinePoint: Codable, Equatable, Sendable {
+    public let index: Int
+    public let timeNanoseconds: Int64
+    public let label: String
+    public let threadID: Int?
+    public let state: String?
+    public let weightNanoseconds: Int64
+
+    public init(index: Int, timeNanoseconds: Int64, label: String, threadID: Int?, state: String?, weightNanoseconds: Int64) {
+        self.index = index
+        self.timeNanoseconds = timeNanoseconds
+        self.label = label
+        self.threadID = threadID
+        self.state = state
+        self.weightNanoseconds = weightNanoseconds
+    }
+}
+
+public struct ApplePerformanceHotspotChange: Codable, Equatable, Sendable {
+    public let symbol: String
+    public let leftSampleCount: Int
+    public let rightSampleCount: Int
+    public let leftWeightNanoseconds: Int64
+    public let rightWeightNanoseconds: Int64
+    public let deltaWeightNanoseconds: Int64
+
+    public init(symbol: String, leftSampleCount: Int, rightSampleCount: Int, leftWeightNanoseconds: Int64, rightWeightNanoseconds: Int64, deltaWeightNanoseconds: Int64) {
+        self.symbol = symbol
+        self.leftSampleCount = leftSampleCount
+        self.rightSampleCount = rightSampleCount
+        self.leftWeightNanoseconds = leftWeightNanoseconds
+        self.rightWeightNanoseconds = rightWeightNanoseconds
+        self.deltaWeightNanoseconds = deltaWeightNanoseconds
+    }
+}
+
+public struct ApplePerformanceTraceDiff: Codable, Equatable, Sendable {
+    public let leftTracePath: String
+    public let rightTracePath: String
+    public let schema: String
+    public let leftSampleCount: Int
+    public let rightSampleCount: Int
+    public let semanticDelta: [String: Int64]
+    public let hotspotChanges: [ApplePerformanceHotspotChange]
+    public let notes: [String]
+
+    public init(leftTracePath: String, rightTracePath: String, schema: String, leftSampleCount: Int, rightSampleCount: Int, semanticDelta: [String: Int64], hotspotChanges: [ApplePerformanceHotspotChange], notes: [String]) {
+        self.leftTracePath = leftTracePath
+        self.rightTracePath = rightTracePath
+        self.schema = schema
+        self.leftSampleCount = leftSampleCount
+        self.rightSampleCount = rightSampleCount
+        self.semanticDelta = semanticDelta
+        self.hotspotChanges = hotspotChanges
+        self.notes = notes
+    }
+}
+
 public struct ApplePerformanceSemanticSummary: Codable, Equatable, Sendable {
     public let schema: String
     public let eventCount: Int
@@ -570,6 +628,89 @@ public enum ApplePerformanceService {
             durationsNanoseconds: durations,
             numericTotals: numericTotals,
             notes: notes
+        )
+    }
+
+    public static func buildTimeline(
+        rows: [ApplePerformanceTraceRow],
+        maximumPoints: Int = 5_000
+    ) -> [ApplePerformanceTimelinePoint] {
+        rows.prefix(max(0, maximumPoints)).enumerated().map { index, row in
+            let label = row.fields["symbol"] ?? row.frames.first?.name ?? row.sampleType ?? row.stackSummary ?? row.fields.sorted { $0.key < $1.key }.first?.value ?? "event"
+            return ApplePerformanceTimelinePoint(
+                index: index,
+                timeNanoseconds: row.timeNanoseconds ?? Int64(index),
+                label: label,
+                threadID: row.threadID,
+                state: row.state,
+                weightNanoseconds: row.weightNanoseconds ?? 0
+            )
+        }
+    }
+
+    public static func timeline(
+        tracePath: String,
+        schema: String = "time-profile",
+        maximumRows: Int = 5_000
+    ) throws -> [ApplePerformanceTimelinePoint] {
+        let analysis = try analyze(tracePath: tracePath, schema: schema, maximumRows: maximumRows, includeRows: true)
+        return buildTimeline(rows: analysis.rows, maximumPoints: maximumRows)
+    }
+
+    public static func diff(
+        leftTracePath: String,
+        rightTracePath: String,
+        schema: String = "time-profile",
+        maximumRows: Int = 5_000
+    ) throws -> ApplePerformanceTraceDiff {
+        let left = try analyze(tracePath: leftTracePath, schema: schema, maximumRows: maximumRows, includeRows: false)
+        let right = try analyze(tracePath: rightTracePath, schema: schema, maximumRows: maximumRows, includeRows: false)
+        var semanticDelta: [String: Int64] = [:]
+        let countKeys = Set(left.templateSemantic.counts.keys).union(right.templateSemantic.counts.keys)
+        for key in countKeys {
+            semanticDelta["count.\(key)"] = (right.templateSemantic.counts[key] ?? 0) - (left.templateSemantic.counts[key] ?? 0)
+        }
+        let durationKeys = Set(left.templateSemantic.durationsNanoseconds.keys).union(right.templateSemantic.durationsNanoseconds.keys)
+        for key in durationKeys {
+            semanticDelta["duration.\(key)"] = (right.templateSemantic.durationsNanoseconds[key] ?? 0) - (left.templateSemantic.durationsNanoseconds[key] ?? 0)
+        }
+        let leftHotspots = left.hotspots.reduce(into: [String: ApplePerformanceHotspot]()) { result, hotspot in
+            result[hotspot.symbol] = hotspot
+        }
+        let rightHotspots = right.hotspots.reduce(into: [String: ApplePerformanceHotspot]()) { result, hotspot in
+            result[hotspot.symbol] = hotspot
+        }
+        let symbols = Set(leftHotspots.keys).union(rightHotspots.keys).sorted()
+        let changes = symbols.compactMap { symbol -> ApplePerformanceHotspotChange? in
+            let lhs = leftHotspots[symbol]
+            let rhs = rightHotspots[symbol]
+            let leftWeight = lhs?.weightNanoseconds ?? 0
+            let rightWeight = rhs?.weightNanoseconds ?? 0
+            let leftCount = lhs?.sampleCount ?? 0
+            let rightCount = rhs?.sampleCount ?? 0
+            guard leftWeight != rightWeight || leftCount != rightCount else { return nil }
+            return ApplePerformanceHotspotChange(
+                symbol: symbol,
+                leftSampleCount: leftCount,
+                rightSampleCount: rightCount,
+                leftWeightNanoseconds: leftWeight,
+                rightWeightNanoseconds: rightWeight,
+                deltaWeightNanoseconds: rightWeight - leftWeight
+            )
+        }
+        .sorted {
+            if $0.deltaWeightNanoseconds != $1.deltaWeightNanoseconds { return $0.deltaWeightNanoseconds > $1.deltaWeightNanoseconds }
+            return $0.symbol < $1.symbol
+        }
+        return ApplePerformanceTraceDiff(
+            leftTracePath: leftTracePath,
+            rightTracePath: rightTracePath,
+            schema: schema,
+            leftSampleCount: left.sampleCount,
+            rightSampleCount: right.sampleCount,
+            semanticDelta: semanticDelta,
+            hotspotChanges: Array(changes.prefix(1_000)),
+            notes: ["Diffs compare bounded public xctrace exports and do not infer causality or access private Instruments databases."]
         )
     }
 

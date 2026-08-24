@@ -140,6 +140,7 @@ public struct ControlFlowFunction: Codable, Equatable, Sendable {
     public let blocks: [ControlFlowBlock]
     public let callees: [String]
     public let callers: [String]
+    public let pseudoCode: String
 
     public init(
         name: String,
@@ -147,7 +148,8 @@ public struct ControlFlowFunction: Codable, Equatable, Sendable {
         endAddress: String,
         blocks: [ControlFlowBlock],
         callees: [String],
-        callers: [String]
+        callers: [String],
+        pseudoCode: String
     ) {
         self.name = name
         self.startAddress = startAddress
@@ -155,6 +157,7 @@ public struct ControlFlowFunction: Codable, Equatable, Sendable {
         self.blocks = blocks
         self.callees = callees
         self.callers = callers
+        self.pseudoCode = pseudoCode
     }
 }
 
@@ -381,7 +384,8 @@ public enum AppleControlFlowService {
                     endAddress: formatAddress(range.end),
                     blocks: blocks,
                     callees: callees.sorted(),
-                    callers: []
+                    callers: [],
+                    pseudoCode: buildPseudoCode(name: range.name, body: body)
                 )
             )
         }
@@ -393,7 +397,8 @@ public enum AppleControlFlowService {
                 endAddress: function.endAddress,
                 blocks: function.blocks,
                 callees: function.callees,
-                callers: callEdges.filter { $0.to == function.name || $0.to == function.startAddress }.map(\.from).sorted()
+                callers: callEdges.filter { $0.to == function.name || $0.to == function.startAddress }.map(\.from).sorted(),
+                pseudoCode: function.pseudoCode
             )
             return updated
         }
@@ -465,6 +470,32 @@ public enum AppleControlFlowService {
                 successors: Array(Set(successors)).sorted()
             )
         }
+    }
+
+    private static func buildPseudoCode(name: String, body: [ControlFlowInstruction]) -> String {
+        var lines = ["function \(name)() {"]
+        for instruction in body {
+            let target = instruction.targetSymbol ?? instruction.targetAddress ?? "indirect"
+            let operands = instruction.operands.map { " \($0)" } ?? ""
+            let statement: String
+            switch instruction.branchKind {
+            case "call":
+                statement = "call \(target)"
+            case "indirect-call":
+                statement = "call *indirect"
+            case "conditional":
+                statement = "if (condition) goto \(target)"
+            case "unconditional":
+                statement = "goto \(target)"
+            case "indirect-branch":
+                statement = "goto *indirect"
+            default:
+                statement = "\(instruction.mnemonic)\(operands)"
+            }
+            lines.append("    \(instruction.address): \(statement)")
+        }
+        lines.append("}")
+        return lines.joined(separator: "\n")
     }
 
     private static func functionStarts(path: String, architecture: String) -> [UInt64] {

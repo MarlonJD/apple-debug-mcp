@@ -79,7 +79,9 @@ public enum AppleSigningAuditService {
             throw AppleSigningAuditError.invalidRequest
         }
         guard FileManager.default.fileExists(atPath: path) else { throw AppleSigningAuditError.inputNotFound }
-        guard let codesign = ToolchainProbe.path(for: "codesign") else { throw AppleSigningAuditError.toolUnavailable }
+        let codesign = ToolchainProbe.path(for: "codesign")
+            ?? (FileManager.default.fileExists(atPath: "/usr/bin/codesign") ? "/usr/bin/codesign" : nil)
+        guard let codesign else { throw AppleSigningAuditError.toolUnavailable }
 
         let verification = try run(codesign, ["--verify", "--deep", "--strict", path], allowFailure: true)
         let details = try run(codesign, ["-d", "--verbose=4", path], allowFailure: true)

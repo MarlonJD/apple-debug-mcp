@@ -10,6 +10,6 @@ NOTARY_PROFILE=general-notary \
 make release-package
 ```
 
-The resulting MCP executable is inside `AppleDebugMCP.app/Contents/MacOS/apple-debug-mcp`; the separately signed `apple-debug-plugin-host` is colocated in the same app bundle for explicit sandboxed plugin execution. An MCP client can use the MCP executable path after extracting the archive. The signing identity and notary credentials are read from the local keychain and are never stored in this repository.
+The resulting MCP executable is inside `AppleDebugMCP.app/Contents/MacOS/apple-debug-mcp`; the separately signed `apple-debug-plugin-host` is colocated in the same app bundle. A production third-party plugin is an independently signed `.xpc` service implementing `AppleDebugPluginXPCProtocol`; embed one during release with `PLUGIN_XPC_BUNDLE=/absolute/path/Analyzer.xpc` and pass its bundle identifier as `serviceName` to `apple_plugin_host_execute`. The legacy `transport=profile` path remains only for explicit local diagnostics. An MCP client can use the MCP executable path after extracting the archive. The signing identity and notary credentials are read from the local keychain and are never stored in this repository.
 
 The release script verifies the Developer ID signature before submission and runs `codesign --verify`, `stapler validate`, and `spctl --assess` after Apple accepts the submission. Release credentials, Apple account authorization, and external notarization are intentionally not part of ordinary `make check` or pull-request CI.

@@ -59,7 +59,7 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         let imageBase: UInt64 = 0x180000000
         let imageFileOffset = 0x1000
-        var data = Data(repeating: 0, count: 8192)
+        var data = Data(repeating: 0, count: 12_288)
         data.replaceSubrange(0..<16, with: Data("dyld_v1  arm64e\0".utf8))
         put32(&data, at: 16, value: 256)
         put32(&data, at: 20, value: 1)
@@ -83,8 +83,8 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         put32(&data, at: header + 4, value: 0x0100000c)
         put32(&data, at: header + 8, value: 0)
         put32(&data, at: header + 12, value: 6)
-        put32(&data, at: header + 16, value: 4)
-        put32(&data, at: header + 20, value: 144)
+        put32(&data, at: header + 16, value: 6)
+        put32(&data, at: header + 20, value: 392)
 
         let uuidCommand = header + 32
         put32(&data, at: uuidCommand, value: 0x1b)
@@ -102,7 +102,31 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         put32(&data, at: segmentCommand + 56, value: 5)
         put32(&data, at: segmentCommand + 60, value: 5)
 
-        let exportCommand = segmentCommand + 72
+        let dataSegmentCommand = segmentCommand + 72
+        put32(&data, at: dataSegmentCommand, value: 0x19)
+        put32(&data, at: dataSegmentCommand + 4, value: 232)
+        data.replaceSubrange((dataSegmentCommand + 8)..<(dataSegmentCommand + 24), with: Data("__DATA\0\0\0\0\0\0\0\0\0\0".utf8))
+        put64(&data, at: dataSegmentCommand + 24, value: imageBase + 0x2000)
+        put64(&data, at: dataSegmentCommand + 32, value: 0x2000)
+        put64(&data, at: dataSegmentCommand + 40, value: 0x200)
+        put64(&data, at: dataSegmentCommand + 48, value: 0x200)
+        put32(&data, at: dataSegmentCommand + 56, value: 3)
+        put32(&data, at: dataSegmentCommand + 60, value: 3)
+        put32(&data, at: dataSegmentCommand + 64, value: 2)
+        let objcNameSection = dataSegmentCommand + 72
+        data.replaceSubrange((objcNameSection)..<(objcNameSection + 16), with: Data("__objc_methname\0".utf8))
+        data.replaceSubrange((objcNameSection + 16)..<(objcNameSection + 32), with: Data("__DATA\0\0\0\0\0\0\0\0\0\0".utf8))
+        put64(&data, at: objcNameSection + 32, value: imageBase + 0x2000)
+        put64(&data, at: objcNameSection + 40, value: 16)
+        put32(&data, at: objcNameSection + 48, value: 0x2500)
+        let objcConstSection = objcNameSection + 80
+        data.replaceSubrange((objcConstSection)..<(objcConstSection + 16), with: Data("__objc_const\0\0\0\0".utf8))
+        data.replaceSubrange((objcConstSection + 16)..<(objcConstSection + 32), with: Data("__DATA\0\0\0\0\0\0\0\0\0\0".utf8))
+        put64(&data, at: objcConstSection + 32, value: imageBase + 0x3000)
+        put64(&data, at: objcConstSection + 40, value: 8)
+        put32(&data, at: objcConstSection + 48, value: 0x2600)
+
+        let exportCommand = dataSegmentCommand + 232
         put32(&data, at: exportCommand, value: 0x80000033)
         put32(&data, at: exportCommand + 4, value: 24)
         put32(&data, at: exportCommand + 8, value: 0x1200)
@@ -116,6 +140,12 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         put32(&data, at: symbolCommand + 16, value: 0x1310)
         put32(&data, at: symbolCommand + 20, value: 6)
 
+        let chainedCommand = symbolCommand + 24
+        put32(&data, at: chainedCommand, value: 0x80000034)
+        put32(&data, at: chainedCommand + 4, value: 16)
+        put32(&data, at: chainedCommand + 8, value: 0x1400)
+        put32(&data, at: chainedCommand + 12, value: 72)
+
         data.replaceSubrange(0x1200..<(0x1200 + 13), with: Data([0, 1, 0x5f, 0x66, 0x6f, 0x6f, 0, 8, 3, 0, 0x80, 0x02, 0]))
         put32(&data, at: 0x1300, value: 1)
         data[0x1304] = 0x0f
@@ -123,6 +153,24 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         put16(&data, at: 0x1306, value: 0)
         put64(&data, at: 0x1308, value: imageBase + 0x100)
         data.replaceSubrange(0x1310..<(0x1310 + 6), with: Data([0, 0x5f, 0x62, 0x61, 0x72, 0]))
+        put32(&data, at: 0x1400 + 4, value: 28)
+        put32(&data, at: 0x1400 + 8, value: 60)
+        put32(&data, at: 0x1400 + 12, value: 64)
+        put32(&data, at: 0x1400 + 16, value: 1)
+        put32(&data, at: 0x1400 + 20, value: 1)
+        put32(&data, at: 0x1400 + 28, value: 1)
+        put32(&data, at: 0x1400 + 32, value: 8)
+        put32(&data, at: 0x1400 + 36, value: 24)
+        put16(&data, at: 0x1400 + 40, value: 0x1000)
+        put16(&data, at: 0x1400 + 42, value: 2)
+        put64(&data, at: 0x1400 + 44, value: 0)
+        put32(&data, at: 0x1400 + 52, value: 0)
+        put16(&data, at: 0x1400 + 56, value: 1)
+        put16(&data, at: 0x1400 + 58, value: 0)
+        put32(&data, at: 0x1400 + 60, value: (1 << 9) | 1)
+        data.replaceSubrange(0x1400 + 64..<(0x1400 + 72), with: Data([0, 0x5f, 0x69, 0x6d, 0x70, 0x6f, 0x72, 0x74]))
+        data.replaceSubrange(0x2500..<(0x2500 + 9), with: Data("selector\0".utf8))
+        put64(&data, at: 0x2600, value: imageBase + 0x2000)
         try data.write(to: url)
 
         let analysis = try AppleDyldSharedCacheService.analyzeImage(path: url.path, imagePath: "/usr/lib/libFoo.dylib")
@@ -133,6 +181,10 @@ final class AppleDyldSharedCacheTests: XCTestCase {
         XCTAssertEqual(analysis.exports.first?.name, "_foo")
         XCTAssertEqual(analysis.exports.first?.address, "0x180001100")
         XCTAssertEqual(analysis.symbols.first?.name, "_bar")
+        XCTAssertEqual(analysis.chainedFixups.first?.pointerFormat, 2)
+        XCTAssertEqual(analysis.fixupImports.first?.name, "_import")
+        XCTAssertEqual(analysis.runtimeReferences.first?.value, "selector")
+        XCTAssertEqual(analysis.crossReferences.first?.targetValue, "selector")
     }
 
     private func put32(_ data: inout Data, at offset: Int, value: UInt32) {

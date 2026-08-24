@@ -19,19 +19,21 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleBinaryIntelligence.swift | Code signatures, entitlements, linked libraries, nm symbols, and dyld exports | Maintainers; update with Apple toolchain output changes |
 | Sources/AppleDebugCore/AppleRuntimeMetadata.swift | Objective-C metadata parsing and Swift symbol demangling | Maintainers; update with Objective-C/Swift ABI/toolchain changes |
 | Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
-| Sources/AppleDebugCore/AppleSwiftAST.swift | Source-backed public `swiftc -dump-ast` nodes, declarations, types, functions, variables, imports, and locations | Maintainers; update with Swift compiler AST output changes |
+| Sources/AppleDebugCore/AppleSwiftAST.swift | Source-backed public `swiftc -dump-ast` nodes, declarations, types, functions, variables, imports, locations, multi-file modules, and Xcode target/SDK context | Maintainers; update with Swift compiler or xcodebuild output changes |
 | Sources/AppleDebugCore/AppleAssembler.swift | Self-contained arm64/x86_64 assembly, Mach-O text extraction, disassembly, and patch payload generation | Maintainers; update with clang/LLVM output changes |
-| Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, address-based xrefs, relocations, call graph, external calls, indirect symbols, and data-in-code reports | Maintainers; update with LLVM disassembly output changes |
+| Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, address-based xrefs, relocations, call graph, external calls, indirect symbols, data-in-code reports, and annotated decompiler-style pseudo-code | Maintainers; update with LLVM disassembly output changes |
 | Sources/AppleDebugCore/AppleSwiftConcurrencyGraph.swift | Public xctrace Swift Concurrency task, actor, continuation, and relationship graph reconstruction | Maintainers; update with Instruments schema changes |
-| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery, runtime-helper/mount evidence, direct header/image-table parsing, and selected-image Mach-O/export/nlist extraction | Maintainers; update with public dyld cache layout changes |
+| Sources/AppleDebugCore/ApplePerformance.swift | Bounded xctrace rows, hotspots, folded stacks, semantic reports, timeline points, and trace diffs | Maintainers; update with Instruments schema changes |
+| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery, runtime-helper/mount evidence, direct header/image-table parsing, selected-image Mach-O/export/nlist extraction, chained-fixup imports, and ObjC/Swift pointer cross-references | Maintainers; update with public dyld cache layout changes |
 | Sources/AppleDebugCore/AppleMemoryMaps.swift | Typed vmmap regions, persisted snapshots, and region diffs | Maintainers; update with vmmap report format changes |
 | Sources/AppleDebugCore/AppleSimulatorEnvironment.swift | Fixed simctl environment controls and bounded input validation | Maintainers; update with simctl public subcommands |
 | Sources/AppleDebugCore/AppleReproBundle.swift | Screenshot/appinfo/log/trace/crash evidence bundle capture | Maintainers; update with Simulator evidence surfaces |
 | Sources/AppleDebugCore/AppleSigningAudit.swift | codesign, entitlements, provisioning, and Gatekeeper audit reports | Maintainers; update with signing tool output |
 | Sources/AppleDebugCore/ApplePatchWorkflow.swift | Non-destructive file patch previews and release-authority re-sign plans | Maintainers; update with packaging/signing policy |
 | Sources/AppleDebugCore/AppleDebugPlugins.swift | In-process plugin protocol, bounded manifest discovery, and registry | Maintainers; update only with a reviewed extension boundary |
-| Sources/AppleDebugCore/ApplePluginHost.swift | Signed executable validation and explicit-grant sandboxed plugin-host execution protocol | Maintainers; update only with a reviewed sandbox/IPC boundary |
+| Sources/AppleDebugCore/ApplePluginHost.swift | Signed executable validation, explicit-grant legacy profile transport, and App Sandbox XPC plugin protocol/client | Maintainers; update only with a reviewed sandbox/IPC boundary |
 | Sources/AppleDebugPluginHost/ | Separate JSON-line plugin host executable with timeout/output limits and sandbox boundary | Maintainers; update only with signed host/release changes |
+| Sources/AppleDebugPluginXPCService/ | Signed App Sandbox XPC protocol fixture and third-party plugin service contract | Maintainers; update only with XPC protocol or entitlement changes |
 | Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench | Maintainers; update with GUI panels and core API changes |
 | Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
 | Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
@@ -58,14 +60,14 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
 - `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
-- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates and parses allowlisted performance tables into typed rows, hotspots, folded flame-stack data, generic summaries, and template-specific semantic reports; the virtual Swift Concurrency schema merges public `swift-task-*`/`swift-actor-*` tables with a per-table row budget.
+- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates and parses allowlisted performance tables into typed rows, hotspots, folded flame-stack data, generic/semantic reports, timeline points, and trace-to-trace hotspot/counter diffs; the virtual Swift Concurrency schema merges public `swift-task-*`/`swift-actor-*` tables with a per-table row budget.
 - `AppleSwiftConcurrencyGraphService`: reconstructs task, actor, continuation-state, and parent/child evidence from materialized public xctrace rows and resolves exported reference nodes without accessing private Swift runtime state.
 - `AppleAssemblerService`: compiles bounded self-contained assembly to a temporary Mach-O object, extracts `__TEXT,__text`, and returns LLVM disassembly; `apple_debug_patch_assembly` feeds only those bytes into the existing expected-bytes transactional memory patch path.
+- `AppleControlFlowService`, `AppleDyldSharedCacheService`, `AppleMemoryMapService`, `AppleSimulatorEnvironmentService`, `AppleReproBundleService`, `AppleSigningAuditService`, and `ApplePatchWorkflowService` provide bounded reverse-engineering and reproducibility evidence; CFG functions include annotated pseudo-code, while dyld image analysis includes chained-fixup imports and direct ObjC/Swift runtime pointer cross-references.
 - `RuntimeDiagnosticsService`: runs fixed `heap`, `leaks`, `malloc_history`, and `sample` argument shapes against an attach-authorized process with bounded output; it never accepts shell fragments or arbitrary tool arguments.
 - `ReverseExecutionService` and `AppleKernelCapabilityService`: expose the installed backend’s actual reverse/time-travel and kernel-debugging boundary instead of claiming Windows/x64dbg semantics on Apple.
-- `AppleControlFlowService`, `AppleDyldSharedCacheService`, `AppleMemoryMapService`, `AppleSimulatorEnvironmentService`, `AppleReproBundleService`, `AppleSigningAuditService`, and `ApplePatchWorkflowService` provide the next Apple-native reverse-engineering and reproducibility layer.
 - `AppleDebugPlugin` is an in-process extension contract; `AppleDebugPluginManifestService` only discovers explicit JSON manifests. Dynamic dylib loading and arbitrary plugin process execution are deliberately outside the MCP trust boundary.
-- `ApplePluginHostService` verifies a candidate executable’s Apple signature and optional team identity, then can launch it only through the separate `apple-debug-plugin-host` process under a deny-by-default, no-network sandbox and explicit environment grant; the MCP server never loads plugin code in-process.
+- `ApplePluginHostService` verifies the candidate XPC service executable's Apple signature and optional team identity, then connects only through the independently signed App Sandbox `AppleDebugPluginXPCProtocol`; `transport=profile` remains an explicit local legacy diagnostic path and no plugin dylib is loaded in-process.
 - `AppleDebugWorkbench` is a SwiftUI macOS executable that consumes read-only core analyzers directly; the MCP server remains the automation surface.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
@@ -84,17 +86,19 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_dwarf_inspect`, `apple_binary_diff`, `apple_symbolicate`, `apple_crash_inspect`, and `apple_crash_symbolicate` analyze local artifacts without launching them.
 10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
-12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
-13. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
-14. `apple_simulator_ui_probe` and `apple_simulator_ui_probe_action` generate a temporary UI-testing-only Xcode project and use `XCUIApplication(bundleIdentifier:)` to inspect an installed Simulator application; they never need to build or inject code into that application.
-15. `apple_debug_runtime_diagnose` invokes bounded Apple heap/runtime tools for authorized host processes; `apple_assemble` produces static code bytes, and `apple_debug_patch_assembly` applies them only through the existing write grant and readback/rollback path.
-16. `apple_debug_forward_trace` records bounded forward stop events; `apple_debug_reverse_capabilities` and `apple_kernel_capabilities` report unsupported reverse/time-travel and kernel-memory operations explicitly.
-17. `apple_debug_memory_analyze`, `apple_debug_memory_snapshot`, and `apple_debug_memory_diff` expose typed vmmap state without replacing the attach gate.
-18. `apple_simulator_environment` and `apple_simulator_repro_bundle` use fixed simctl workflows and bounded artifact paths; they do not erase or pair devices.
-19. `apple_signing_audit`, `apple_patch_preview`, and `apple_resign_plan` inspect or plan release operations without silently signing or overwriting artifacts.
-20. `apple_plugin_list` discovers manifests only; `apple_performance_semantic_report` returns bounded template-domain metrics; `apple_swift_concurrency_graph` combines public Swift Concurrency export tables; `apple-debug-workbench` provides a local native GUI over selected analyzers.
-21. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-22. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+12. `apple_swift_ast_inspect` can resolve an Xcode target's bounded Swift Sources phase, module name, SDK, and target triple before public AST emission; direct file/multi-file mode remains available.
+13. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
+14. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
+15. `apple_simulator_ui_probe` and `apple_simulator_ui_probe_action` generate a temporary UI-testing-only Xcode project and use `XCUIApplication(bundleIdentifier:)` to inspect an installed Simulator application; they never need to build or inject code into that application.
+16. `apple_debug_runtime_diagnose` invokes bounded Apple heap/runtime tools for authorized host processes; `apple_assemble` produces static code bytes, and `apple_debug_patch_assembly` applies them only through the existing write grant and readback/rollback path.
+17. `apple_debug_forward_trace` records bounded forward stop events; `apple_debug_reverse_capabilities` and `apple_kernel_capabilities` report unsupported reverse/time-travel and kernel-memory operations explicitly.
+18. `apple_debug_memory_analyze`, `apple_debug_memory_snapshot`, and `apple_debug_memory_diff` expose typed vmmap state without replacing the attach gate.
+19. `apple_simulator_environment` and `apple_simulator_repro_bundle` use fixed simctl workflows and bounded artifact paths; they do not erase or pair devices.
+20. `apple_signing_audit`, `apple_patch_preview`, and `apple_resign_plan` inspect or plan release operations without silently signing or overwriting artifacts.
+21. `apple_plugin_list` discovers manifests only; `apple_performance_semantic_report`, `apple_performance_timeline`, and `apple_performance_diff` expose bounded trace analysis; `apple_swift_concurrency_graph` combines public Swift Concurrency export tables; `apple-debug-workbench` provides a local native GUI over selected analyzers.
+22. `apple_plugin_host_execute` connects to an embedded signed App Sandbox XPC plugin service; `transport=profile` remains an explicit legacy diagnostic path.
+23. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+24. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 

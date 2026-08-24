@@ -10,7 +10,7 @@ import sys
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     server_path = root / ".build" / "debug" / "apple-debug-mcp"
-    source_path = root / "Tests" / "Fixtures" / "iOSDebugApp" / "DebugApp.swift"
+    project_path = root / "Tests" / "Fixtures" / "iOSDebugApp" / "DebugApp.xcodeproj"
     process = subprocess.Popen(
         [str(server_path)], cwd=root, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
@@ -19,7 +19,20 @@ def main() -> int:
         messages = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "swift-ast-smoke", "version": "0.1.0"}}},
             {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-            {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "apple_swift_ast_inspect", "arguments": {"path": str(source_path), "moduleName": "DebugApp"}}},
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "apple_swift_ast_inspect",
+                    "arguments": {
+                        "projectPath": str(project_path),
+                        "scheme": "DebugApp",
+                        "configuration": "Debug",
+                        "destination": "generic/platform=iOS Simulator",
+                    },
+                },
+            },
         ]
         for message in messages:
             process.stdin.write(json.dumps(message) + "\n")
@@ -39,10 +52,9 @@ def main() -> int:
             raise RuntimeError("swiftc AST report did not contain the DebugApp type")
         if "SwiftUI" not in report.get("imports", []):
             raise RuntimeError("swiftc AST report did not contain the SwiftUI import")
-        print(
-            "swift-ast-smoke: parsed %d public swiftc AST nodes, %d types, %d functions"
-            % (report["nodeCount"], report["typeCount"], report["functionCount"])
-        )
+        if report.get("targetName") != "DebugApp" or report.get("sourcePaths", []) != [str(project_path.parent / "DebugApp.swift")]:
+            raise RuntimeError("Xcode target source/module context was incomplete")
+        print("swift-ast-smoke: parsed %d target-backed public swiftc AST nodes, %d types, %d functions" % (report["nodeCount"], report["typeCount"], report["functionCount"]))
         return 0
     except Exception as error:
         print(f"swift-ast-smoke: {error}", file=sys.stderr)

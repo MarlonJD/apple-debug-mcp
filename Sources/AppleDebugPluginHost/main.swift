@@ -15,16 +15,34 @@ struct AppleDebugPluginHostMain {
             let executablePath = try value(for: "--executable", in: arguments)
             let teamIdentifier = optionalValue(for: "--team-id", in: arguments)
             let timeout = Double(optionalValue(for: "--timeout", in: arguments) ?? "10") ?? 10
+            let transport = optionalValue(for: "--transport", in: arguments) ?? "profile"
+            let serviceName = optionalValue(for: "--service-name", in: arguments)
             let inputData = FileHandle.standardInput.readDataToEndOfFile()
             guard inputData.count <= 256 * 1024 else { throw ApplePluginHostError.invalidRequest }
             let input = String(decoding: inputData, as: UTF8.self)
-            let result = try ApplePluginHostService.execute(
-                executablePath: executablePath,
-                manifestPath: manifestPath,
-                input: input,
-                requiredTeamIdentifier: teamIdentifier,
-                timeoutSeconds: timeout
-            )
+            let result: ApplePluginHostExecutionResult
+            switch transport {
+            case "profile":
+                result = try ApplePluginHostService.execute(
+                    executablePath: executablePath,
+                    manifestPath: manifestPath,
+                    input: input,
+                    requiredTeamIdentifier: teamIdentifier,
+                    timeoutSeconds: timeout
+                )
+            case "xpc":
+                guard let serviceName else { throw ApplePluginHostError.invalidRequest }
+                result = try ApplePluginHostService.executeViaXPC(
+                    serviceName: serviceName,
+                    executablePath: executablePath,
+                    manifestPath: manifestPath,
+                    input: input,
+                    requiredTeamIdentifier: teamIdentifier,
+                    timeoutSeconds: timeout
+                )
+            default:
+                throw ApplePluginHostError.invalidRequest
+            }
             let output = try JSONEncoder().encode(result)
             FileHandle.standardOutput.write(output)
             FileHandle.standardOutput.write(Data("\n".utf8))

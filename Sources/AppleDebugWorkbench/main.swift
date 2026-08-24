@@ -42,10 +42,15 @@ private final class WorkbenchModel: ObservableObject {
     @Published var analysisPath = ""
     @Published var controlFlowOutput = ""
     @Published var controlFlowSummary = ""
+    @Published var controlFlowFunctions: [ControlFlowFunction] = []
+    @Published var controlFlowXrefs: [ControlFlowXref] = []
     @Published var tracePath = ""
     @Published var performanceSchema = "time-profile"
     @Published var performanceOutput = ""
     @Published var performanceSummary = ""
+    @Published var comparisonTracePath = ""
+    @Published var performanceDiffOutput = ""
+    @Published var timelinePoints: [ApplePerformanceTimelinePoint] = []
     @Published var errorMessage: String?
 
     let capabilities = CapabilityMatrix.reports()
@@ -68,6 +73,8 @@ private final class WorkbenchModel: ObservableObject {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             controlFlowOutput = String(decoding: try encoder.encode(report), as: UTF8.self)
             controlFlowSummary = "Functions: \(report.functions.count) · Blocks: \(report.functions.reduce(0) { $0 + $1.blocks.count }) · Xrefs: \(report.xrefs.count) · Relocations: \(report.relocations.count) · Indirect symbols: \(report.indirectSymbols.count)"
+            controlFlowFunctions = report.functions
+            controlFlowXrefs = report.xrefs
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -78,6 +85,7 @@ private final class WorkbenchModel: ObservableObject {
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            timelinePoints = []
             if performanceSchema == "swift-concurrency" {
                 let graph = try AppleSwiftConcurrencyGraphService.analyze(tracePath: tracePath)
                 performanceOutput = String(decoding: try encoder.encode(graph), as: UTF8.self)
@@ -91,7 +99,33 @@ private final class WorkbenchModel: ObservableObject {
                 )
                 performanceOutput = String(decoding: try encoder.encode(report), as: UTF8.self)
                 performanceSummary = "\(report.templateSemantic.domain.rawValue) · Rows: \(report.templateSemantic.eventCount) · Threads: \(report.templateSemantic.uniqueThreadCount) · Processes: \(report.templateSemantic.uniqueProcessCount) · Metrics: \(report.templateSemantic.counts.count)"
+                timelinePoints = try ApplePerformanceService.timeline(
+                    tracePath: tracePath,
+                    schema: performanceSchema,
+                    maximumRows: 500
+                )
             }
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func diffPerformance() {
+        guard !tracePath.isEmpty, !comparisonTracePath.isEmpty else {
+            errorMessage = "Enter both trace paths first."
+            return
+        }
+        do {
+            let diff = try ApplePerformanceService.diff(
+                leftTracePath: tracePath,
+                rightTracePath: comparisonTracePath,
+                schema: performanceSchema == "swift-concurrency" ? "time-profile" : performanceSchema,
+                maximumRows: 5_000
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            performanceDiffOutput = String(decoding: try encoder.encode(diff), as: UTF8.self)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -380,9 +414,86 @@ private struct ControlFlowPanel: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if !model.controlFlowFunctions.isEmpty {
+                if let function = model.controlFlowFunctions.first {
+                    GroupBox("CFG graph · \(function.name)") {
+                        ControlFlowGraphView(function: function)
+                            .frame(height: min(420, CGFloat(max(1, function.blocks.count)) * 72))
+                    }
+                }
+                GroupBox("Call graph / pseudo-code") {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(model.controlFlowFunctions.prefix(32), id: \.name) { function in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(function.name)
+                                        .font(.system(.body, design: .monospaced).bold())
+                                    Text(function.callees.isEmpty ? "no direct callees" : "→ " + function.callees.joined(separator: ", "))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(function.pseudoCode)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .textSelection(.enabled)
+                                }
+                                Divider()
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 220)
+                }
+            }
             TextEditor(text: $model.controlFlowOutput)
                 .font(.system(.body, design: .monospaced))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
+        }
+    }
+}
+
+private struct ControlFlowGraphView: View {
+    let function: ControlFlowFunction
+
+    var body: some View {
+        let blocks = function.blocks
+        let positions = Dictionary(uniqueKeysWithValues: blocks.enumerated().map { index, block in
+            (block.startAddress, CGPoint(x: 150, y: CGFloat(index) * 72 + 28))
+        })
+        ScrollView(.vertical) {
+            ZStack(alignment: .topLeading) {
+                Canvas { context, _ in
+                    for block in blocks {
+                        guard let source = positions[block.startAddress] else { continue }
+                        for successor in block.successors {
+                            guard let target = positions[successor] else { continue }
+                            var path = Path()
+                            path.move(to: CGPoint(x: source.x, y: source.y + 22))
+                            path.addLine(to: CGPoint(x: target.x, y: target.y - 22))
+                            context.stroke(path, with: .color(.accentColor.opacity(0.7)), lineWidth: 2)
+                        }
+                    }
+                }
+                .frame(width: 320, height: CGFloat(max(1, blocks.count)) * 72)
+                ForEach(blocks, id: \.startAddress) { block in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(block.startAddress) – \(block.endAddress)")
+                            .font(.system(.caption, design: .monospaced).bold())
+                        Text("\(block.instructionCount) instructions")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if !block.successors.isEmpty {
+                            Text("→ \(block.successors.joined(separator: ", "))")
+                                .font(.system(.caption2, design: .monospaced))
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(6)
+                    .frame(width: 260, alignment: .leading)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 7))
+                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.accentColor.opacity(0.45)))
+                    .position(positions[block.startAddress] ?? CGPoint(x: 150, y: 28))
+                }
+            }
+            .frame(width: 320, height: CGFloat(max(1, blocks.count)) * 72)
         }
     }
 }
@@ -410,10 +521,39 @@ private struct PerformancePanel: View {
                 Button("Analyze") { model.analyzePerformance() }
                     .disabled(model.tracePath.isEmpty)
             }
+            HStack {
+                TextField("Comparison .trace (optional)", text: $model.comparisonTracePath)
+                    .textFieldStyle(.roundedBorder)
+                Button("Diff") { model.diffPerformance() }
+                    .disabled(model.tracePath.isEmpty || model.comparisonTracePath.isEmpty)
+            }
             if !model.performanceSummary.isEmpty {
                 Text(model.performanceSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            if !model.timelinePoints.isEmpty {
+                GroupBox("Timeline") {
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: 8) {
+                            ForEach(model.timelinePoints.prefix(80), id: \.index) { point in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(point.label)
+                                        .font(.caption.bold())
+                                        .lineLimit(2)
+                                    Text("\(point.timeNanoseconds) ns")
+                                        .font(.caption2.monospaced())
+                                    if let state = point.state {
+                                        Text(state).font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(6)
+                                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+                                .frame(width: 130, alignment: .leading)
+                            }
+                        }
+                    }
+                }
             }
             ScrollView {
                 Text(model.performanceOutput.isEmpty ? "Select an existing trace bundle and schema." : model.performanceOutput)
@@ -423,6 +563,17 @@ private struct PerformancePanel: View {
             }
             .padding(10)
             .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
+            if !model.performanceDiffOutput.isEmpty {
+                GroupBox("Trace diff") {
+                    ScrollView {
+                        Text(model.performanceDiffOutput)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 180)
+                }
+            }
         }
     }
 }

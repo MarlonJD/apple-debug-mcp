@@ -5,6 +5,16 @@
 import Foundation
 import Darwin
 
+@objc public protocol AppleDebugPluginXPCProtocol {
+    func analyze(
+        pluginExecutablePath: String,
+        manifestData: Data,
+        inputData: Data,
+        timeoutSeconds: Double,
+        reply: @escaping (Data?, String?) -> Void
+    )
+}
+
 public struct ApplePluginHostPlan: Codable, Equatable, Sendable {
     public let executablePath: String
     public let manifest: AppleDebugPluginManifest?
@@ -52,6 +62,8 @@ public enum ApplePluginHostError: Error, Equatable, LocalizedError, Sendable {
     case teamIdentifierMismatch
     case executionDisabled
     case sandboxUnavailable
+    case xpcUnavailable
+    case xpcFailed(String)
     case timedOut
     case outputTooLarge
     case executionFailed(String)
@@ -64,6 +76,8 @@ public enum ApplePluginHostError: Error, Equatable, LocalizedError, Sendable {
         case .teamIdentifierMismatch: return "Plugin host team identifier does not match the requested signer."
         case .executionDisabled: return "Plugin execution is disabled. Set APPLE_DEBUG_ALLOW_PLUGIN_EXECUTION=1 only for an authorized plugin test."
         case .sandboxUnavailable: return "The required macOS sandbox-exec boundary is unavailable."
+        case .xpcUnavailable: return "The embedded App Sandbox XPC plugin service is unavailable in the current application bundle."
+        case .xpcFailed(let message): return "The App Sandbox XPC plugin service failed: \(message)"
         case .timedOut: return "The sandboxed plugin exceeded the bounded execution timeout."
         case .outputTooLarge: return "The sandboxed plugin exceeded the bounded stdout/stderr limit."
         case .executionFailed(let message): return "Sandboxed plugin execution failed: \(message)"
@@ -95,7 +109,7 @@ public enum ApplePluginHostService {
             signingAudit: audit,
             sandboxRequired: true,
             executionSupported: true,
-            reason: "The separate sandboxed host is available, but this plan operation remains non-executing. Use apple_plugin_host_execute with an explicit execution grant; MCP never loads arbitrary plugin code in-process."
+            reason: "The plan validates the candidate service executable without executing it. Use apple_plugin_host_execute with transport=xpc and the embedded plugin service name; each third-party plugin must be its own signed App Sandbox XPC service."
         )
     }
 
@@ -152,6 +166,75 @@ public enum ApplePluginHostService {
         )
     }
 
+    public static func executeViaXPC(
+        serviceName: String,
+        executablePath: String,
+        manifestPath: String,
+        input: String,
+        requiredTeamIdentifier: String? = nil,
+        timeoutSeconds: Double = 10.0
+    ) throws -> ApplePluginHostExecutionResult {
+        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_PLUGIN_EXECUTION"] == "1" else {
+            throw ApplePluginHostError.executionDisabled
+        }
+        guard serviceName.utf8.count <= 256, !serviceName.isEmpty, !serviceName.contains("\0"),
+              timeoutSeconds.isFinite, (0.1...30.0).contains(timeoutSeconds),
+              !input.contains("\0"), input.utf8.count <= 256 * 1024 else {
+            throw ApplePluginHostError.invalidRequest
+        }
+        let manifest = try loadManifest(path: manifestPath)
+        guard manifest.id == serviceName else {
+            throw ApplePluginHostError.invalidRequest
+        }
+        let manifestData = try JSONEncoder().encode(manifest)
+        guard FileManager.default.fileExists(atPath: executablePath) else {
+            throw ApplePluginHostError.executableNotFound
+        }
+        let audit = try AppleSigningAuditService.inspect(path: executablePath)
+        guard audit.verificationSucceeded else { throw ApplePluginHostError.unsignedExecutable }
+        if let requiredTeamIdentifier, audit.teamIdentifier != requiredTeamIdentifier {
+            throw ApplePluginHostError.teamIdentifierMismatch
+        }
+        if let entrypoint = manifest.entrypoint,
+           entrypoint != URL(fileURLWithPath: executablePath).lastPathComponent {
+            throw ApplePluginHostError.invalidRequest
+        }
+        let connection = NSXPCConnection(serviceName: serviceName)
+        connection.remoteObjectInterface = NSXPCInterface(with: AppleDebugPluginXPCProtocol.self)
+        let semaphore = DispatchSemaphore(value: 0)
+        var responseData: Data?
+        var responseError: String?
+        let proxy = connection.remoteObjectProxyWithErrorHandler { error in
+            responseError = error.localizedDescription
+            semaphore.signal()
+        } as! AppleDebugPluginXPCProtocol
+        connection.resume()
+        proxy.analyze(
+            pluginExecutablePath: executablePath,
+            manifestData: manifestData,
+            inputData: Data(input.utf8),
+            timeoutSeconds: timeoutSeconds
+        ) { data, error in
+            responseData = data
+            responseError = error
+            semaphore.signal()
+        }
+        if semaphore.wait(timeout: .now() + timeoutSeconds + 5.0) == .timedOut {
+            connection.invalidate()
+            throw ApplePluginHostError.timedOut
+        }
+        connection.invalidate()
+        if let responseError, !responseError.isEmpty {
+            throw ApplePluginHostError.xpcFailed(responseError)
+        }
+        guard let responseData else { throw ApplePluginHostError.xpcUnavailable }
+        do {
+            return try JSONDecoder().decode(ApplePluginHostExecutionResult.self, from: responseData)
+        } catch {
+            throw ApplePluginHostError.xpcFailed("The service returned an invalid result payload.")
+        }
+    }
+
     private static let maximumOutputSize = 1 * 1024 * 1024
 
     private static func loadManifest(path: String) throws -> AppleDebugPluginManifest {
@@ -200,9 +283,23 @@ public enum ApplePluginHostService {
         input: String,
         timeoutSeconds: Double
     ) throws -> (exitCode: Int32, timedOut: Bool, stdout: String, stderr: String) {
+        try runProcess(
+            executablePath: sandboxExec,
+            arguments: ["-p", profile, executablePath],
+            input: input,
+            timeoutSeconds: timeoutSeconds
+        )
+    }
+
+    private static func runProcess(
+        executablePath: String,
+        arguments: [String],
+        input: String,
+        timeoutSeconds: Double
+    ) throws -> (exitCode: Int32, timedOut: Bool, stdout: String, stderr: String) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: sandboxExec)
-        process.arguments = ["-p", profile, executablePath]
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = arguments
         let inputPipe = Pipe()
         let stdoutURL = FileManager.default.temporaryDirectory.appendingPathComponent("apple-debug-mcp-plugin-\(UUID().uuidString).stdout")
         let stderrURL = FileManager.default.temporaryDirectory.appendingPathComponent("apple-debug-mcp-plugin-\(UUID().uuidString).stderr")

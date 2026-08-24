@@ -113,6 +113,68 @@ public struct DyldSharedCacheSymbol: Codable, Equatable, Sendable {
     }
 }
 
+public struct DyldSharedCacheChainedFixup: Codable, Equatable, Sendable {
+    public let segmentIndex: Int
+    public let segmentOffset: UInt64
+    public let pageSize: UInt16
+    public let pointerFormat: UInt16
+    public let pageStarts: [UInt16]
+
+    public init(segmentIndex: Int, segmentOffset: UInt64, pageSize: UInt16, pointerFormat: UInt16, pageStarts: [UInt16]) {
+        self.segmentIndex = segmentIndex
+        self.segmentOffset = segmentOffset
+        self.pageSize = pageSize
+        self.pointerFormat = pointerFormat
+        self.pageStarts = pageStarts
+    }
+}
+
+public struct DyldSharedCacheFixupImport: Codable, Equatable, Sendable {
+    public let name: String
+    public let libraryOrdinal: Int32
+    public let weakImport: Bool
+    public let addend: Int64
+
+    public init(name: String, libraryOrdinal: Int32, weakImport: Bool, addend: Int64) {
+        self.name = name
+        self.libraryOrdinal = libraryOrdinal
+        self.weakImport = weakImport
+        self.addend = addend
+    }
+}
+
+public struct DyldSharedCacheRuntimeReference: Codable, Equatable, Sendable {
+    public let kind: String
+    public let section: String
+    public let offset: UInt64
+    public let value: String
+
+    public init(kind: String, section: String, offset: UInt64, value: String) {
+        self.kind = kind
+        self.section = section
+        self.offset = offset
+        self.value = value
+    }
+}
+
+public struct DyldSharedCacheCrossReference: Codable, Equatable, Sendable {
+    public let sourceSection: String
+    public let sourceAddress: UInt64
+    public let targetKind: String
+    public let targetSection: String
+    public let targetAddress: UInt64
+    public let targetValue: String
+
+    public init(sourceSection: String, sourceAddress: UInt64, targetKind: String, targetSection: String, targetAddress: UInt64, targetValue: String) {
+        self.sourceSection = sourceSection
+        self.sourceAddress = sourceAddress
+        self.targetKind = targetKind
+        self.targetSection = targetSection
+        self.targetAddress = targetAddress
+        self.targetValue = targetValue
+    }
+}
+
 public struct DyldSharedCacheImageAnalysis: Codable, Equatable, Sendable {
     public let cachePath: String
     public let image: DyldSharedCacheImage
@@ -124,9 +186,13 @@ public struct DyldSharedCacheImageAnalysis: Codable, Equatable, Sendable {
     public let segments: [DyldSharedCacheImageSegment]
     public let exports: [DyldSharedCacheExport]
     public let symbols: [DyldSharedCacheSymbol]
+    public let chainedFixups: [DyldSharedCacheChainedFixup]
+    public let fixupImports: [DyldSharedCacheFixupImport]
+    public let runtimeReferences: [DyldSharedCacheRuntimeReference]
+    public let crossReferences: [DyldSharedCacheCrossReference]
     public let notes: [String]
 
-    public init(cachePath: String, image: DyldSharedCacheImage, fileOffset: UInt64, magic: String, cpuType: Int32, cpuSubtype: Int32, uuid: String?, segments: [DyldSharedCacheImageSegment], exports: [DyldSharedCacheExport], symbols: [DyldSharedCacheSymbol], notes: [String]) {
+    public init(cachePath: String, image: DyldSharedCacheImage, fileOffset: UInt64, magic: String, cpuType: Int32, cpuSubtype: Int32, uuid: String?, segments: [DyldSharedCacheImageSegment], exports: [DyldSharedCacheExport], symbols: [DyldSharedCacheSymbol], chainedFixups: [DyldSharedCacheChainedFixup], fixupImports: [DyldSharedCacheFixupImport], runtimeReferences: [DyldSharedCacheRuntimeReference], crossReferences: [DyldSharedCacheCrossReference], notes: [String]) {
         self.cachePath = cachePath
         self.image = image
         self.fileOffset = fileOffset
@@ -137,6 +203,10 @@ public struct DyldSharedCacheImageAnalysis: Codable, Equatable, Sendable {
         self.segments = segments
         self.exports = exports
         self.symbols = symbols
+        self.chainedFixups = chainedFixups
+        self.fixupImports = fixupImports
+        self.runtimeReferences = runtimeReferences
+        self.crossReferences = crossReferences
         self.notes = notes
     }
 }
@@ -475,6 +545,10 @@ public enum AppleDyldSharedCacheService {
                 segments: [],
                 exports: [],
                 symbols: [],
+                chainedFixups: [],
+                fixupImports: [],
+                runtimeReferences: [],
+                crossReferences: [],
                 notes: ["32-bit shared-cache Mach-O images are identified but deep export/symbol extraction is only enabled for bounded 64-bit images."]
             )
         }
@@ -496,6 +570,9 @@ public enum AppleDyldSharedCacheService {
         var symbolCount: UInt32 = 0
         var stringOffset: UInt64?
         var stringSize: UInt64 = 0
+        var chainedOffset: UInt64?
+        var chainedSize: UInt64 = 0
+        var sections: [(name: String, offset: UInt64, size: UInt64, address: UInt64)] = []
         var cursor = 0
         for _ in 0..<commandCount {
             guard cursor + 8 <= commands.count else { throw DyldSharedCacheError.malformedImage }
@@ -506,10 +583,11 @@ public enum AppleDyldSharedCacheService {
             switch command {
             case 0x19 where size >= 72:
                 let segmentName = readFixedCString(commandData, offset: 8, length: 16)
+                let segmentAddress = try uint64(commandData, offset: 24)
                 segments.append(
                     DyldSharedCacheImageSegment(
                         name: segmentName,
-                        virtualAddress: format(try uint64(commandData, offset: 24)),
+                        virtualAddress: format(segmentAddress),
                         virtualSize: try uint64(commandData, offset: 32),
                         fileOffset: try uint64(commandData, offset: 40),
                         fileSize: try uint64(commandData, offset: 48),
@@ -517,6 +595,16 @@ public enum AppleDyldSharedCacheService {
                         initialProtection: Int32(bitPattern: try uint32(commandData, offset: 60))
                     )
                 )
+                let sectionCount = Int(try uint32(commandData, offset: 64))
+                for sectionIndex in 0..<min(sectionCount, 1_024) {
+                    let sectionOffset = 72 + sectionIndex * 80
+                    guard sectionOffset + 80 <= commandData.count else { break }
+                    let sectionName = readFixedCString(commandData, offset: sectionOffset, length: 16)
+                    let sectionAddress = try uint64(commandData, offset: sectionOffset + 32)
+                    let sectionSize = try uint64(commandData, offset: sectionOffset + 40)
+                    let rawSectionOffset = UInt64(try uint32(commandData, offset: sectionOffset + 48))
+                    sections.append((sectionName, rawSectionOffset, sectionSize, sectionAddress))
+                }
             case 0x1b where size >= 24:
                 uuid = parseUUID(commandData, offset: 8)
             case 0x2 where size >= 24:
@@ -527,9 +615,12 @@ public enum AppleDyldSharedCacheService {
             case 0x22 where size >= 48:
                 exportOffset = UInt64(try uint32(commandData, offset: 40))
                 exportSize = UInt64(try uint32(commandData, offset: 44))
-            case 0x80000033 where size >= 16:
+            case 0x80000033 where size >= 24:
                 exportOffset = try uint64(commandData, offset: 8)
                 exportSize = try uint64(commandData, offset: 16)
+            case 0x80000034 where size >= 16:
+                chainedOffset = UInt64(try uint32(commandData, offset: 8))
+                chainedSize = UInt64(try uint32(commandData, offset: 12))
             default:
                 break
             }
@@ -554,11 +645,37 @@ public enum AppleDyldSharedCacheService {
                 maximumSymbols: maximumSymbols
             )
         }
+        var chainedFixups: [DyldSharedCacheChainedFixup] = []
+        var fixupImports: [DyldSharedCacheFixupImport] = []
+        if let chainedOffset, chainedSize > 0,
+           let data = try readMachOData(handle: handle, rawOffset: chainedOffset, imageFileOffset: imageFileOffset, size: chainedSize, fileSize: fileSize) {
+            let parsed = parseChainedFixups(data: data, maximumImports: maximumSymbols)
+            chainedFixups = parsed.chains
+            fixupImports = parsed.imports
+        }
+        let runtimeReferences = try parseRuntimeReferences(
+            handle: handle,
+            sections: sections,
+            imageFileOffset: imageFileOffset,
+            fileSize: fileSize
+        )
+        let crossReferences = try parseCrossReferences(
+            handle: handle,
+            sections: sections,
+            targets: runtimeReferences,
+            imageFileOffset: imageFileOffset,
+            fileSize: fileSize
+        )
         var notes = [
-            "Mach-O load commands and exports are decoded from public shared-cache bytes; no private dyld database is accessed."
+            "Mach-O load commands, exports, chained-fixups metadata, and runtime sections are decoded from public shared-cache bytes; no private dyld database is accessed."
         ]
         if exports.isEmpty { notes.append("The image did not expose a bounded export trie through its public load commands.") }
         if symbols.isEmpty { notes.append("The image did not expose a bounded LC_SYMTAB symbol table; modern shared caches may keep local symbols in separate tables.") }
+        if chainedFixups.isEmpty { notes.append("The image did not expose a bounded LC_DYLD_CHAINED_FIXUPS payload.") }
+        if runtimeReferences.isEmpty { notes.append("No bounded ObjC/Swift runtime reference sections were present in the selected image.") }
+        if crossReferences.isEmpty, !runtimeReferences.isEmpty {
+            notes.append("Runtime strings were found, but no direct 64-bit data pointers to them were observed; authenticated or chained pointers are not rewritten by this read-only scan.")
+        }
         if symbolCount > UInt32(maximumSymbols) { notes.append("The symbol table was bounded at maximumSymbols=\(maximumSymbols).") }
         return DyldSharedCacheImageAnalysis(
             cachePath: cachePath,
@@ -571,6 +688,10 @@ public enum AppleDyldSharedCacheService {
             segments: segments,
             exports: exports,
             symbols: symbols,
+            chainedFixups: chainedFixups,
+            fixupImports: fixupImports,
+            runtimeReferences: runtimeReferences,
+            crossReferences: crossReferences,
             notes: notes
         )
     }
@@ -746,6 +867,181 @@ public enum AppleDyldSharedCacheService {
         return exports.sorted { $0.name == $1.name ? ($0.address ?? "") < ($1.address ?? "") : $0.name < $1.name }
     }
 
+    private static func parseChainedFixups(
+        data: Data,
+        maximumImports: Int
+    ) -> (chains: [DyldSharedCacheChainedFixup], imports: [DyldSharedCacheFixupImport]) {
+        guard data.count >= 28,
+              let startsOffset = try? uint32(data, offset: 4),
+              let importsOffset = try? uint32(data, offset: 8),
+              let symbolsOffset = try? uint32(data, offset: 12),
+              let importsCount = try? uint32(data, offset: 16),
+              let importsFormat = try? uint32(data, offset: 20) else {
+            return ([], [])
+        }
+        var chains: [DyldSharedCacheChainedFixup] = []
+        if Int(startsOffset) + 4 <= data.count,
+           let segmentCount = try? uint32(data, offset: Int(startsOffset)) {
+            for index in 0..<min(Int(segmentCount), 4_096) {
+                let offset = Int(startsOffset) + 4 + index * 4
+                guard offset + 4 <= data.count,
+                      let segmentOffset = try? uint32(data, offset: offset),
+                      segmentOffset != 0,
+                      Int(startsOffset) + Int(segmentOffset) + 22 <= data.count,
+                      let size = try? uint32(data, offset: Int(startsOffset) + Int(segmentOffset)),
+                      let pageSize = try? uint16(data, offset: Int(startsOffset) + Int(segmentOffset) + 4),
+                      let pointerFormat = try? uint16(data, offset: Int(startsOffset) + Int(segmentOffset) + 6),
+                      let segmentVMOffset = try? uint64(data, offset: Int(startsOffset) + Int(segmentOffset) + 8),
+                      let pageCount = try? uint16(data, offset: Int(startsOffset) + Int(segmentOffset) + 20),
+                      size >= 22,
+                      Int(startsOffset) + Int(segmentOffset) + 22 + Int(pageCount) * 2 <= data.count else { continue }
+                var pageStarts: [UInt16] = []
+                for pageIndex in 0..<Int(pageCount) {
+                    if let pageStart = try? uint16(data, offset: Int(startsOffset) + Int(segmentOffset) + 22 + pageIndex * 2) {
+                        pageStarts.append(pageStart)
+                    }
+                }
+                chains.append(
+                    DyldSharedCacheChainedFixup(
+                        segmentIndex: index,
+                        segmentOffset: segmentVMOffset,
+                        pageSize: pageSize,
+                        pointerFormat: pointerFormat,
+                        pageStarts: pageStarts
+                    )
+                )
+            }
+        }
+
+        let count = min(Int(importsCount), maximumImports)
+        guard count > 0, Int(symbolsOffset) < data.count else { return (chains, []) }
+        var imports: [DyldSharedCacheFixupImport] = []
+        let entrySize: Int
+        switch importsFormat {
+        case 1, 2:
+            entrySize = 4
+        case 3:
+            entrySize = 8
+        default:
+            return (chains, [])
+        }
+        for index in 0..<count {
+            let entryOffset = Int(importsOffset) + index * entrySize
+            guard entryOffset + entrySize <= data.count else { break }
+            var nameOffset: UInt64 = 0
+            var libraryOrdinal: Int32 = 0
+            var weak = false
+            var addend: Int64 = 0
+            if importsFormat == 3 {
+                guard let raw = try? uint64(data, offset: entryOffset) else { continue }
+                libraryOrdinal = Int32(raw & 0xffff)
+                weak = ((raw >> 16) & 1) != 0
+                nameOffset = raw >> 32
+                if entryOffset + 16 <= data.count, let rawAddend = try? uint64(data, offset: entryOffset + 8) {
+                    addend = Int64(bitPattern: rawAddend)
+                }
+            } else {
+                guard let raw = try? uint32(data, offset: entryOffset) else { continue }
+                libraryOrdinal = Int32(raw & 0xff)
+                weak = ((raw >> 8) & 1) != 0
+                nameOffset = UInt64(raw >> 9)
+                if importsFormat == 2, entryOffset + 8 <= data.count,
+                   let rawAddend = try? uint32(data, offset: entryOffset + 4) {
+                    addend = Int64(Int32(bitPattern: rawAddend))
+                }
+            }
+            guard let name = readDataCString(data, offset: Int(symbolsOffset) + Int(nameOffset)), !name.isEmpty else { continue }
+            imports.append(DyldSharedCacheFixupImport(name: name, libraryOrdinal: libraryOrdinal, weakImport: weak, addend: addend))
+        }
+        return (chains, imports)
+    }
+
+    private static func parseRuntimeReferences(
+        handle: FileHandle,
+        sections: [(name: String, offset: UInt64, size: UInt64, address: UInt64)],
+        imageFileOffset: UInt64,
+        fileSize: UInt64
+    ) throws -> [DyldSharedCacheRuntimeReference] {
+        var references: [DyldSharedCacheRuntimeReference] = []
+        for section in sections where isRuntimeReferenceSection(section.name) {
+            guard let data = try readMachOData(handle: handle, rawOffset: section.offset, imageFileOffset: imageFileOffset, size: section.size, fileSize: fileSize) else { continue }
+            var start = 0
+            while start < data.count, references.count < 20_000 {
+                let end = data[start...].firstIndex(of: 0) ?? data.endIndex
+                let bytes = data[start..<end]
+                if let value = String(data: bytes, encoding: .utf8), !value.isEmpty, value.allSatisfy({ $0.isASCII && !$0.isNewline }) {
+                    let kind: String
+                    if section.name == "__objc_methname" { kind = "objc-selector" }
+                    else if section.name == "__objc_classname" { kind = "objc-class" }
+                    else if section.name == "__objc_methtype" { kind = "objc-method-type" }
+                    else { kind = "swift-metadata-string" }
+                    references.append(
+                        DyldSharedCacheRuntimeReference(
+                            kind: kind,
+                            section: section.name,
+                            offset: section.address + UInt64(start),
+                            value: value
+                        )
+                    )
+                }
+                start = end + 1
+            }
+        }
+        return references.sorted { $0.offset == $1.offset ? $0.value < $1.value : $0.offset < $1.offset }
+    }
+
+    private static func parseCrossReferences(
+        handle: FileHandle,
+        sections: [(name: String, offset: UInt64, size: UInt64, address: UInt64)],
+        targets: [DyldSharedCacheRuntimeReference],
+        imageFileOffset: UInt64,
+        fileSize: UInt64
+    ) throws -> [DyldSharedCacheCrossReference] {
+        guard !targets.isEmpty else { return [] }
+        var references: [DyldSharedCacheCrossReference] = []
+        let targetRanges = targets.compactMap { target -> (reference: DyldSharedCacheRuntimeReference, end: UInt64)? in
+            let length = UInt64(target.value.utf8.count + 1)
+            let (end, overflow) = target.offset.addingReportingOverflow(length)
+            return overflow ? nil : (target, end)
+        }
+        for section in sections where !isRuntimeReferenceSection(section.name) {
+            guard section.size >= 8, section.size <= 16 * 1024 * 1024,
+                  let data = try readMachOData(handle: handle, rawOffset: section.offset, imageFileOffset: imageFileOffset, size: section.size, fileSize: fileSize) else { continue }
+            var offset = 0
+            while offset + 8 <= data.count, references.count < 20_000 {
+                guard let pointer = try? uint64(data, offset: offset) else { break }
+                if let target = targetRanges.first(where: { pointer >= $0.reference.offset && pointer < $0.end }) {
+                    references.append(
+                        DyldSharedCacheCrossReference(
+                            sourceSection: section.name,
+                            sourceAddress: section.address + UInt64(offset),
+                            targetKind: target.reference.kind,
+                            targetSection: target.reference.section,
+                            targetAddress: target.reference.offset,
+                            targetValue: target.reference.value
+                        )
+                    )
+                }
+                offset += 8
+            }
+        }
+        return references.sorted {
+            if $0.sourceAddress != $1.sourceAddress { return $0.sourceAddress < $1.sourceAddress }
+            if $0.targetAddress != $1.targetAddress { return $0.targetAddress < $1.targetAddress }
+            return $0.targetValue < $1.targetValue
+        }
+    }
+
+    private static func isRuntimeReferenceSection(_ name: String) -> Bool {
+        name == "__objc_methname" || name == "__objc_classname" || name == "__objc_methtype" || name == "__swift5_reflstr"
+    }
+
+    private static func readDataCString(_ data: Data, offset: Int) -> String? {
+        guard offset >= 0, offset < data.count else { return nil }
+        let end = data[offset...].firstIndex(of: 0) ?? data.endIndex
+        return String(data: data[offset..<end], encoding: .utf8)
+    }
+
     private static func parseMappings(handle: FileHandle, offset: UInt64, count: UInt32, fileSize: UInt64) throws -> [DyldSharedCacheMapping] {
         var values: [DyldSharedCacheMapping] = []
         for index in 0..<UInt64(count) {
@@ -813,6 +1109,13 @@ public enum AppleDyldSharedCacheService {
         guard offset >= 0, offset + 4 <= data.count else { throw DyldSharedCacheError.malformedHeader }
         return data[offset..<(offset + 4)].enumerated().reduce(UInt32(0)) { result, item in
             result | UInt32(item.element) << UInt32(item.offset * 8)
+        }
+    }
+
+    private static func uint16(_ data: Data, offset: Int) throws -> UInt16 {
+        guard offset >= 0, offset + 2 <= data.count else { throw DyldSharedCacheError.malformedHeader }
+        return data[offset..<(offset + 2)].enumerated().reduce(UInt16(0)) { result, item in
+            result | UInt16(item.element) << UInt16(item.offset * 8)
         }
     }
 

@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -78,8 +78,12 @@ repro-bundle-smoke: build ios-fixture
 plugin-smoke: build
 	python3 ./scripts/plugin_smoke.py
 
+plugin-xpc-smoke:
+	python3 ./scripts/plugin_xpc_smoke.py
+
 plugin-host-build-smoke:
 	swift build --product apple-debug-plugin-host
+	swift build --product apple-debug-plugin-xpc-service
 
 workbench-build-smoke:
 	swift build --product apple-debug-workbench

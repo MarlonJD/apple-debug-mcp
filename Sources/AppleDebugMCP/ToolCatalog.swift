@@ -40,12 +40,12 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_plugin_host_plan",
-            description: "Validate a signed plugin executable and return a non-executing plan for the available separate sandboxed host.",
+            description: "Validate a signed plugin XPC service executable and return a non-executing plan for the App Sandbox service boundary.",
             inputSchema: pluginHostPlanObjectSchema
         ),
         Tool(
             name: "apple_plugin_host_execute",
-            description: "Execute a signed plugin as a separate deny-by-default, no-network sandboxed process after an explicit execution grant; MCP never loads plugin code in-process.",
+            description: "Execute a signed plugin through the embedded App Sandbox XPC service after an explicit execution grant; use the legacy sandbox-exec profile only when transport=profile is explicitly selected.",
             inputSchema: pluginHostExecuteObjectSchema
         ),
         Tool(
@@ -85,7 +85,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_swift_ast_inspect",
-            description: "Emit a bounded typed source-backed Swift AST with declarations, types, functions, variables, imports, and compiler locations through public swiftc -dump-ast.",
+            description: "Emit a bounded typed source-backed Swift AST with declarations, types, functions, variables, imports, and compiler locations through public swiftc -dump-ast; accepts a file set or an Xcode project/scheme target context.",
             inputSchema: swiftASTObjectSchema
         ),
         Tool(
@@ -95,7 +95,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_control_flow",
-            description: "Build a bounded Mach-O instruction model with function boundaries, basic blocks, direct branch edges, call graph edges, and external call targets.",
+            description: "Build a bounded Mach-O instruction model with function boundaries, basic blocks, direct branch edges, call graph edges, external call targets, and annotated decompiler-style pseudo-code.",
             inputSchema: controlFlowObjectSchema
         ),
         Tool(
@@ -105,7 +105,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_dyld_shared_cache_image_analyze",
-            description: "Decode one selected shared-cache image's public Mach-O load commands, segments, export trie, UUID, and bounded nlist symbols without executing the cache.",
+            description: "Decode one selected shared-cache image's public Mach-O load commands, segments, export trie, UUID, nlist symbols, chained-fixup imports, and bounded ObjC/Swift runtime cross-references without executing the cache.",
             inputSchema: dyldSharedCacheImageObjectSchema
         ),
         Tool(
@@ -237,6 +237,16 @@ enum ToolCatalog {
             name: "apple_performance_semantic_report",
             description: "Return a template-specific semantic xctrace report for allocations, system trace, power/energy, animation, signposts, or Swift Concurrency public schemas.",
             inputSchema: performanceSemanticReportObjectSchema
+        ),
+        Tool(
+            name: "apple_performance_timeline",
+            description: "Return bounded timeline points from a public xctrace schema for workbench/timeline visualization.",
+            inputSchema: performanceTimelineObjectSchema
+        ),
+        Tool(
+            name: "apple_performance_diff",
+            description: "Compare two bounded public xctrace exports by semantic counters, durations, and hotspot deltas.",
+            inputSchema: performanceDiffObjectSchema
         ),
         Tool(
             name: "apple_swift_concurrency_graph",
@@ -531,15 +541,37 @@ enum ToolCatalog {
                 return errorResult("Missing required executablePath, manifestPath, or input argument.")
             }
             do {
-                return result(
-                    for: try ApplePluginHostService.execute(
-                        executablePath: executablePath,
-                        manifestPath: manifestPath,
-                        input: input,
-                        requiredTeamIdentifier: params.arguments?["requiredTeamIdentifier"]?.stringValue,
-                        timeoutSeconds: doubleValue(from: params.arguments?["timeoutSeconds"]) ?? 10.0
+                let transport = params.arguments?["transport"]?.stringValue ?? "xpc"
+                let requiredTeamIdentifier = params.arguments?["requiredTeamIdentifier"]?.stringValue
+                let timeoutSeconds = doubleValue(from: params.arguments?["timeoutSeconds"]) ?? 10.0
+                switch transport {
+                case "xpc":
+                    guard let serviceName = params.arguments?["serviceName"]?.stringValue else {
+                        return errorResult("serviceName is required for transport=xpc.")
+                    }
+                    return result(
+                        for: try ApplePluginHostService.executeViaXPC(
+                            serviceName: serviceName,
+                            executablePath: executablePath,
+                            manifestPath: manifestPath,
+                            input: input,
+                            requiredTeamIdentifier: requiredTeamIdentifier,
+                            timeoutSeconds: timeoutSeconds
+                        )
                     )
-                )
+                case "profile":
+                    return result(
+                        for: try ApplePluginHostService.execute(
+                            executablePath: executablePath,
+                            manifestPath: manifestPath,
+                            input: input,
+                            requiredTeamIdentifier: requiredTeamIdentifier,
+                            timeoutSeconds: timeoutSeconds
+                        )
+                    )
+                default:
+                    return errorResult("transport must be xpc or profile.")
+                }
             } catch {
                 return errorResult(error)
             }
@@ -679,17 +711,31 @@ enum ToolCatalog {
                 return errorResult(error)
             }
         case "apple_swift_ast_inspect":
-            guard let path = params.arguments?["path"]?.stringValue else {
-                return errorResult("Missing required path argument.")
-            }
             do {
-                return result(
-                    for: try SwiftASTService.inspect(
-                        path: path,
-                        moduleName: params.arguments?["moduleName"]?.stringValue ?? "AppleDebugSource",
-                        includeRaw: boolValue(from: params.arguments?["includeRaw"], default: false)
+                let moduleName = params.arguments?["moduleName"]?.stringValue ?? "AppleDebugSource"
+                let includeRaw = boolValue(from: params.arguments?["includeRaw"], default: false)
+                if let projectPath = params.arguments?["projectPath"]?.stringValue {
+                    guard let scheme = params.arguments?["scheme"]?.stringValue else {
+                        return errorResult("Missing required scheme for projectPath analysis.")
+                    }
+                    return result(
+                        for: try SwiftASTService.inspect(
+                            projectPath: projectPath,
+                            scheme: scheme,
+                            configuration: params.arguments?["configuration"]?.stringValue ?? "Debug",
+                            destination: params.arguments?["destination"]?.stringValue ?? "generic/platform=macOS",
+                            includeRaw: includeRaw
+                        )
                     )
-                )
+                }
+                let paths = stringArray(from: params.arguments?["paths"])
+                if !paths.isEmpty {
+                    return result(for: try SwiftASTService.inspect(paths: paths, moduleName: moduleName, includeRaw: includeRaw))
+                }
+                guard let path = params.arguments?["path"]?.stringValue else {
+                    return errorResult("Missing required path or paths argument.")
+                }
+                return result(for: try SwiftASTService.inspect(path: path, moduleName: moduleName, includeRaw: includeRaw))
             } catch {
                 return errorResult(error)
             }
@@ -1117,6 +1163,38 @@ enum ToolCatalog {
                     includeRows: false
                 )
                 return result(for: analysis.templateSemantic)
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_performance_timeline":
+            guard let tracePath = params.arguments?["tracePath"]?.stringValue else {
+                return errorResult("Missing required tracePath argument.")
+            }
+            do {
+                return result(
+                    for: try ApplePerformanceService.timeline(
+                        tracePath: tracePath,
+                        schema: params.arguments?["schema"]?.stringValue ?? "time-profile",
+                        maximumRows: intValue(from: params.arguments?["maximumRows"]) ?? 5_000
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_performance_diff":
+            guard let leftTracePath = params.arguments?["leftTracePath"]?.stringValue,
+                  let rightTracePath = params.arguments?["rightTracePath"]?.stringValue else {
+                return errorResult("Missing required leftTracePath or rightTracePath argument.")
+            }
+            do {
+                return result(
+                    for: try ApplePerformanceService.diff(
+                        leftTracePath: leftTracePath,
+                        rightTracePath: rightTracePath,
+                        schema: params.arguments?["schema"]?.stringValue ?? "time-profile",
+                        maximumRows: intValue(from: params.arguments?["maximumRows"]) ?? 5_000
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1971,10 +2049,19 @@ enum ToolCatalog {
             "manifestPath": .object(["type": .string("string")]),
             "input": .object([
                 "type": .string("string"),
-                "description": .string("Bounded JSON-line input delivered to the sandboxed plugin process")
+                "description": .string("Bounded UTF-8 JSON-line input delivered through the plugin XPC protocol")
             ]),
             "requiredTeamIdentifier": .object(["type": .string("string")]),
-            "timeoutSeconds": .object(["type": .string("number")])
+            "timeoutSeconds": .object(["type": .string("number")]),
+            "transport": .object([
+                "type": .string("string"),
+                "enum": .array([.string("xpc"), .string("profile")]),
+                "description": .string("Defaults to embedded App Sandbox XPC; profile is an explicit legacy diagnostic transport")
+            ]),
+            "serviceName": .object([
+                "type": .string("string"),
+                "description": .string("Embedded XPC service bundle identifier; must match the manifest id for transport=xpc")
+            ])
         ]),
         "required": .array([.string("executablePath"), .string("manifestPath"), .string("input")])
     ])
@@ -2129,6 +2216,24 @@ enum ToolCatalog {
                 "type": .string("string"),
                 "description": .string("Absolute .swift source file path")
             ]),
+            "paths": .object([
+                "type": .string("array"),
+                "items": .object(["type": .string("string")]),
+                "description": .string("Optional bounded multi-file Swift source set in one module")
+            ]),
+            "projectPath": .object([
+                "type": .string("string"),
+                "description": .string("Optional .xcodeproj or .xcworkspace path for target-aware source/module analysis")
+            ]),
+            "scheme": .object([
+                "type": .string("string"),
+                "description": .string("Xcode scheme used with projectPath")
+            ]),
+            "configuration": .object(["type": .string("string")]),
+            "destination": .object([
+                "type": .string("string"),
+                "description": .string("xcodebuild destination used to resolve SDK and target triple")
+            ]),
             "moduleName": .object([
                 "type": .string("string"),
                 "description": .string("Bounded Swift module name passed to public swiftc")
@@ -2138,7 +2243,7 @@ enum ToolCatalog {
                 "description": .string("Include bounded raw swiftc AST text")
             ])
         ]),
-        "required": .array([.string("path")])
+        "required": .array([])
     ])
 
     private static let dwarfInspectObjectSchema: Value = .object([
@@ -2419,6 +2524,27 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("tracePath")])
+    ])
+
+    private static let performanceTimelineObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "tracePath": .object(["type": .string("string")]),
+            "schema": .object(["type": .string("string")]),
+            "maximumRows": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("tracePath")])
+    ])
+
+    private static let performanceDiffObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "leftTracePath": .object(["type": .string("string")]),
+            "rightTracePath": .object(["type": .string("string")]),
+            "schema": .object(["type": .string("string")]),
+            "maximumRows": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("leftTracePath"), .string("rightTracePath")])
     ])
 
     private static let swiftConcurrencyGraphObjectSchema: Value = .object([

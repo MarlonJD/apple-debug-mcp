@@ -58,4 +58,27 @@ final class AppleXcodeTests: XCTestCase {
             XCTFail("xcodebuild discovery did not return an object")
         }
     }
+
+    func testResolvesSwiftSourcesAndTargetContextFromIOSFixture() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let projectPath = repositoryRoot
+            .appendingPathComponent("Tests/Fixtures/iOSDebugApp/DebugApp.xcodeproj")
+            .path
+
+        let context = try XcodeService.swiftTargetContext(
+            path: projectPath,
+            scheme: "DebugApp",
+            configuration: "Debug",
+            destination: "generic/platform=iOS Simulator"
+        )
+
+        XCTAssertEqual(context.targetName, "DebugApp")
+        XCTAssertEqual(context.moduleName, "DebugApp")
+        XCTAssertTrue(context.sourcePaths.contains { $0.hasSuffix("/DebugApp.swift") })
+        XCTAssertFalse(context.sourcePaths.contains { $0.hasSuffix("DebugAppUITests.swift") }, "paths=\(context.sourcePaths), notes=\(context.notes)")
+        XCTAssertTrue(context.targetTriple?.contains("ios") == true)
+    }
 }

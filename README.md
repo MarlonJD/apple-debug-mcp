@@ -14,22 +14,24 @@ The current product surface includes:
 - parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
 - semantic performance summaries for allocation bytes/events, running/blocked samples, hitches, signposts, and Swift concurrency task/actor/continuation rows;
 - template-specific semantic xctrace reports with explicit domains and bounded numeric totals for Time Profiler, Allocations, System Trace, Power/Energy, Animation, Signposts, and Swift Concurrency;
+- bounded xctrace timeline points plus trace-to-trace semantic/hotspot diffs for regression work;
 - trace-backed Swift Concurrency task/actor/continuation graphs that merge the public `swift-task-*` and `swift-actor-*` xctrace schemas with explicit sampling and private-runtime boundaries;
 - Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
 - bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
-- Mach-O CFG/basic-block/call-graph/xref/relocation reports with address-based branch/call references and a direct dyld shared-cache header/mapping/image parser plus selected-image Mach-O/export/nlist extraction and bounded mount/helper discovery;
+- Mach-O CFG/basic-block/call-graph/xref/relocation reports with address-based branch/call references, annotated decompiler-style pseudo-code, and a native workbench graph view;
+- direct dyld shared-cache header/mapping/image parsing with selected-image export/nlist extraction, chained-fixup imports, ObjC/Swift runtime strings, and bounded pointer cross-references;
 - typed vmmap region reports, persisted memory snapshots, and region diffs;
 - Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
 - read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;
-- a native SwiftUI macOS workbench with session launch/threads/snapshots/pause/continue/instruction stepping/evaluation controls plus safe plugin manifest/registry APIs that never load external dylibs;
-- signed plugin-host validation plus a separately built deny-by-default/no-network host executable with explicit execution grant and bounded JSON IPC;
+- a native SwiftUI macOS workbench with session launch/threads/snapshots/pause/continue/instruction stepping/evaluation controls, CFG graph/pseudo-code, and trace timeline/diff panels;
+- signed plugin manifest validation plus an App Sandbox XPC plugin protocol; third-party plugin code stays in its own independently signed `.xpc` service, while `transport=profile` is an explicit legacy diagnostic path;
 - explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
 - Objective-C classes/protocols/selectors and demangled Swift symbol metadata;
 - deep bounded DWARF inspection from Mach-O/dSYM inputs, including DIE hierarchy, typed attributes, declaration locations, source lists, line-table rows, statistics, and address lookups;
-- source-backed typed Swift AST inspection through public `swiftc -dump-ast`, with declarations, types, functions, variables, imports, and compiler locations;
+- source-backed typed Swift AST inspection through public `swiftc -dump-ast`, with declarations, types, functions, variables, imports, compiler locations, bounded multi-file modules, and Xcode project/scheme SDK context;
 - read-only binary diffing for Mach-O files, `.app` bundles, and `.dSYM` bundles, including symbols, exports, dependencies, signatures, entitlements, hashes, and UUIDs;
 - `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
 - crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
@@ -93,6 +95,7 @@ make repro-bundle-smoke
 make signing-audit-smoke
 make patch-workflow-smoke
 make plugin-smoke
+make plugin-xpc-smoke
 make plugin-host-build-smoke
 make workbench-build-smoke
 ```
