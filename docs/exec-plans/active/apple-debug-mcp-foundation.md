@@ -17,17 +17,17 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 
 ## Progress
 
-- [x] Inspect the empty GitHub repository, local instructions, and product boundary.
-- [x] Apply the standard harness profile and create repository-local routing, evidence, and certification documents.
-- [x] Add GPL-3.0-or-later licensing under Burak Karahan.
-- [x] Add SwiftPM package, official MCP SDK, capability model, and stdio MCP server.
-- [x] Add DAP framing, LLDB-DAP initialization, session ownership, cleanup, launch, attach, breakpoints, stack, memory, disassembly, and continue operations.
-- [x] Add macOS fixture launch/inspection smoke with get-task-allow ad-hoc signing.
-- [x] Add stepping, pause, scopes, variables, evaluate policy, data-breakpoint/watchpoint plumbing, bounded memory write policy, and fixture coverage.
-- [x] Add Mach-O universal/thin parsing, segments, symbols, strings, `atos` symbolication, and crash-report analysis.
-- [x] Add iOS Simulator inventory/lifecycle, Xcode fixture build, screenshot smoke, and LLDB-DAP attach smoke.
-- [x] Add host/Simulator bounded unified-log adapter.
-- [x] Add CoreDevice inventory and fail-closed development-app install/launch operations.
+- [x] (2026-08-24 00:30Z) Inspect the empty GitHub repository, local instructions, and product boundary.
+- [x] (2026-08-24 00:45Z) Apply the standard harness profile and create repository-local routing, evidence, and certification documents.
+- [x] (2026-08-24 01:00Z) Add GPL-3.0-or-later licensing under Burak Karahan.
+- [x] (2026-08-24 01:15Z) Add SwiftPM package, official MCP SDK, capability model, and stdio MCP server.
+- [x] (2026-08-24 02:30Z) Add DAP framing, LLDB-DAP initialization, session ownership, cleanup, launch, attach, breakpoints, stack, memory, disassembly, and continue operations.
+- [x] (2026-08-24 03:00Z) Add macOS fixture launch/inspection smoke with get-task-allow ad-hoc signing.
+- [x] (2026-08-24 03:30Z) Add stepping, pause, scopes, variables, evaluate policy, data-breakpoint/watchpoint plumbing, bounded memory write policy, and fixture coverage.
+- [x] (2026-08-24 03:45Z) Add Mach-O universal/thin parsing, segments, symbols, strings, `atos` symbolication, and crash-report analysis.
+- [x] (2026-08-24 03:55Z) Add iOS Simulator inventory/lifecycle, Xcode fixture build, screenshot smoke, and LLDB-DAP attach smoke.
+- [x] (2026-08-24 04:00Z) Add host/Simulator bounded unified-log adapter.
+- [x] (2026-08-24 04:05Z) Add CoreDevice inventory and fail-closed development-app install/launch operations.
 - [ ] Add a paired physical-device fixture for remote LLDB attach and lifecycle evidence.
 - [ ] Add dedicated Objective-C/Swift metadata reports and richer UI inspection.
 - [ ] Add signed/notarized packaging and CI release artifacts.
