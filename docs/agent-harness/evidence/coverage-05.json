@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "8d9ecdbed9311c128cc221045e014c0ada3bf3dd",
+  "repository_commit": "0b7a2736d69368c0bd04e6e1641ac72b6f669c9c",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,12 +9,12 @@
   "environment": "local",
   "command": "./scripts/smoke_mcp.sh",
   "exit_code": 0,
-  "observed_at": "2026-08-24T04:15:56Z",
+  "observed_at": "2026-08-24T04:23:22Z",
   "result": "passed",
   "artifacts": [
     "scripts/smoke_mcp.sh"
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "e22ea43cf63320a568df50f240fd5ba1eba0e249707ac28003db7e95c3e16c9d"
+  "signature": "7732a5972884bacc54b0bf2e8bec82c91097b2df92f80c24957b736e055cfe80"
 }
