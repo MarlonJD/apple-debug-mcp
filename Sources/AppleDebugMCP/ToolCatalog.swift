@@ -49,6 +49,11 @@ enum ToolCatalog {
             inputSchema: launchObjectSchema
         ),
         Tool(
+            name: "apple_debug_attach",
+            description: "Attach an authorized LLDB-DAP session to a process ID. Disabled unless APPLE_DEBUG_ALLOW_TARGET_ATTACH=1.",
+            inputSchema: attachObjectSchema
+        ),
+        Tool(
             name: "apple_debug_set_breakpoint",
             description: "Set a source-line breakpoint in an active debug session.",
             inputSchema: breakpointObjectSchema
@@ -217,6 +222,16 @@ enum ToolCatalog {
                     stopOnEntry: stopOnEntry
                 )
                 return result(for: DebugLaunchResult(sessionID: sessionID, response: response))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_attach":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let processID = intValue(from: params.arguments?["processID"]) else {
+                return errorResult("Missing required sessionID or processID argument.")
+            }
+            do {
+                return result(for: try await sessions.attach(sessionID: sessionID, processID: processID))
             } catch {
                 return errorResult(error)
             }
@@ -453,6 +468,15 @@ enum ToolCatalog {
             "stopOnEntry": .object(["type": .string("boolean")])
         ]),
         "required": .array([.string("sessionID"), .string("program")])
+    ])
+
+    private static let attachObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "processID": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("processID")])
     ])
 
     private static let breakpointObjectSchema: Value = .object([

@@ -92,6 +92,13 @@ public actor DebugSessionManager {
         }
     }
 
+    public func attach(sessionID: String, processID: Int) async throws -> DAPMessage {
+        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_TARGET_ATTACH"] == "1" else {
+            throw DebugPolicyError.launchDisabled
+        }
+        return try await session(for: sessionID).attach(processID: processID)
+    }
+
     public func setBreakpoint(sessionID: String, file: String, line: Int) async throws -> DAPMessage {
         let session = try session(for: sessionID)
         return try await session.send(

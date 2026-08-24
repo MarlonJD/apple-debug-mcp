@@ -314,6 +314,13 @@ public actor LLDBDAPSession {
         return response
     }
 
+    public func attach(processID: Int) throws -> DAPMessage {
+        try send(
+            command: "attach",
+            arguments: .object(["pid": .integer(processID)])
+        )
+    }
+
     public func drainEvents() -> [DAPMessage] {
         defer { events.removeAll(keepingCapacity: true) }
         return events
