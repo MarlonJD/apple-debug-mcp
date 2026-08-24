@@ -15,4 +15,5 @@
 | Runtime reset | Close stdin; make clean for build state | Stop process and remove local build artifacts | Process exits; .build reset | Maintainers; lifecycle changes | candidate |
 | UI or API exercise | scripts/smoke_mcp.sh | Exercise MCP protocol and LLDB-DAP initialization | Initialize, tools/list, read-only tool calls, and adapter response | Maintainers; tool surface changes | candidate |
 | Debug session lifecycle | apple_debug_session_create/list/close | Create, inspect, and close an owned LLDB-DAP adapter session | Session ID appears, then adapter exits after close | Maintainers; session policy changes | candidate |
+| Debugger inspection | apple_debug_set_breakpoint, apple_debug_threads, apple_debug_stack_trace, apple_debug_read_memory, apple_debug_disassemble, apple_debug_continue | Route specialized debugger inspection commands through a session | Tool schemas and DAP request mapping compile and pass checks | Maintainers; DAP surface changes | candidate |
 | Logs, metrics, or traces | stderr transcript; metrics/traces N/A | Diagnose CLI failures | Actionable stderr or justified N/A | Maintainers; runtime changes | candidate |

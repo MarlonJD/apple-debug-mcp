@@ -28,6 +28,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 - [x] (2026-08-24 02:04Z) Commit the LLDB-DAP adapter foundation as 23dd183.
 - [x] (2026-08-24 02:10Z) Add read-only Mach-O/universal-binary inspection and commit it as f4d9724.
 - [x] (2026-08-24 02:22Z) Add owned LLDB-DAP session create/list/close lifecycle and commit it as d101ae7.
+- [x] (2026-08-24 02:27Z) Add DAP breakpoint, continue, threads, stack, memory-read, and disassembly operations and commit them as 05dbc60.
 - [x] (2026-08-24 01:53Z) Create the authorized source commit 48ce3c9 and direct-child harness attestation checkpoint f6d5348.
 - [x] (2026-08-24 01:53Z) Push the verified commits to github.com/MarlonJD/apple-debug-mcp.
 
@@ -63,7 +64,7 @@ After this milestone, an MCP client can launch the SwiftPM server, complete MCP 
 
 ## Outcomes & Retrospective
 
-The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. Owned LLDB-DAP session lifecycle is committed as d101ae7 and proves create/initialize/close cleanup. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full target launch, stack/memory controls, symbol/static-analysis, Simulator, and device product remains active follow-up work.
+The foundation checkpoint is complete: the MCP smoke, project-native checks, harness checks, source commit 48ce3c9, direct-child attestation f6d5348, and GitHub push were observed. The LLDB-DAP adapter foundation is committed as 23dd183 and proves framing, initialization, event draining, and cleanup without launching a debug target. The first Mach-O inspection layer is committed as f4d9724 and proves universal/thin header and segment parsing. Owned LLDB-DAP session lifecycle is committed as d101ae7 and proves create/initialize/close cleanup. Specialized debugger inspection operations are committed as 05dbc60 and map breakpoint, continue, threads, stack, memory-read, and disassembly requests. The result is a small working server with explicit future debt rather than a false claim of full debugger parity. The full target launch, symbol/static-analysis, Simulator, and device product remains active follow-up work.
 
 ## Context and Orientation
 
@@ -126,3 +127,5 @@ The MCP server uses MCP.Server, MCP.StdioTransport, MCP.ListTools, MCP.CallTool,
   Reason: Preserve a reusable static-analysis foundation for macOS and iOS binaries before adding symbols and metadata.
 - (2026-08-24 02:22Z) Change: Recorded the owned LLDB-DAP session lifecycle commit d101ae7.
   Reason: Make adapter ownership and cleanup observable before enabling target launch and process-control tools.
+- (2026-08-24 02:27Z) Change: Recorded the specialized debugger inspection commit 05dbc60.
+  Reason: Add structured debugger operations without exposing arbitrary LLDB command execution.

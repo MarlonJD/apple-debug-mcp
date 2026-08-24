@@ -10,7 +10,7 @@ The project is designed to cover:
 - Mach-O, Objective-C, and Swift binary analysis;
 - crash analysis and dSYM-based symbolication.
 
-The repository starts with a small, safe foundation. The server exposes read-only capability and toolchain discovery, Mach-O inspection, LLDB-DAP adapter initialization, and owned session lifecycle management. Target launch, attach, memory mutation, and device operations are behind explicit capability and permission boundaries.
+The repository starts with a small, safe foundation. The server exposes read-only capability and toolchain discovery, Mach-O inspection, LLDB-DAP adapter initialization, owned session lifecycle management, and specialized debugger inspection commands. Target launch, attach, memory mutation, and device operations are behind explicit capability and permission boundaries.
 
 ## Design
 

@@ -43,7 +43,8 @@ Backends may be added only behind capability checks. The MCP layer must not expo
 6. apple_macho_inspect reads a regular, size-bounded Mach-O file without executing it and returns structured architecture/header/segment data.
 7. apple_debug_session_create/list/close manage initialized local LLDB-DAP adapter sessions.
 8. apple_debug_launch validates the explicit launch policy before sending a target launch request and tears down failed sessions.
-9. Future debugger calls select a backend, enforce policy, and return structured observations.
+9. Breakpoint, continue, threads, stack trace, memory read, and disassembly tools route through an owned session.
+10. Future debugger calls select a backend, enforce policy, and return structured observations.
 
 ## Runtime topology
 
