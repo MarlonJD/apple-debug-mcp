@@ -5,7 +5,7 @@ Apple Debug MCP is a local, GPL-licensed MCP server for AI-assisted debugging an
 The current product surface includes:
 
 - macOS LLDB-DAP launch and attach sessions;
-- source/function/exception breakpoints, threads, stack traces, scopes, registers, variables, modules, stepping, pause/continue, disassembly, and bounded memory reads;
+- source/function/exception/instruction breakpoints, breakpoint-location lookup, threads, stack traces, scopes, registers, variables, completions, modules, statement/line/instruction stepping, pause/continue, disassembly, and bounded memory reads;
 - watchpoint plumbing through DAP data breakpoints;
 - explicitly authorized expression evaluation and memory writes, plus target terminate/disconnect control;
 - bounded memory pattern search and expected-bytes transactional patch/rollback (write permission required);
@@ -73,6 +73,7 @@ Safe defaults and opt-in boundaries:
 - `APPLE_DEBUG_ALLOW_TARGET_ATTACH=1` — attach to an explicitly selected local process ID;
 - `APPLE_DEBUG_ALLOW_EVALUATE=1` — permit LLDB expression evaluation;
 - `APPLE_DEBUG_ALLOW_MEMORY_WRITE=1` — permit at most 4096-byte DAP memory writes;
+- `APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1` — permit explicit DAP variable mutation for an authorized stopped target;
 - `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` — boot, install, launch, terminate, shut down, or screenshot a Simulator;
 - `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — mutate only a paired, tunnel-ready development device;
 - `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1` — create a physical-device LLDB session only after UUID, pairing, tunnel, signing, and Developer Mode checks pass;

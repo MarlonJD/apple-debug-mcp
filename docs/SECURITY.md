@@ -21,6 +21,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Target attach | Requires `APPLE_DEBUG_ALLOW_TARGET_ATTACH=1` and a positive process ID | `DebugPolicy.validateAttach` | `DebugSessionTests`, iOS Simulator smoke |
 | Expression evaluation | Requires `APPLE_DEBUG_ALLOW_EVALUATE=1` and a 16 KiB expression limit | `DebugPolicy.validateEvaluate` | `DebugSessionTests` and fixture smoke |
 | Memory write | Requires `APPLE_DEBUG_ALLOW_MEMORY_WRITE=1` and a 4096-byte limit | `DebugPolicy.validateMemoryWrite` | `DebugSessionTests` |
+| Variable write | Requires `APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1` and bounded name/value fields | `DebugPolicy.validateVariableWrite` | `DebugSessionTests` |
 | Debugger commands | MCP exposes named DAP requests, not arbitrary shell execution | `ToolCatalog`, `DebugSessionManager` | Tool schema review and `make check` |
 | Session cleanup | Failed launch, explicit close, and server shutdown terminate only owned adapters | `DebugSessionManager`, `LLDBDAPSession.stop` | Session tests and fixture smoke |
 | Simulator mutation | Known UDID and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` are required | `SimulatorService.mutate` | `AppleSimulatorTests`, iOS smoke |

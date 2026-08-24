@@ -61,6 +61,22 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testVariableWriteRequiresSeparateExplicitPolicy() async {
+        let manager = DebugSessionManager()
+        do {
+            _ = try await manager.setVariable(
+                sessionID: "missing",
+                variablesReference: 1,
+                name: "debug_value",
+                value: "8",
+                format: nil
+            )
+            XCTFail("Variable write unexpectedly bypassed its policy gate")
+        } catch {
+            XCTAssertEqual(error as? DebugPolicyError, .variableWriteDisabled)
+        }
+    }
+
     func testExpressionEvaluationRequiresExplicitPolicy() {
         XCTAssertThrowsError(
             try DebugPolicy.validateEvaluate()

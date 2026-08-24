@@ -110,6 +110,10 @@ def main() -> int:
                 "stopOnEntry": True,
             },
         )
+        tool(
+            "apple_debug_breakpoint_locations",
+            {"sessionID": session_id, "file": source_path, "line": 10},
+        )
         threads = json.loads(
             tool("apple_debug_threads", {"sessionID": session_id})["result"]["content"][0]["text"]
         )["body"]["threads"]
@@ -136,6 +140,10 @@ def main() -> int:
             raise RuntimeError("debugger returned no stack frames")
         frame_id = stack[0]["id"]
         instruction_reference = stack[0]["instructionPointerReference"]
+        tool(
+            "apple_debug_set_instruction_breakpoint",
+            {"sessionID": session_id, "instructionReference": instruction_reference},
+        )
 
         scopes = json.loads(
             tool("apple_debug_scopes", {"sessionID": session_id, "frameID": frame_id})["result"]["content"][0]["text"]
@@ -156,6 +164,10 @@ def main() -> int:
         tool(
             "apple_debug_evaluate",
             {"sessionID": session_id, "expression": "1 + 1", "frameID": frame_id},
+        )
+        tool(
+            "apple_debug_completions",
+            {"sessionID": session_id, "frameID": frame_id, "text": "debug_", "column": 7, "line": 10},
         )
 
         memory_response = tool(
@@ -183,7 +195,7 @@ def main() -> int:
         )
         tool(
             "apple_debug_step",
-            {"sessionID": session_id, "threadID": thread_id, "kind": "next"},
+            {"sessionID": session_id, "threadID": thread_id, "kind": "next", "granularity": "instruction"},
         )
         tool("apple_debug_continue", {"sessionID": session_id, "threadID": thread_id})
         closed = json.loads(
@@ -192,7 +204,7 @@ def main() -> int:
         if not closed.get("closed"):
             raise RuntimeError("debug session did not close")
         session_id = None
-        print("fixture-smoke: launch, breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup passed")
+        print("fixture-smoke: launch, source/instruction breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, completions, evaluate, memory, disassembly, instruction stepping, continue, and cleanup passed")
         return 0
     except Exception as error:
         print(f"fixture-smoke: {error}", file=sys.stderr)

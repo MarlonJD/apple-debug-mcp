@@ -84,6 +84,16 @@ enum ToolCatalog {
             inputSchema: breakpointObjectSchema
         ),
         Tool(
+            name: "apple_debug_breakpoint_locations",
+            description: "Resolve executable breakpoint locations for a source line through LLDB-DAP.",
+            inputSchema: breakpointLocationsObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_set_instruction_breakpoint",
+            description: "Set a bounded instruction-address breakpoint with optional condition, hit condition, or log message.",
+            inputSchema: instructionBreakpointObjectSchema
+        ),
+        Tool(
             name: "apple_debug_set_function_breakpoint",
             description: "Set a function breakpoint with optional condition or hit condition.",
             inputSchema: functionBreakpointObjectSchema
@@ -137,6 +147,16 @@ enum ToolCatalog {
             name: "apple_debug_variables",
             description: "Read variables for a DAP variables reference returned by a scope or evaluate request.",
             inputSchema: variablesObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_completions",
+            description: "Request LLDB expression or source completions for a frame.",
+            inputSchema: completionsObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_set_variable",
+            description: "Set a debugger variable only when APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1 is explicitly enabled.",
+            inputSchema: setVariableObjectSchema
         ),
         Tool(
             name: "apple_debug_registers",
@@ -469,6 +489,45 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_debug_breakpoint_locations":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let file = params.arguments?["file"]?.stringValue,
+                  let line = intValue(from: params.arguments?["line"]) else {
+                return errorResult("Missing required sessionID, file, or line argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.breakpointLocations(
+                        sessionID: sessionID,
+                        file: file,
+                        line: line,
+                        column: intValue(from: params.arguments?["column"]),
+                        endLine: intValue(from: params.arguments?["endLine"]),
+                        endColumn: intValue(from: params.arguments?["endColumn"])
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_set_instruction_breakpoint":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let instructionReference = params.arguments?["instructionReference"]?.stringValue else {
+                return errorResult("Missing required sessionID or instructionReference argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.setInstructionBreakpoint(
+                        sessionID: sessionID,
+                        instructionReference: instructionReference,
+                        offset: intValue(from: params.arguments?["offset"]),
+                        condition: params.arguments?["condition"]?.stringValue,
+                        hitCondition: params.arguments?["hitCondition"]?.stringValue,
+                        logMessage: params.arguments?["logMessage"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_debug_set_function_breakpoint":
             guard let sessionID = params.arguments?["sessionID"]?.stringValue,
                   let name = params.arguments?["name"]?.stringValue else {
@@ -571,7 +630,14 @@ enum ToolCatalog {
                 return errorResult("Missing or invalid sessionID, threadID, or kind argument. kind must be stepIn, next, or stepOut.")
             }
             do {
-                return result(for: try await sessions.step(sessionID: sessionID, threadID: threadID, kind: stepKind))
+                return result(
+                    for: try await sessions.step(
+                        sessionID: sessionID,
+                        threadID: threadID,
+                        kind: stepKind,
+                        granularity: params.arguments?["granularity"]?.stringValue.flatMap(DebugStepGranularity.init(rawValue:))
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -592,6 +658,45 @@ enum ToolCatalog {
             }
             do {
                 return result(for: try await sessions.variables(sessionID: sessionID, variablesReference: variablesReference))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_completions":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let text = params.arguments?["text"]?.stringValue,
+                  let column = intValue(from: params.arguments?["column"]) else {
+                return errorResult("Missing required sessionID, text, or column argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.completions(
+                        sessionID: sessionID,
+                        frameID: intValue(from: params.arguments?["frameID"]),
+                        text: text,
+                        column: column,
+                        line: intValue(from: params.arguments?["line"])
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_set_variable":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let variablesReference = intValue(from: params.arguments?["variablesReference"]),
+                  let name = params.arguments?["name"]?.stringValue,
+                  let value = params.arguments?["value"]?.stringValue else {
+                return errorResult("Missing required sessionID, variablesReference, name, or value argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.setVariable(
+                        sessionID: sessionID,
+                        variablesReference: variablesReference,
+                        name: name,
+                        value: value,
+                        format: nil
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1168,6 +1273,32 @@ enum ToolCatalog {
         "required": .array([.string("sessionID"), .string("file"), .string("line")])
     ])
 
+    private static let breakpointLocationsObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "file": .object(["type": .string("string")]),
+            "line": .object(["type": .string("integer")]),
+            "column": .object(["type": .string("integer")]),
+            "endLine": .object(["type": .string("integer")]),
+            "endColumn": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("file"), .string("line")])
+    ])
+
+    private static let instructionBreakpointObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "instructionReference": .object(["type": .string("string")]),
+            "offset": .object(["type": .string("integer")]),
+            "condition": .object(["type": .string("string")]),
+            "hitCondition": .object(["type": .string("string")]),
+            "logMessage": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("sessionID"), .string("instructionReference")])
+    ])
+
     private static let functionBreakpointObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1208,6 +1339,10 @@ enum ToolCatalog {
             "kind": .object([
                 "type": .string("string"),
                 "enum": .array([.string("stepIn"), .string("next"), .string("stepOut")])
+            ]),
+            "granularity": .object([
+                "type": .string("string"),
+                "enum": .array([.string("statement"), .string("line"), .string("instruction")])
             ])
         ]),
         "required": .array([.string("sessionID"), .string("threadID"), .string("kind")])
@@ -1229,6 +1364,34 @@ enum ToolCatalog {
             "variablesReference": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("sessionID"), .string("variablesReference")])
+    ])
+
+    private static let completionsObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "frameID": .object(["type": .string("integer")]),
+            "text": .object(["type": .string("string")]),
+            "column": .object(["type": .string("integer")]),
+            "line": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("text"), .string("column")])
+    ])
+
+    private static let setVariableObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "variablesReference": .object(["type": .string("integer")]),
+            "name": .object(["type": .string("string")]),
+            "value": .object(["type": .string("string")])
+        ]),
+        "required": .array([
+            .string("sessionID"),
+            .string("variablesReference"),
+            .string("name"),
+            .string("value")
+        ])
     ])
 
     private static let moduleObjectSchema: Value = .object([

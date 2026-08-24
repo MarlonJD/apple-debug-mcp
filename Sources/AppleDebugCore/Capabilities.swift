@@ -67,7 +67,7 @@ public enum CapabilityMatrix {
                 restricted: [],
                 notes: [
                     "Attach and memory mutation depend on macOS debugger permissions and target entitlements.",
-                    "Memory mutation is disabled by default and requires an explicit policy grant."
+                    "Memory and variable mutation are disabled by default and require separate explicit policy grants."
                 ]
             ),
             CapabilityReport(
@@ -82,7 +82,7 @@ public enum CapabilityMatrix {
                 restricted: [],
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
-                    "Memory mutation is disabled by default and requires an explicit policy grant.",
+                    "Memory and variable mutation are disabled by default and require separate explicit policy grants.",
                     "UI inspection and bounded tap, text-entry, swipe, and wait actions run through an explicit XCUITest probe; Simulator mutation permission is required."
                 ]
             ),

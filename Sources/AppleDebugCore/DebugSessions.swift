@@ -8,6 +8,7 @@ public enum DebugPolicyError: Error, Equatable, LocalizedError, Sendable {
     case launchDisabled
     case attachDisabled
     case memoryWriteDisabled
+    case variableWriteDisabled
     case evaluateDisabled
     case invalidProcessID
     case invalidMemoryWrite
@@ -23,6 +24,8 @@ public enum DebugPolicyError: Error, Equatable, LocalizedError, Sendable {
             return "Target attach is disabled. Set APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 only for an authorized local target."
         case .memoryWriteDisabled:
             return "Memory write is disabled. Set APPLE_DEBUG_ALLOW_MEMORY_WRITE=1 only for an authorized target."
+        case .variableWriteDisabled:
+            return "Variable write is disabled. Set APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1 only for an authorized target."
         case .evaluateDisabled:
             return "Expression evaluation is disabled. Set APPLE_DEBUG_ALLOW_EVALUATE=1 only for an authorized target."
         case .invalidProcessID:
@@ -77,6 +80,16 @@ public enum DebugPolicy {
     public static func validateEvaluate() throws {
         guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_EVALUATE"] == "1" else {
             throw DebugPolicyError.evaluateDisabled
+        }
+    }
+
+    public static func validateVariableWrite(name: String, value: String) throws {
+        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_VARIABLE_WRITE"] == "1" else {
+            throw DebugPolicyError.variableWriteDisabled
+        }
+        guard !name.isEmpty, name.utf8.count <= 4_096,
+              !value.isEmpty, value.utf8.count <= 16_384 else {
+            throw DebugPolicyError.invalidRequest("Variable name or value is invalid.")
         }
     }
 
@@ -327,6 +340,70 @@ public actor DebugSessionManager {
         )
     }
 
+    public func breakpointLocations(
+        sessionID: String,
+        file: String,
+        line: Int,
+        column: Int?,
+        endLine: Int?,
+        endColumn: Int?
+    ) async throws -> DAPMessage {
+        try DebugPolicy.validatePositive(line, label: "Breakpoint location line")
+        guard !file.isEmpty, file.utf8.count <= 4_096 else {
+            throw DebugPolicyError.invalidRequest("Breakpoint location source path is invalid.")
+        }
+        var arguments: [String: DAPValue] = [
+            "source": .object(["path": .string(file)]),
+            "line": .integer(line)
+        ]
+        if let column {
+            try DebugPolicy.validatePositive(column, label: "Breakpoint location column")
+            arguments["column"] = .integer(column)
+        }
+        if let endLine {
+            try DebugPolicy.validatePositive(endLine, label: "Breakpoint location end line")
+            arguments["endLine"] = .integer(endLine)
+        }
+        if let endColumn {
+            try DebugPolicy.validatePositive(endColumn, label: "Breakpoint location end column")
+            arguments["endColumn"] = .integer(endColumn)
+        }
+        return try await session(for: sessionID).send(
+            command: "breakpointLocations",
+            arguments: .object(arguments)
+        )
+    }
+
+    public func setInstructionBreakpoint(
+        sessionID: String,
+        instructionReference: String,
+        offset: Int?,
+        condition: String?,
+        hitCondition: String?,
+        logMessage: String?
+    ) async throws -> DAPMessage {
+        guard !instructionReference.isEmpty, instructionReference.utf8.count <= 512 else {
+            throw DebugPolicyError.invalidRequest("Instruction breakpoint reference is invalid.")
+        }
+        if let offset { try DebugPolicy.validateNonNegative(offset, label: "Instruction breakpoint offset") }
+        if let condition { try DebugPolicy.validateExpression(condition) }
+        if let hitCondition { try DebugPolicy.validateExpression(hitCondition) }
+        if let logMessage { try DebugPolicy.validateExpression(logMessage) }
+        var breakpoint: [String: DAPValue] = [
+            "instructionReference": .string(instructionReference)
+        ]
+        if let offset { breakpoint["offset"] = .integer(offset) }
+        if let condition { breakpoint["condition"] = .string(condition) }
+        if let hitCondition { breakpoint["hitCondition"] = .string(hitCondition) }
+        if let logMessage { breakpoint["logMessage"] = .string(logMessage) }
+        return try await session(for: sessionID).send(
+            command: "setInstructionBreakpoints",
+            arguments: .object([
+                "breakpoints": .array([.object(breakpoint)])
+            ])
+        )
+    }
+
     public func setFunctionBreakpoints(
         sessionID: String,
         name: String,
@@ -430,12 +507,15 @@ public actor DebugSessionManager {
     public func step(
         sessionID: String,
         threadID: Int,
-        kind: DebugStepKind
+        kind: DebugStepKind,
+        granularity: DebugStepGranularity?
     ) async throws -> DAPMessage {
         try DebugPolicy.validatePositive(threadID, label: "Thread ID")
+        var arguments: [String: DAPValue] = ["threadId": .integer(threadID)]
+        if let granularity { arguments["granularity"] = .string(granularity.rawValue) }
         return try await session(for: sessionID).send(
             command: kind.command,
-            arguments: .object(["threadId": .integer(threadID)])
+            arguments: .object(arguments)
         )
     }
 
@@ -450,6 +530,56 @@ public actor DebugSessionManager {
         try await session(for: sessionID).send(
             command: "variables",
             arguments: .object(["variablesReference": .integer(variablesReference)])
+        )
+    }
+
+    public func completions(
+        sessionID: String,
+        frameID: Int?,
+        text: String,
+        column: Int,
+        line: Int?
+    ) async throws -> DAPMessage {
+        guard !text.isEmpty, text.utf8.count <= 16_384 else {
+            throw DebugPolicyError.invalidRequest("Completion text is invalid.")
+        }
+        try DebugPolicy.validatePositive(column, label: "Completion column")
+        var arguments: [String: DAPValue] = [
+            "text": .string(text),
+            "column": .integer(column)
+        ]
+        if let frameID {
+            try DebugPolicy.validatePositive(frameID, label: "Frame ID")
+            arguments["frameId"] = .integer(frameID)
+        }
+        if let line {
+            try DebugPolicy.validatePositive(line, label: "Completion line")
+            arguments["line"] = .integer(line)
+        }
+        return try await session(for: sessionID).send(
+            command: "completions",
+            arguments: .object(arguments)
+        )
+    }
+
+    public func setVariable(
+        sessionID: String,
+        variablesReference: Int,
+        name: String,
+        value: String,
+        format: DAPValue?
+    ) async throws -> DAPMessage {
+        try DebugPolicy.validatePositive(variablesReference, label: "Variables reference")
+        try DebugPolicy.validateVariableWrite(name: name, value: value)
+        var arguments: [String: DAPValue] = [
+            "variablesReference": .integer(variablesReference),
+            "name": .string(name),
+            "value": .string(value)
+        ]
+        if let format { arguments["format"] = format }
+        return try await session(for: sessionID).send(
+            command: "setVariable",
+            arguments: .object(arguments)
         )
     }
 
@@ -888,4 +1018,10 @@ public enum DebugStepKind: String, Codable, CaseIterable, Sendable {
     case out = "stepOut"
 
     fileprivate var command: String { rawValue }
+}
+
+public enum DebugStepGranularity: String, Codable, CaseIterable, Sendable {
+    case statement
+    case line
+    case instruction
 }
