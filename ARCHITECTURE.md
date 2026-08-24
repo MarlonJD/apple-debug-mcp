@@ -38,7 +38,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
 - `AppleBinaryIntelligenceService`, `AppleRuntimeMetadataService`, `AppleBinaryDiffService`, and `CrashSymbolicationService`: inspect signed Apple binaries, recover Objective-C/Swift metadata, compare regular Mach-O files or `.app`/`.dSYM` bundles, and triage crash frames without executing artifacts.
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
-- `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths.
+- `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 

@@ -27,6 +27,19 @@ final class AppleXcodeTests: XCTestCase {
         }
     }
 
+    func testTestExecutionIsPolicyGatedBeforeProjectValidation() {
+        XCTAssertThrowsError(
+            try XcodeService.test(
+                path: "/tmp/example.xcodeproj",
+                scheme: "Example",
+                configuration: "Debug",
+                destination: "generic/platform=iOS Simulator"
+            )
+        ) { error in
+            XCTAssertEqual(error as? XcodeError, .testDisabled)
+        }
+    }
+
     func testDiscoversIOSFixtureProject() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

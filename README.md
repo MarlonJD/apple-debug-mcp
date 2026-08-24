@@ -18,7 +18,7 @@ The current product surface includes:
 - crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
 - Simulator URL opening, deterministic location injection/clear, and bounded video recording for automated reproduction;
-- Xcode project discovery and explicitly authorized builds with derived-data, `.app`, and `.dSYM` artifact manifests;
+- Xcode project discovery, explicitly authorized builds with derived-data/`.app`/`.dSYM` manifests, and test execution with `.xcresult` summaries;
 - CoreDevice physical-device inventory plus authorization-gated development-app install/launch.
 
 The server is intentionally local and capability-aware. It does not provide arbitrary shell execution, bypass Apple signing or entitlements, or attach to stock App Store applications without an authorized development boundary.

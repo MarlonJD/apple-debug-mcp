@@ -329,6 +329,11 @@ enum ToolCatalog {
             inputSchema: xcodeBuildObjectSchema
         ),
         Tool(
+            name: "apple_xcode_test",
+            description: "Run an Xcode scheme on an explicit destination and return its xcresult path and test summary. Disabled unless APPLE_DEBUG_ALLOW_XCODE_BUILD=1.",
+            inputSchema: xcodeTestObjectSchema
+        ),
+        Tool(
             name: "apple_symbolicate",
             description: "Resolve a Mach-O address with atos using a binary or dSYM-backed binary.",
             inputSchema: symbolicateObjectSchema
@@ -1208,6 +1213,30 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_xcode_test":
+            guard let path = params.arguments?["path"]?.stringValue,
+                  let scheme = params.arguments?["scheme"]?.stringValue,
+                  let destination = params.arguments?["destination"]?.stringValue else {
+                return errorResult("Missing required path, scheme, or destination argument.")
+            }
+            do {
+                return result(
+                    for: try XcodeService.test(
+                        path: path,
+                        scheme: scheme,
+                        configuration: params.arguments?["configuration"]?.stringValue ?? "Debug",
+                        destination: destination,
+                        derivedDataPath: params.arguments?["derivedDataPath"]?.stringValue,
+                        resultBundlePath: params.arguments?["resultBundlePath"]?.stringValue,
+                        codeSigningAllowed: boolValue(
+                            from: params.arguments?["codeSigningAllowed"],
+                            default: true
+                        )
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_symbolicate":
             guard let binaryPath = params.arguments?["binaryPath"]?.stringValue,
                   let architecture = params.arguments?["architecture"]?.stringValue,
@@ -1904,6 +1933,23 @@ enum ToolCatalog {
                 "type": .string("string"),
                 "description": .string("Optional absolute derived-data directory; build results include discovered app and dSYM artifacts")
             ])
+        ]),
+        "required": .array([.string("path"), .string("scheme"), .string("destination")])
+    ])
+
+    private static let xcodeTestObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object(["type": .string("string")]),
+            "scheme": .object(["type": .string("string")]),
+            "configuration": .object(["type": .string("string")]),
+            "destination": .object(["type": .string("string")]),
+            "derivedDataPath": .object(["type": .string("string")]),
+            "resultBundlePath": .object([
+                "type": .string("string"),
+                "description": .string("Optional absolute xcresult output path")
+            ]),
+            "codeSigningAllowed": .object(["type": .string("boolean")])
         ]),
         "required": .array([.string("path"), .string("scheme"), .string("destination")])
     ])

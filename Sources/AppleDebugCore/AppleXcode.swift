@@ -8,6 +8,7 @@ public enum XcodeError: Error, Equatable, LocalizedError, Sendable {
     case invalidProjectPath
     case invalidBuildRequest
     case buildDisabled
+    case testDisabled
     case commandFailed(String)
     case invalidResponse
 
@@ -19,6 +20,8 @@ public enum XcodeError: Error, Equatable, LocalizedError, Sendable {
             return "Xcode build scheme, configuration, destination, or derived-data path is invalid."
         case .buildDisabled:
             return "Xcode build is disabled. Set APPLE_DEBUG_ALLOW_XCODE_BUILD=1 for an authorized local build."
+        case .testDisabled:
+            return "Xcode test execution is disabled. Set APPLE_DEBUG_ALLOW_XCODE_BUILD=1 for an authorized local test run."
         case .commandFailed(let message):
             return "xcodebuild command failed: \(message)"
         case .invalidResponse:
@@ -79,6 +82,34 @@ public struct XcodeBuildResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct XcodeTestResult: Codable, Equatable, Sendable {
+    public let projectPath: String
+    public let scheme: String
+    public let configuration: String
+    public let destination: String
+    public let resultBundlePath: String
+    public let summary: DAPValue?
+    public let output: String
+
+    public init(
+        projectPath: String,
+        scheme: String,
+        configuration: String,
+        destination: String,
+        resultBundlePath: String,
+        summary: DAPValue?,
+        output: String
+    ) {
+        self.projectPath = projectPath
+        self.scheme = scheme
+        self.configuration = configuration
+        self.destination = destination
+        self.resultBundlePath = resultBundlePath
+        self.summary = summary
+        self.output = output
+    }
+}
+
 public enum XcodeService {
     private static let maximumCommandOutput = 16 * 1024 * 1024
 
@@ -102,20 +133,12 @@ public enum XcodeService {
         guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_XCODE_BUILD"] == "1" else {
             throw XcodeError.buildDisabled
         }
-        guard !scheme.isEmpty, scheme.utf8.count <= 256,
-              !configuration.isEmpty, configuration.utf8.count <= 256,
-              !destination.isEmpty, destination.utf8.count <= 1_024,
-              !scheme.contains("\0"), !configuration.contains("\0"),
-              !destination.contains("\0") else {
-            throw XcodeError.invalidBuildRequest
-        }
-        if let derivedDataPath {
-            guard !derivedDataPath.isEmpty, derivedDataPath.utf8.count <= 4_096,
-                  !derivedDataPath.contains("\0"),
-                  URL(fileURLWithPath: derivedDataPath).path.hasPrefix("/") else {
-                throw XcodeError.invalidBuildRequest
-            }
-        }
+        try validateBuildRequest(
+            scheme: scheme,
+            configuration: configuration,
+            destination: destination,
+            derivedDataPath: derivedDataPath
+        )
         let kind = try validateProject(path: path)
         var arguments = [
             kind, path,
@@ -145,6 +168,95 @@ public enum XcodeService {
             artifacts: settings.artifacts,
             output: result.stdout
         )
+    }
+
+    public static func test(
+        path: String,
+        scheme: String,
+        configuration: String,
+        destination: String,
+        derivedDataPath: String? = nil,
+        resultBundlePath: String? = nil,
+        codeSigningAllowed: Bool = true
+    ) throws -> XcodeTestResult {
+        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_XCODE_BUILD"] == "1" else {
+            throw XcodeError.testDisabled
+        }
+        try validateBuildRequest(
+            scheme: scheme,
+            configuration: configuration,
+            destination: destination,
+            derivedDataPath: derivedDataPath
+        )
+        let kind = try validateProject(path: path)
+        let resultURL = resultBundlePath.map(URL.init(fileURLWithPath:))
+            ?? FileManager.default.temporaryDirectory
+                .appendingPathComponent("apple-debug-mcp-(UUID().uuidString).xcresult")
+        guard resultURL.path.hasPrefix("/"), !FileManager.default.fileExists(atPath: resultURL.path) else {
+            throw XcodeError.invalidBuildRequest
+        }
+        var arguments = [
+            kind, path,
+            "-scheme", scheme,
+            "-configuration", configuration,
+            "-destination", destination,
+            "-resultBundlePath", resultURL.path
+        ]
+        if let derivedDataPath {
+            arguments += ["-derivedDataPath", derivedDataPath]
+        }
+        if !codeSigningAllowed {
+            arguments.append("CODE_SIGNING_ALLOWED=NO")
+        }
+        arguments.append("test")
+        let result = try run(arguments: arguments)
+        let summary = try? testSummary(resultBundlePath: resultURL.path)
+        return XcodeTestResult(
+            projectPath: path,
+            scheme: scheme,
+            configuration: configuration,
+            destination: destination,
+            resultBundlePath: resultURL.path,
+            summary: summary,
+            output: result.stdout
+        )
+    }
+
+    private static func validateBuildRequest(
+        scheme: String,
+        configuration: String,
+        destination: String,
+        derivedDataPath: String?
+    ) throws {
+        guard !scheme.isEmpty, scheme.utf8.count <= 256,
+              !configuration.isEmpty, configuration.utf8.count <= 256,
+              !destination.isEmpty, destination.utf8.count <= 1_024,
+              !scheme.contains("\0"), !configuration.contains("\0"),
+              !destination.contains("\0") else {
+            throw XcodeError.invalidBuildRequest
+        }
+        if let derivedDataPath {
+            guard !derivedDataPath.isEmpty, derivedDataPath.utf8.count <= 4_096,
+                  !derivedDataPath.contains("\0"),
+                  URL(fileURLWithPath: derivedDataPath).path.hasPrefix("/") else {
+                throw XcodeError.invalidBuildRequest
+            }
+        }
+    }
+
+    private static func testSummary(resultBundlePath: String) throws -> DAPValue {
+        let result = try AppleProcessRunner.run(
+            executable: "/usr/bin/xcrun",
+            arguments: [
+                "xcresulttool", "get", "test-results", "summary",
+                "--path", resultBundlePath, "--compact"
+            ],
+            maximumOutputSize: 2 * 1024 * 1024
+        )
+        guard result.terminationStatus == 0 else {
+            throw XcodeError.invalidResponse
+        }
+        return try JSONDecoder().decode(DAPValue.self, from: result.stdout)
     }
 
     private struct BuildSettingsResult {
