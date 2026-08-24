@@ -284,6 +284,13 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
 }
 
 public enum ApplePerformanceService {
+    public static let swiftConcurrencySchemas = [
+        "swift-task-state", "swift-actor-count", "swift-task-cancellation-event",
+        "swift-total-task-count", "swift-actor-lifetime", "swift-actor-execution",
+        "swift-task-creation-event", "swift-actor-queue-size", "swift-task-relationship",
+        "swift-alive-task-count", "swift-task-lifetime", "swift-running-task-count"
+    ]
+
     private static let templates = [
         "Time Profiler", "Allocations", "System Trace", "Power Profiler", "Animation Hitches",
         "Swift Concurrency", "Processor Trace", "CPU Profiler", "Leaks", "Network",
@@ -293,8 +300,8 @@ public enum ApplePerformanceService {
         "time-profile", "time-sample", "allocations", "allocation", "os-signpost", "os-log",
         "animation-hitch", "animation-hitches", "power", "energy", "core-animation",
         "swift-concurrency", "thread-info", "process-info", "signpost"
-    ]
-    private static let maximumExportSize = 8 * 1024 * 1024
+    ] + swiftConcurrencySchemas
+    private static let maximumExportSize = 32 * 1024 * 1024
 
     public static func record(
         processID: Int?,
@@ -395,14 +402,27 @@ public enum ApplePerformanceService {
             arguments: ["--toc"]
         )
         let summary = try PerformanceTraceTOCParser.parse(tocData)
-        let queryData = try export(
-            tracePath: tracePath,
-            arguments: [
-                "--xpath",
-                "/trace-toc/run[@number=\"1\"]/data/table[@schema=\"\(schema)\"]"
-            ]
-        )
-        let rows = try PerformanceTraceRowsParser.parse(queryData, maximumRows: maximumRows)
+        let querySchemas: [String]
+        if schema == "swift-concurrency" {
+            let availableSchemas = Set(summary.availableSchemas)
+            querySchemas = swiftConcurrencySchemas.filter { availableSchemas.contains($0) }
+        } else {
+            querySchemas = [schema]
+        }
+        var rows: [ApplePerformanceTraceRow] = []
+        let perSchemaLimit = querySchemas.isEmpty ? 0 : max(1, maximumRows / querySchemas.count)
+        for querySchema in querySchemas {
+            let remaining = maximumRows - rows.count
+            guard remaining > 0 else { break }
+            let queryData = try export(
+                tracePath: tracePath,
+                arguments: [
+                    "--xpath",
+                    "/trace-toc/run[@number=\"1\"]/data/table[@schema=\"\(querySchema)\"]"
+                ]
+            )
+            rows.append(contentsOf: try PerformanceTraceRowsParser.parse(queryData, maximumRows: min(remaining, perSchemaLimit)))
+        }
         let analysis = analyzeRows(rows)
         let semantic = semanticSummary(schema: schema, rows: rows)
         return ApplePerformanceAnalysisResult(
@@ -446,16 +466,21 @@ public enum ApplePerformanceService {
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             throw ApplePerformanceError.commandFailed("xctrace export did not produce XML output.")
         }
-        let data: Data
+        let attributes: [FileAttributeKey: Any]
         do {
-            data = try Data(contentsOf: outputURL)
+            attributes = try FileManager.default.attributesOfItem(atPath: outputURL.path)
         } catch {
             throw ApplePerformanceError.commandFailed(error.localizedDescription)
         }
-        guard data.count <= maximumExportSize else {
+        guard let fileSize = attributes[.size] as? NSNumber,
+              fileSize.intValue <= maximumExportSize else {
             throw ApplePerformanceError.outputTooLarge
         }
-        return data
+        do {
+            return try Data(contentsOf: outputURL)
+        } catch {
+            throw ApplePerformanceError.commandFailed(error.localizedDescription)
+        }
     }
 
     private static func isTraceDirectory(_ path: String) -> Bool {
@@ -710,6 +735,7 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
     private var textElement: String?
     private var text = ""
     private var didHitLimit = false
+    private var referenceValues: [String: String] = [:]
 
     private init(maximumRows: Int) {
         self.maximumRows = maximumRows
@@ -733,6 +759,9 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
         qualifiedName qName: String?,
         attributes attributeDict: [String: String] = [:]
     ) {
+        if let id = attributeDict["id"], let formatted = attributeDict["fmt"] {
+            referenceValues[id] = formatted
+        }
         switch elementName {
         case "row":
             currentRow = MutableRow(
@@ -807,6 +836,11 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
             if let fmt = attributeDict["fmt"] {
                 currentRow?.fields["\(elementName).fmt"] = fmt
             }
+        } else if let ref = attributeDict["ref"],
+                  let value = referenceValues[ref],
+                  currentRow != nil,
+                  !["row", "thread", "process", "tagged-backtrace", "backtrace", "frame", "binary", "sentinel"].contains(elementName) {
+            currentRow?.fields[elementName] = value
         }
     }
 

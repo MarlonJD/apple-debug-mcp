@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke performance-smoke performance-analysis-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -41,6 +41,9 @@ performance-smoke: build
 
 performance-analysis-smoke: build
 	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/performance_analysis_smoke.py
+
+swift-concurrency-graph-smoke: build
+	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/swift_concurrency_graph_smoke.py
 
 runtime-diagnostics-smoke: build
 	APPLE_DEBUG_ALLOW_TARGET_ATTACH=1 python3 ./scripts/runtime_diagnostics_smoke.py

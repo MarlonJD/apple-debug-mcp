@@ -25,6 +25,7 @@ private final class WorkbenchModel: ObservableObject {
         case debugger = "Debugger"
         case assembler = "Assembler"
         case controlFlow = "Control Flow"
+        case performance = "Performance"
         case boundaries = "Boundaries"
         var id: String { rawValue }
     }
@@ -39,6 +40,9 @@ private final class WorkbenchModel: ObservableObject {
     @Published var assemblyOutput = ""
     @Published var analysisPath = ""
     @Published var controlFlowOutput = ""
+    @Published var tracePath = ""
+    @Published var performanceSchema = "time-profile"
+    @Published var performanceOutput = ""
     @Published var errorMessage: String?
 
     let capabilities = CapabilityMatrix.reports()
@@ -60,6 +64,28 @@ private final class WorkbenchModel: ObservableObject {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             controlFlowOutput = String(decoding: try encoder.encode(report), as: UTF8.self)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func analyzePerformance() {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if performanceSchema == "swift-concurrency" {
+                let graph = try AppleSwiftConcurrencyGraphService.analyze(tracePath: tracePath)
+                performanceOutput = String(decoding: try encoder.encode(graph), as: UTF8.self)
+            } else {
+                let report = try ApplePerformanceService.analyze(
+                    tracePath: tracePath,
+                    schema: performanceSchema,
+                    maximumRows: 5_000,
+                    includeRows: false
+                )
+                performanceOutput = String(decoding: try encoder.encode(report), as: UTF8.self)
+            }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -140,6 +166,7 @@ private struct WorkbenchView: View {
                 case .debugger: DebuggerPanel(model: model)
                 case .assembler: AssemblerPanel(model: model)
                 case .controlFlow: ControlFlowPanel(model: model)
+                case .performance: PerformancePanel(model: model)
                 case .boundaries: BoundaryPanel(model: model)
                 }
             }
@@ -162,6 +189,7 @@ private struct WorkbenchView: View {
         case .debugger: return "ladybug"
         case .assembler: return "chevron.left.forwardslash.chevron.right"
         case .controlFlow: return "point.3.connected.trianglepath.dotted"
+        case .performance: return "waveform.path.ecg"
         case .boundaries: return "shield.lefthalf.filled"
         }
     }
@@ -276,6 +304,41 @@ private struct ControlFlowPanel: View {
             TextEditor(text: $model.controlFlowOutput)
                 .font(.system(.body, design: .monospaced))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
+        }
+    }
+}
+
+private struct PerformancePanel: View {
+    @ObservedObject var model: WorkbenchModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Performance / Concurrency").font(.title.bold())
+            Text("Analyze an existing .trace bundle through the same bounded public xctrace parsers exposed by MCP.")
+                .foregroundStyle(.secondary)
+            HStack {
+                TextField("Absolute .trace bundle path", text: $model.tracePath)
+                    .textFieldStyle(.roundedBorder)
+                Picker("Schema", selection: $model.performanceSchema) {
+                    Text("Time Profiler").tag("time-profile")
+                    Text("Swift Concurrency Graph").tag("swift-concurrency")
+                    Text("Allocations").tag("allocations")
+                    Text("OS Signposts").tag("os-signpost")
+                    Text("Animation Hitches").tag("animation-hitches")
+                    Text("Power / Energy").tag("power")
+                }
+                .frame(width: 190)
+                Button("Analyze") { model.analyzePerformance() }
+                    .disabled(model.tracePath.isEmpty)
+            }
+            ScrollView {
+                Text(model.performanceOutput.isEmpty ? "Select an existing trace bundle and schema." : model.performanceOutput)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(10)
+            .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
         }
     }
 }

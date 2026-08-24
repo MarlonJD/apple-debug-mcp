@@ -219,6 +219,11 @@ enum ToolCatalog {
             inputSchema: performanceAnalyzeObjectSchema
         ),
         Tool(
+            name: "apple_swift_concurrency_graph",
+            description: "Build a trace-backed Swift Concurrency task/actor/continuation graph from the public xctrace export; private runtime state is never accessed.",
+            inputSchema: swiftConcurrencyGraphObjectSchema
+        ),
+        Tool(
             name: "apple_debug_disassemble",
             description: "Disassemble instructions from a stopped target through LLDB-DAP.",
             inputSchema: disassembleObjectSchema
@@ -1024,6 +1029,20 @@ enum ToolCatalog {
                             from: params.arguments?["includeRows"],
                             default: false
                         )
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_swift_concurrency_graph":
+            guard let tracePath = params.arguments?["tracePath"]?.stringValue else {
+                return errorResult("Missing required tracePath argument.")
+            }
+            do {
+                return result(
+                    for: try AppleSwiftConcurrencyGraphService.analyze(
+                        tracePath: tracePath,
+                        maximumRows: intValue(from: params.arguments?["maximumRows"]) ?? 5_000
                     )
                 )
             } catch {
@@ -2211,7 +2230,13 @@ enum ToolCatalog {
                     .string("allocation"), .string("os-signpost"), .string("os-log"),
                     .string("animation-hitch"), .string("animation-hitches"), .string("power"),
                     .string("energy"), .string("core-animation"), .string("swift-concurrency"),
-                    .string("thread-info"), .string("process-info"), .string("signpost")
+                    .string("thread-info"), .string("process-info"), .string("signpost"),
+                    .string("swift-task-state"), .string("swift-actor-count"),
+                    .string("swift-task-cancellation-event"), .string("swift-total-task-count"),
+                    .string("swift-actor-lifetime"), .string("swift-actor-execution"),
+                    .string("swift-task-creation-event"), .string("swift-actor-queue-size"),
+                    .string("swift-task-relationship"), .string("swift-alive-task-count"),
+                    .string("swift-task-lifetime"), .string("swift-running-task-count")
                 ])
             ]),
             "maximumRows": .object([
@@ -2221,6 +2246,18 @@ enum ToolCatalog {
             "includeRows": .object([
                 "type": .string("boolean"),
                 "description": .string("Include parsed rows in addition to hotspots and folded flame stacks")
+            ])
+        ]),
+        "required": .array([.string("tracePath")])
+    ])
+
+    private static let swiftConcurrencyGraphObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "tracePath": .object(["type": .string("string")]),
+            "maximumRows": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum Swift Concurrency export rows from 1 to 5000")
             ])
         ]),
         "required": .array([.string("tracePath")])

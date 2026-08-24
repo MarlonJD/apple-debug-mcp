@@ -13,6 +13,7 @@ The current product surface includes:
 - bounded `xctrace` Time Profiler, Allocations, and System Trace capture for macOS or Simulator targets;
 - parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
 - semantic performance summaries for allocation bytes/events, running/blocked samples, hitches, signposts, and Swift concurrency task/actor/continuation rows;
+- trace-backed Swift Concurrency task/actor/continuation graphs that merge the public `swift-task-*` and `swift-actor-*` xctrace schemas with explicit sampling and private-runtime boundaries;
 - Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
 - bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
 - Mach-O CFG/basic-block/call-graph/xref reports and a direct dyld shared-cache header/mapping/image parser;
@@ -78,6 +79,7 @@ make ios-ui-tree-smoke
 make ios-arbitrary-ui-smoke
 make dwarf-smoke
 make performance-analysis-smoke
+make swift-concurrency-graph-smoke
 make runtime-diagnostics-smoke
 make assembler-smoke
 make reverse-capability-smoke
@@ -91,7 +93,7 @@ make plugin-smoke
 make workbench-build-smoke
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation.
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `swift-concurrency-graph-smoke` compiles an async fixture, records the public Swift Concurrency template, and verifies task/actor graph evidence, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation.
 
 Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
 

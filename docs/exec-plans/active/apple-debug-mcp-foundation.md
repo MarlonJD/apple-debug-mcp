@@ -64,6 +64,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 22:05Z) Add CFG/basic-block/call-graph analysis, direct dyld shared-cache table parsing, typed vmmap snapshots/diffs, expanded xctrace schema support, Simulator environment controls, reproducible evidence bundles, signing audits, patch/re-sign plans, native workbench build, and safe plugin manifest discovery.
 - [x] (2026-08-24 22:20Z) Add semantic xctrace summaries, workbench debugger thread/snapshot controls, and signed plugin-host validation with sandbox-required non-executing plans.
 - [x] (2026-08-24 22:35Z) Add indirect-symbol/data-in-code CFG evidence and bounded dyld cache discovery smoke; current host reports no mounted cache and no `dyld_shared_cache_util`.
+- [x] (2026-08-24 23:05Z) Merge the public Swift Concurrency xctrace schemas, resolve reference nodes, reconstruct task/actor/continuation edges, and verify a live async fixture through `make swift-concurrency-graph-smoke`.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries
@@ -80,6 +81,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - The installed Apple LLDB (`lldb-2100.0.17.203`) exposes `process trace start/stop` but `apropos reverse`, `apropos replay`, and `process record` are unavailable; a forward DAP stop trace is therefore the strongest truthful execution-history feature on this host.
 - Apple `heap`, `leaks`, `malloc_history`, `sample`, and `vmmap` provide strong user-process runtime counterparts, while SIP/KDK/entitlement requirements keep kernel task and kext debugging outside the supported boundary.
 - The current Xcode template catalog includes Power Profiler, Animation Hitches, Swift Concurrency, Processor Trace, CPU Profiler, Network, File Activity, and Game Performance; the xctrace parser now accepts bounded allowlisted schema names and preserves generic row fields when a template emits a different table shape.
+- The Swift Concurrency template exposes several public `swift-task-*` and `swift-actor-*` tables rather than one `swift-concurrency` table. The virtual analysis distributes its bounded row budget across available tables, resolves deduplicated references, and reports only public export evidence; task creation, actor execution, and continuation-state rows are not private runtime memory inspection.
 - `dyld_shared_cache_util` is not installed on this host, so shared-cache inspection uses the public header/mapping/image table layout and keeps live-tool absence visible rather than inventing a utility result.
 
 ## Decision Log
