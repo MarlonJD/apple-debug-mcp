@@ -19,6 +19,10 @@ let package = Package(
         .executable(
             name: "apple-debug-mcp",
             targets: ["AppleDebugMCP"]
+        ),
+        .executable(
+            name: "apple-debug-workbench",
+            targets: ["AppleDebugWorkbench"]
         )
     ],
     dependencies: [
@@ -37,6 +41,10 @@ let package = Package(
                 "AppleDebugCore",
                 .product(name: "MCP", package: "swift-sdk")
             ]
+        ),
+        .executableTarget(
+            name: "AppleDebugWorkbench",
+            dependencies: ["AppleDebugCore"]
         ),
         .testTarget(
             name: "AppleDebugCoreTests",

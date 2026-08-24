@@ -61,6 +61,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 18:45Z) Add deep bounded DWARF inspection for Mach-O/dSYM inputs, including DIE hierarchy/attributes, declaration locations, source lists, line-table rows, statistics, and address lookup plumbing; verify it through `make dwarf-smoke` against the generic iOS fixture.
 - [x] (2026-08-24 19:08Z) Add generated UI-test-only Xcode projects for arbitrary installed Simulator bundle IDs, with snapshot/action MCP tools and end-to-end install/probe/tap evidence through `make ios-arbitrary-ui-smoke`.
 - [x] (2026-08-24 19:25Z) Add Apple-native heap/leaks/malloc-history/sample diagnostics, self-contained arm64/x86_64 assembler/disassembly, transactional assembly patching, bounded forward stop traces, and explicit reverse/kernel capability reports; verify with runtime, assembler, macOS fixture, and reverse-boundary smokes.
+- [x] (2026-08-24 22:05Z) Add CFG/basic-block/call-graph analysis, direct dyld shared-cache table parsing, typed vmmap snapshots/diffs, expanded xctrace schema support, Simulator environment controls, reproducible evidence bundles, signing audits, patch/re-sign plans, native workbench build, and safe plugin manifest discovery.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries
@@ -76,6 +77,8 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - A UI-test target can inspect an already installed Simulator app with `XCUIApplication(bundleIdentifier:)`; a generated UI-testing-only project is sufficient, but Apple still requires XCTest/Xcode and an accessibility-exposed target, so this does not bypass app UI privacy or entitlements.
 - The installed Apple LLDB (`lldb-2100.0.17.203`) exposes `process trace start/stop` but `apropos reverse`, `apropos replay`, and `process record` are unavailable; a forward DAP stop trace is therefore the strongest truthful execution-history feature on this host.
 - Apple `heap`, `leaks`, `malloc_history`, `sample`, and `vmmap` provide strong user-process runtime counterparts, while SIP/KDK/entitlement requirements keep kernel task and kext debugging outside the supported boundary.
+- The current Xcode template catalog includes Power Profiler, Animation Hitches, Swift Concurrency, Processor Trace, CPU Profiler, Network, File Activity, and Game Performance; the xctrace parser now accepts bounded allowlisted schema names and preserves generic row fields when a template emits a different table shape.
+- `dyld_shared_cache_util` is not installed on this host, so shared-cache inspection uses the public header/mapping/image table layout and keeps live-tool absence visible rather than inventing a utility result.
 
 ## Decision Log
 

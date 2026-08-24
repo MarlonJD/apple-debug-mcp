@@ -28,15 +28,29 @@ public struct SwiftSymbolMetadata: Codable, Equatable, Sendable {
     }
 }
 
+public struct SwiftConcurrencyMetadata: Codable, Equatable, Sendable {
+    public let asyncFunctions: [String]
+    public let actors: [String]
+    public let tasksAndContinuations: [String]
+
+    public init(asyncFunctions: [String], actors: [String], tasksAndContinuations: [String]) {
+        self.asyncFunctions = asyncFunctions
+        self.actors = actors
+        self.tasksAndContinuations = tasksAndContinuations
+    }
+}
+
 public struct AppleRuntimeMetadataReport: Codable, Equatable, Sendable {
     public let path: String
     public let objectiveC: ObjectiveCMetadataReport
     public let swift: [SwiftSymbolMetadata]
+    public let concurrency: SwiftConcurrencyMetadata
 
-    public init(path: String, objectiveC: ObjectiveCMetadataReport, swift: [SwiftSymbolMetadata]) {
+    public init(path: String, objectiveC: ObjectiveCMetadataReport, swift: [SwiftSymbolMetadata], concurrency: SwiftConcurrencyMetadata) {
         self.path = path
         self.objectiveC = objectiveC
         self.swift = swift
+        self.concurrency = concurrency
     }
 }
 
@@ -55,7 +69,19 @@ public enum AppleRuntimeMetadataService {
             return candidate.hasPrefix("$s") || candidate.hasPrefix("$S") ? candidate : nil
         }
         let swift = try demangle(Array(Set(swiftNames)).sorted().prefix(2_000))
-        return AppleRuntimeMetadataReport(path: path, objectiveC: objectiveC, swift: swift)
+        return AppleRuntimeMetadataReport(
+            path: path,
+            objectiveC: objectiveC,
+            swift: swift,
+            concurrency: SwiftConcurrencyMetadata(
+                asyncFunctions: swift.filter { $0.demangled.localizedCaseInsensitiveContains("async") }.map(\.demangled),
+                actors: swift.filter { $0.demangled.localizedCaseInsensitiveContains("actor") }.map(\.demangled),
+                tasksAndContinuations: swift.filter {
+                    let value = $0.demangled.localizedLowercase
+                    return value.contains("task") || value.contains("continuation") || value.contains("asyncstream")
+                }.map(\.demangled)
+            )
+        )
     }
 
     private static func parseObjectiveC(_ output: String) -> ObjectiveCMetadataReport {

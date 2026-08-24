@@ -14,6 +14,11 @@ The current product surface includes:
 - parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
 - Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
 - bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
+- Mach-O CFG/basic-block/call-graph/xref reports and a direct dyld shared-cache header/mapping/image parser;
+- typed vmmap region reports, persisted memory snapshots, and region diffs;
+- Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
+- read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;
+- a native SwiftUI macOS workbench plus safe plugin manifest/registry APIs that never load external dylibs;
 - explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
@@ -74,6 +79,14 @@ make performance-analysis-smoke
 make runtime-diagnostics-smoke
 make assembler-smoke
 make reverse-capability-smoke
+make control-flow-smoke
+make memory-map-smoke
+make simulator-environment-smoke
+make repro-bundle-smoke
+make signing-audit-smoke
+make patch-workflow-smoke
+make plugin-smoke
+make workbench-build-smoke
 ```
 
 `make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation.

@@ -34,6 +34,11 @@ enum ToolCatalog {
             inputSchema: emptyObjectSchema
         ),
         Tool(
+            name: "apple_plugin_list",
+            description: "Discover bounded JSON plugin manifests from an explicit directory without loading dylibs or executing plugin code.",
+            inputSchema: pluginListObjectSchema
+        ),
+        Tool(
             name: "apple_macho_inspect",
             description: "Inspect a Mach-O or universal Mach-O file and return architectures, header metadata, load-command count, and segments without executing it.",
             inputSchema: pathObjectSchema
@@ -49,6 +54,21 @@ enum ToolCatalog {
             inputSchema: binaryDiffObjectSchema
         ),
         Tool(
+            name: "apple_signing_audit",
+            description: "Audit Apple code-signature verification, identity, entitlements, authorities, Gatekeeper assessment, and embedded provisioning metadata without modifying the artifact.",
+            inputSchema: pathObjectSchema
+        ),
+        Tool(
+            name: "apple_patch_preview",
+            description: "Assemble code and preview byte-level changes at a file offset without modifying the Mach-O or bundle.",
+            inputSchema: patchPreviewObjectSchema
+        ),
+        Tool(
+            name: "apple_resign_plan",
+            description: "Create a reviewable copy/sign/verify/Gatekeeper plan for an Apple artifact without executing release-authority operations.",
+            inputSchema: resignPlanObjectSchema
+        ),
+        Tool(
             name: "apple_runtime_metadata",
             description: "Extract Objective-C classes/protocols/selectors and demangled Swift symbols from an authorized Apple binary.",
             inputSchema: binaryInspectObjectSchema
@@ -57,6 +77,16 @@ enum ToolCatalog {
             name: "apple_assemble",
             description: "Assemble bounded arm64 or x86_64 Apple assembly into bytes and llvm-objdump disassembly without executing or patching it.",
             inputSchema: assembleObjectSchema
+        ),
+        Tool(
+            name: "apple_control_flow",
+            description: "Build a bounded Mach-O instruction model with function boundaries, basic blocks, direct branch edges, call graph edges, and external call targets.",
+            inputSchema: controlFlowObjectSchema
+        ),
+        Tool(
+            name: "apple_dyld_shared_cache_inspect",
+            description: "Inspect a dyld shared-cache header, mappings, UUID, code-signature ranges, and bounded image paths without executing the cache.",
+            inputSchema: dyldSharedCacheObjectSchema
         ),
         Tool(
             name: "apple_dwarf_inspect",
@@ -152,6 +182,21 @@ enum ToolCatalog {
             name: "apple_debug_runtime_diagnose",
             description: "Run bounded Apple heap, leaks, malloc-history, or live-sample diagnostics for an explicitly authorized local process.",
             inputSchema: runtimeDiagnosticObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_memory_analyze",
+            description: "Parse an authorized process vmmap report into typed regions, permissions, resident/dirty/swap sizes, and details.",
+            inputSchema: processObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_memory_snapshot",
+            description: "Capture a typed vmmap JSON snapshot for an authorized process for later memory-region diffing.",
+            inputSchema: memorySnapshotObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_memory_diff",
+            description: "Compare two typed vmmap snapshots and return added, removed, and changed regions.",
+            inputSchema: memoryDiffObjectSchema
         ),
         Tool(
             name: "apple_performance_record",
@@ -344,6 +389,16 @@ enum ToolCatalog {
             inputSchema: simulatorContainerObjectSchema
         ),
         Tool(
+            name: "apple_simulator_environment",
+            description: "Control or inspect bounded Simulator environment state: status bar, appearance/content size, privacy permissions, push payloads, pasteboard, keychain reset, environment variables, installed apps, and media import.",
+            inputSchema: simulatorEnvironmentObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_repro_bundle",
+            description: "Capture a bounded reproducible Simulator evidence bundle containing screenshot, app metadata, logs, optional xctrace bundles, and an optional crash report.",
+            inputSchema: simulatorReproBundleObjectSchema
+        ),
+        Tool(
             name: "apple_simulator_ui_snapshot",
             description: "Run the project's XCUITest UI probe and return a structured accessibility tree. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
             inputSchema: simulatorUISnapshotObjectSchema
@@ -410,6 +465,15 @@ enum ToolCatalog {
             return result(for: ReverseExecutionService.capabilities())
         case "apple_kernel_capabilities":
             return result(for: AppleKernelCapabilityService.report())
+        case "apple_plugin_list":
+            guard let directory = params.arguments?["directory"]?.stringValue else {
+                return errorResult("Missing required directory argument.")
+            }
+            do {
+                return result(for: try AppleDebugPluginManifestService.discover(directory: directory))
+            } catch {
+                return errorResult(error)
+            }
         case "apple_toolchain_status":
             return result(for: ToolchainProbe.collect())
         case "apple_lldb_dap_initialize":
@@ -480,6 +544,57 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_signing_audit":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(for: try AppleSigningAuditService.inspect(path: path))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_patch_preview":
+            guard let path = params.arguments?["path"]?.stringValue,
+                  let architecture = params.arguments?["architecture"]?.stringValue,
+                  let source = params.arguments?["source"]?.stringValue else {
+                return errorResult("Missing required path, architecture, or source argument.")
+            }
+            let expectedData: Data?
+            if let encoded = params.arguments?["expectedData"]?.stringValue {
+                guard let decoded = Data(base64Encoded: encoded) else { return errorResult("expectedData must be valid base64.") }
+                expectedData = decoded
+            } else { expectedData = nil }
+            do {
+                return result(
+                    for: try ApplePatchWorkflowService.preview(
+                        path: path,
+                        architecture: architecture,
+                        fileOffset: intValue(from: params.arguments?["fileOffset"]) ?? 0,
+                        source: source,
+                        expectedData: expectedData
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_resign_plan":
+            guard let inputPath = params.arguments?["inputPath"]?.stringValue,
+                  let outputPath = params.arguments?["outputPath"]?.stringValue,
+                  let identity = params.arguments?["identity"]?.stringValue else {
+                return errorResult("Missing required inputPath, outputPath, or identity argument.")
+            }
+            do {
+                return result(
+                    for: try ApplePatchWorkflowService.resignPlan(
+                        inputPath: inputPath,
+                        outputPath: outputPath,
+                        identity: identity,
+                        entitlementsPath: params.arguments?["entitlementsPath"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_runtime_metadata":
             guard let path = params.arguments?["path"]?.stringValue else {
                 return errorResult("Missing required path argument.")
@@ -501,6 +616,31 @@ enum ToolCatalog {
             }
             do {
                 return result(for: try AppleAssemblerService.assemble(source: source, architecture: architecture))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_control_flow":
+            guard let path = params.arguments?["path"]?.stringValue,
+                  let architecture = params.arguments?["architecture"]?.stringValue else {
+                return errorResult("Missing required path or architecture argument.")
+            }
+            do {
+                return result(for: try AppleControlFlowService.analyze(path: path, architecture: architecture))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_dyld_shared_cache_inspect":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(
+                    for: try AppleDyldSharedCacheService.inspect(
+                        path: path,
+                        imageFilter: params.arguments?["imageFilter"]?.stringValue,
+                        maximumImages: intValue(from: params.arguments?["maximumImages"]) ?? 10_000
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -791,6 +931,41 @@ enum ToolCatalog {
                         sampleIntervalMilliseconds: intValue(from: params.arguments?["sampleIntervalMilliseconds"]) ?? 10
                     )
                 )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_memory_analyze":
+            guard let processID = intValue(from: params.arguments?["processID"]) else {
+                return errorResult("Missing required processID argument.")
+            }
+            do {
+                return result(for: try AppleMemoryMapService.capture(processID: processID, includeRawOutput: false))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_memory_snapshot":
+            guard let processID = intValue(from: params.arguments?["processID"]),
+                  let outputPath = params.arguments?["outputPath"]?.stringValue else {
+                return errorResult("Missing required processID or outputPath argument.")
+            }
+            do {
+                return result(
+                    for: try AppleMemoryMapService.saveSnapshot(
+                        processID: processID,
+                        outputPath: outputPath,
+                        includeRawOutput: boolValue(from: params.arguments?["includeRawOutput"], default: false)
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_memory_diff":
+            guard let leftPath = params.arguments?["leftPath"]?.stringValue,
+                  let rightPath = params.arguments?["rightPath"]?.stringValue else {
+                return errorResult("Missing required leftPath or rightPath argument.")
+            }
+            do {
+                return result(for: try AppleMemoryMapService.diff(leftPath: leftPath, rightPath: rightPath))
             } catch {
                 return errorResult(error)
             }
@@ -1356,6 +1531,50 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_simulator_environment":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let operation = params.arguments?["operation"]?.stringValue else {
+                return errorResult("Missing required udid or operation argument.")
+            }
+            do {
+                return result(
+                    for: try AppleSimulatorEnvironmentService.perform(
+                        udid: udid,
+                        operation: operation,
+                        bundleID: params.arguments?["bundleID"]?.stringValue,
+                        service: params.arguments?["service"]?.stringValue,
+                        value: params.arguments?["value"]?.stringValue,
+                        payload: params.arguments?["payload"].flatMap(dapValue(from:)),
+                        variable: params.arguments?["variable"]?.stringValue,
+                        mediaPaths: stringArray(from: params.arguments?["mediaPaths"]),
+                        statusOverrides: stringDictionary(from: params.arguments?["statusOverrides"])
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_repro_bundle":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue,
+                  let outputDirectory = params.arguments?["outputDirectory"]?.stringValue else {
+                return errorResult("Missing required udid, bundleID, or outputDirectory argument.")
+            }
+            do {
+                return result(
+                    for: try AppleReproBundleService.capture(
+                        udid: udid,
+                        bundleID: bundleID,
+                        outputDirectory: outputDirectory,
+                        includeScreenshot: boolValue(from: params.arguments?["includeScreenshot"], default: true),
+                        includeAppInfo: boolValue(from: params.arguments?["includeAppInfo"], default: true),
+                        includeLogs: boolValue(from: params.arguments?["includeLogs"], default: true),
+                        tracePaths: stringArray(from: params.arguments?["tracePaths"]),
+                        crashPath: params.arguments?["crashPath"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_simulator_ui_snapshot":
             guard let udid = params.arguments?["udid"]?.stringValue,
                   let bundleID = params.arguments?["bundleID"]?.stringValue,
@@ -1584,6 +1803,17 @@ enum ToolCatalog {
         "properties": .object([:])
     ])
 
+    private static let pluginListObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "directory": .object([
+                "type": .string("string"),
+                "description": .string("Absolute directory containing *.appledebugplugin.json manifests")
+            ])
+        ]),
+        "required": .array([.string("directory")])
+    ])
+
     private static let pathObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1623,6 +1853,66 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("architecture"), .string("source")])
+    ])
+
+    private static let patchPreviewObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object(["type": .string("string")]),
+            "architecture": .object([
+                "type": .string("string"),
+                "enum": .array([.string("arm64"), .string("x86_64")])
+            ]),
+            "fileOffset": .object(["type": .string("integer")]),
+            "source": .object(["type": .string("string")]),
+            "expectedData": .object(["type": .string("string"), "description": .string("Optional base64 expected bytes")])
+        ]),
+        "required": .array([.string("path"), .string("architecture"), .string("source")])
+    ])
+
+    private static let resignPlanObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "inputPath": .object(["type": .string("string")]),
+            "outputPath": .object(["type": .string("string")]),
+            "identity": .object(["type": .string("string")]),
+            "entitlementsPath": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("inputPath"), .string("outputPath"), .string("identity")])
+    ])
+
+    private static let controlFlowObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute Mach-O or app executable path")
+            ]),
+            "architecture": .object([
+                "type": .string("string"),
+                "enum": .array([.string("arm64"), .string("arm64e"), .string("x86_64")])
+            ])
+        ]),
+        "required": .array([.string("path"), .string("architecture")])
+    ])
+
+    private static let dyldSharedCacheObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute dyld_shared_cache file path")
+            ]),
+            "imageFilter": .object([
+                "type": .string("string"),
+                "description": .string("Optional bounded case-insensitive image path filter")
+            ]),
+            "maximumImages": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum returned images from 1 to 10000")
+            ])
+        ]),
+        "required": .array([.string("path")])
     ])
 
     private static let binaryDiffObjectSchema: Value = .object([
@@ -1814,6 +2104,28 @@ enum ToolCatalog {
         "required": .array([.string("processID"), .string("tool")])
     ])
 
+    private static let memorySnapshotObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "processID": .object(["type": .string("integer")]),
+            "outputPath": .object([
+                "type": .string("string"),
+                "description": .string("Absolute non-existing .json snapshot path")
+            ]),
+            "includeRawOutput": .object(["type": .string("boolean")])
+        ]),
+        "required": .array([.string("processID"), .string("outputPath")])
+    ])
+
+    private static let memoryDiffObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "leftPath": .object(["type": .string("string")]),
+            "rightPath": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("leftPath"), .string("rightPath")])
+    ])
+
     private static let performanceRecordObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1824,7 +2136,16 @@ enum ToolCatalog {
                 "enum": .array([
                     .string("Time Profiler"),
                     .string("Allocations"),
-                    .string("System Trace")
+                    .string("System Trace"),
+                    .string("Power Profiler"),
+                    .string("Animation Hitches"),
+                    .string("Swift Concurrency"),
+                    .string("Processor Trace"),
+                    .string("CPU Profiler"),
+                    .string("Leaks"),
+                    .string("Network"),
+                    .string("File Activity"),
+                    .string("Game Performance")
                 ])
             ]),
             "durationSeconds": .object([
@@ -1848,7 +2169,13 @@ enum ToolCatalog {
             ]),
             "schema": .object([
                 "type": .string("string"),
-                "enum": .array([.string("time-profile"), .string("time-sample")])
+                "enum": .array([
+                    .string("time-profile"), .string("time-sample"), .string("allocations"),
+                    .string("allocation"), .string("os-signpost"), .string("os-log"),
+                    .string("animation-hitch"), .string("animation-hitches"), .string("power"),
+                    .string("energy"), .string("core-animation"), .string("swift-concurrency"),
+                    .string("thread-info"), .string("process-info"), .string("signpost")
+                ])
             ]),
             "maximumRows": .object([
                 "type": .string("integer"),
@@ -2332,6 +2659,51 @@ enum ToolCatalog {
         "required": .array([.string("udid"), .string("bundleID")])
     ])
 
+    private static let simulatorEnvironmentObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "operation": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("status_bar_list"), .string("status_bar_override"), .string("status_bar_clear"),
+                    .string("ui_get"), .string("ui_set"), .string("privacy"), .string("push"),
+                    .string("pasteboard_get"), .string("pasteboard_set"), .string("keychain_reset"),
+                    .string("getenv"), .string("list_apps"), .string("add_media")
+                ])
+            ]),
+            "bundleID": .object(["type": .string("string")]),
+            "service": .object(["type": .string("string")]),
+            "value": .object(["type": .string("string")]),
+            "variable": .object(["type": .string("string")]),
+            "payload": .object(["type": .string("object")]),
+            "mediaPaths": .object(["type": .string("array"), "items": .object(["type": .string("string")])]),
+            "statusOverrides": .object([
+                "type": .string("object"),
+                "description": .string("Fixed status-bar override keys: time, dataNetwork, wifiMode, wifiBars, cellularMode, cellularBars, operatorName, batteryState, batteryLevel")
+            ])
+        ]),
+        "required": .array([.string("udid"), .string("operation")])
+    ])
+
+    private static let simulatorReproBundleObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")]),
+            "outputDirectory": .object([
+                "type": .string("string"),
+                "description": .string("Absolute non-existing output directory")
+            ]),
+            "includeScreenshot": .object(["type": .string("boolean")]),
+            "includeAppInfo": .object(["type": .string("boolean")]),
+            "includeLogs": .object(["type": .string("boolean")]),
+            "tracePaths": .object(["type": .string("array"), "items": .object(["type": .string("string")])]),
+            "crashPath": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("bundleID"), .string("outputDirectory")])
+    ])
+
     private static let simulatorUISnapshotObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -2521,6 +2893,11 @@ enum ToolCatalog {
 
     private static func stringArray(from value: Value?) -> [String] {
         value?.arrayValue?.compactMap(\.stringValue) ?? []
+    }
+
+    private static func stringDictionary(from value: Value?) -> [String: String] {
+        guard let object = value?.objectValue else { return [:] }
+        return object.compactMapValues(\.stringValue)
     }
 
     private static func crashArtifacts(from value: Value?) -> [CrashSymbolicationArtifact]? {

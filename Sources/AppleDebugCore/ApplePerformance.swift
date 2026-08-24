@@ -131,6 +131,7 @@ public struct ApplePerformanceTraceRow: Codable, Equatable, Sendable {
     public let stackSummary: String?
     public let addresses: [String]
     public let frames: [ApplePerformanceTraceFrame]
+    public let fields: [String: String]
 
     public init(
         timeNanoseconds: Int64?,
@@ -145,7 +146,8 @@ public struct ApplePerformanceTraceRow: Codable, Equatable, Sendable {
         sampleType: String?,
         stackSummary: String?,
         addresses: [String],
-        frames: [ApplePerformanceTraceFrame]
+        frames: [ApplePerformanceTraceFrame],
+        fields: [String: String]
     ) {
         self.timeNanoseconds = timeNanoseconds
         self.timeFormatted = timeFormatted
@@ -160,6 +162,7 @@ public struct ApplePerformanceTraceRow: Codable, Equatable, Sendable {
         self.stackSummary = stackSummary
         self.addresses = addresses
         self.frames = frames
+        self.fields = fields
     }
 }
 
@@ -229,8 +232,16 @@ public struct ApplePerformanceAnalysisResult: Codable, Equatable, Sendable {
 }
 
 public enum ApplePerformanceService {
-    private static let templates = ["Time Profiler", "Allocations", "System Trace"]
-    private static let analysisSchemas = ["time-profile", "time-sample"]
+    private static let templates = [
+        "Time Profiler", "Allocations", "System Trace", "Power Profiler", "Animation Hitches",
+        "Swift Concurrency", "Processor Trace", "CPU Profiler", "Leaks", "Network",
+        "File Activity", "Game Performance"
+    ]
+    private static let analysisSchemas = [
+        "time-profile", "time-sample", "allocations", "allocation", "os-signpost", "os-log",
+        "animation-hitch", "animation-hitches", "power", "energy", "core-animation",
+        "swift-concurrency", "thread-info", "process-info", "signpost"
+    ]
     private static let maximumExportSize = 8 * 1024 * 1024
 
     public static func record(
@@ -410,7 +421,8 @@ public enum ApplePerformanceService {
             let frames = row.frames.map { frame in
                 frame.name ?? frame.address ?? "<unknown>"
             }
-            let fallback = row.addresses.first ?? row.stackSummary ?? "<unknown>"
+            let fallback = row.fields["symbol"] ?? row.fields["class"] ?? row.fields["category"] ??
+                row.addresses.first ?? row.stackSummary ?? "<unknown>"
             let stack = frames.isEmpty ? [fallback] : frames
             let top = stack[0]
             let key = "\(top)\u{0000}\(row.frames.first?.binaryName ?? "")"
@@ -578,6 +590,7 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
         var stackSummary: String?
         var addresses: [String] = []
         var frames: [MutableFrame] = []
+        var fields: [String: String] = [:]
     }
 
     private let maximumRows: Int
@@ -676,6 +689,14 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
             if elementName == "text-address" {
                 appendAddress(attributeDict["fmt"])
             }
+        } else if currentRow != nil,
+                  attributeDict["ref"] == nil,
+                  !["row", "thread", "process", "tagged-backtrace", "backtrace", "frame", "binary", "sentinel"].contains(elementName) {
+            textElement = elementName
+            text = ""
+            if let fmt = attributeDict["fmt"] {
+                currentRow?.fields["\(elementName).fmt"] = fmt
+            }
         }
     }
 
@@ -724,7 +745,8 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
                             binaryLoadAddress: frame.binaryLoadAddress,
                             binaryPath: frame.binaryPath
                         )
-                    }
+                    },
+                    fields: row.fields
                 )
             )
             currentRow = nil
@@ -738,6 +760,7 @@ private final class PerformanceTraceRowsParser: NSObject, XMLParserDelegate {
     private func applyText(_ elementName: String) {
         guard var row = currentRow else { return }
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !value.isEmpty { row.fields[elementName] = value }
         switch elementName {
         case "sample-time":
             row.timeNanoseconds = Int64(value)

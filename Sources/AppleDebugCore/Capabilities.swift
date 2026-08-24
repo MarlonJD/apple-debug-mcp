@@ -22,21 +22,30 @@ public enum AppleDebugCapability: String, Codable, CaseIterable, Sendable {
     case memoryRead = "memory-read"
     case memoryWrite = "memory-write"
     case machOAnalysis = "macho-analysis"
+    case controlFlowAnalysis = "control-flow-analysis"
+    case dyldSharedCache = "dyld-shared-cache"
     case binaryIntelligence = "binary-intelligence"
     case runtimeMetadata = "runtime-metadata"
     case dwarfAnalysis = "dwarf-analysis"
     case performanceAnalysis = "performance-analysis"
     case runtimeDiagnostics = "runtime-diagnostics"
+    case memoryMapAnalysis = "memory-map-analysis"
     case assembler
     case binaryDiff = "binary-diff"
     case symbolication
     case crashAnalysis = "crash-analysis"
     case simulatorControl = "simulator-control"
+    case simulatorEnvironment = "simulator-environment"
+    case reproducibleEvidence = "reproducible-evidence"
     case deviceControl = "device-control"
     case uiInspection = "ui-inspection"
     case forwardExecutionTrace = "forward-execution-trace"
     case reverseExecution = "reverse-execution"
     case kernelInspection = "kernel-inspection"
+    case signingAudit = "signing-audit"
+    case patchWorkflow = "patch-workflow"
+    case nativeWorkbench = "native-workbench"
+    case pluginExtensions = "plugin-extensions"
     case logs
 }
 
@@ -68,16 +77,20 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
-                    .binaryIntelligence, .runtimeMetadata, .dwarfAnalysis,
-                    .performanceAnalysis, .runtimeDiagnostics, .assembler,
-                    .binaryDiff, .crashAnalysis, .forwardExecutionTrace, .logs
+                    .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
+                    .runtimeMetadata, .dwarfAnalysis, .performanceAnalysis,
+                    .runtimeDiagnostics, .memoryMapAnalysis, .assembler,
+                    .binaryDiff, .crashAnalysis, .forwardExecutionTrace,
+                    .signingAudit, .patchWorkflow, .nativeWorkbench,
+                    .pluginExtensions, .logs
                 ],
                 restricted: [.reverseExecution, .kernelInspection],
                 notes: [
                     "Attach and memory mutation depend on macOS debugger permissions and target entitlements.",
                     "Memory and variable mutation are disabled by default and require separate explicit policy grants.",
                     "Apple LLDB reverse execution/time-travel is not available in the installed toolchain; forward stop tracing is supported.",
-                    "Kernel memory/debugging remains restricted by SIP, entitlements, and privileged Apple tooling; user-process vmmap and runtime diagnostics are the supported boundary."
+                    "Kernel memory/debugging remains restricted by SIP, entitlements, and privileged Apple tooling; user-process vmmap and runtime diagnostics are the supported boundary.",
+                    "The native workbench embeds read-only analyzers and safe patch planning; external plugin code is never loaded by the MCP server."
                 ]
             ),
             CapabilityReport(
@@ -86,25 +99,29 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
-                    .binaryIntelligence, .runtimeMetadata, .dwarfAnalysis,
-                    .performanceAnalysis, .assembler, .binaryDiff,
-                    .crashAnalysis, .simulatorControl, .uiInspection,
-                    .forwardExecutionTrace, .logs
+                    .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
+                    .runtimeMetadata, .dwarfAnalysis, .performanceAnalysis,
+                    .assembler, .binaryDiff, .crashAnalysis, .simulatorControl,
+                    .simulatorEnvironment, .reproducibleEvidence, .uiInspection,
+                    .forwardExecutionTrace, .signingAudit, .patchWorkflow,
+                    .pluginExtensions, .logs
                 ],
                 restricted: [.reverseExecution, .kernelInspection, .runtimeDiagnostics],
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
                     "Memory and variable mutation are disabled by default and require separate explicit policy grants.",
                     "UI inspection and bounded actions run through project-backed or generated XCUITest probes; the generated path targets an installed bundle ID and requires Simulator mutation permission.",
-                    "Apple LLDB reverse execution/time-travel is not available; use forward stop tracing, xctrace export, and crash/DWARF evidence instead."
+                    "Apple LLDB reverse execution/time-travel is not available; use forward stop tracing, xctrace export, and crash/DWARF evidence instead.",
+                    "Generated UI probes and repro bundles are local Simulator workflows and do not grant physical-device access."
                 ]
             ),
             CapabilityReport(
                 platform: .iOSDevice,
                 supported: [
                     .launch, .machOAnalysis, .symbolication, .crashAnalysis,
-                    .binaryIntelligence, .runtimeMetadata, .dwarfAnalysis,
-                    .assembler, .binaryDiff, .deviceControl
+                    .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
+                    .runtimeMetadata, .dwarfAnalysis, .assembler, .binaryDiff,
+                    .signingAudit, .patchWorkflow, .deviceControl
                 ],
                 restricted: [
                     .sessionLifecycle, .attach, .breakpoints, .watchpoints,

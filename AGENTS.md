@@ -37,6 +37,14 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Runtime diagnostics smoke | make runtime-diagnostics-smoke | Run bounded heap, leaks, and sample reports against an authorized local process |
 | Assembler smoke | make assembler-smoke | Assemble arm64/x86_64 source and verify bytes plus disassembly |
 | Reverse boundary smoke | make reverse-capability-smoke | Verify Apple LLDB reverse/time-travel and kernel memory capabilities fail closed |
+| Control-flow smoke | make control-flow-smoke | Build a Mach-O CFG/basic-block/call-graph report |
+| Memory-map smoke | make memory-map-smoke | Capture typed vmmap regions and snapshot diffs |
+| Simulator environment smoke | make simulator-environment-smoke | Exercise bounded Simulator UI/status/pasteboard/privacy controls |
+| Repro bundle smoke | make repro-bundle-smoke | Capture screenshot/appinfo/manifest evidence for an installed Simulator app |
+| Signing audit smoke | make signing-audit-smoke | Audit codesign identity, entitlements, authorities, and Gatekeeper output |
+| Patch workflow smoke | make patch-workflow-smoke | Verify non-destructive assembly preview and re-sign plan generation |
+| Plugin smoke | make plugin-smoke | Discover explicit plugin manifests without executing code |
+| Workbench build smoke | make workbench-build-smoke | Build the native macOS SwiftUI workbench executable |
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |
