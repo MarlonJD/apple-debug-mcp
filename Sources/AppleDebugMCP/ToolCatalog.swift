@@ -107,6 +107,21 @@ enum ToolCatalog {
             name: "apple_simulator_terminate",
             description: "Terminate an app on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
             inputSchema: simulatorLaunchObjectSchema
+        ),
+        Tool(
+            name: "apple_device_list",
+            description: "List CoreDevice physical-device inventory and explicit pairing/tunnel authorization state.",
+            inputSchema: emptyObjectSchema
+        ),
+        Tool(
+            name: "apple_device_install",
+            description: "Install an authorized development app on a paired physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            inputSchema: deviceInstallObjectSchema
+        ),
+        Tool(
+            name: "apple_device_launch",
+            description: "Launch an authorized development app on a paired physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            inputSchema: deviceLaunchObjectSchema
         )
     ]
 
@@ -301,6 +316,38 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_device_list":
+            do {
+                return result(for: try AppleDeviceService.list())
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_install":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let appPath = params.arguments?["appPath"]?.stringValue else {
+                return errorResult("Missing required identifier or appPath argument.")
+            }
+            do {
+                return result(for: try AppleDeviceService.install(identifier: identifier, appPath: appPath))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_launch":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let bundleID = params.arguments?["bundleID"]?.stringValue else {
+                return errorResult("Missing required identifier or bundleID argument.")
+            }
+            do {
+                return result(
+                    for: try AppleDeviceService.launch(
+                        identifier: identifier,
+                        bundleID: bundleID,
+                        startStopped: boolValue(from: params.arguments?["startStopped"], default: false)
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
 
         default:
             return .init(
@@ -445,6 +492,25 @@ enum ToolCatalog {
             "bundleID": .object(["type": .string("string")])
         ]),
         "required": .array([.string("udid"), .string("bundleID")])
+    ])
+
+    private static let deviceInstallObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object(["type": .string("string")]),
+            "appPath": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("identifier"), .string("appPath")])
+    ])
+
+    private static let deviceLaunchObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object(["type": .string("string")]),
+            "bundleID": .object(["type": .string("string")]),
+            "startStopped": .object(["type": .string("boolean")])
+        ]),
+        "required": .array([.string("identifier"), .string("bundleID")])
     ])
 
     private static func errorResult(_ error: Error) -> CallTool.Result {
