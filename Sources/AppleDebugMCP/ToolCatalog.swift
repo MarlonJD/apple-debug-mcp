@@ -122,6 +122,16 @@ enum ToolCatalog {
             name: "apple_device_launch",
             description: "Launch an authorized development app on a paired physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
             inputSchema: deviceLaunchObjectSchema
+        ),
+        Tool(
+            name: "apple_xcode_discover",
+            description: "Discover schemes and targets from an Xcode project or workspace without building it.",
+            inputSchema: xcodeDiscoverObjectSchema
+        ),
+        Tool(
+            name: "apple_xcode_build",
+            description: "Build an Xcode project or workspace for a destination. Disabled unless APPLE_DEBUG_ALLOW_XCODE_BUILD=1.",
+            inputSchema: xcodeBuildObjectSchema
         )
     ]
 
@@ -348,6 +358,34 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_xcode_discover":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(for: try XcodeService.discover(path: path))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_xcode_build":
+            guard let path = params.arguments?["path"]?.stringValue,
+                  let scheme = params.arguments?["scheme"]?.stringValue,
+                  let destination = params.arguments?["destination"]?.stringValue else {
+                return errorResult("Missing required path, scheme, or destination argument.")
+            }
+            let configuration = params.arguments?["configuration"]?.stringValue ?? "Debug"
+            do {
+                return result(
+                    for: try XcodeService.build(
+                        path: path,
+                        scheme: scheme,
+                        configuration: configuration,
+                        destination: destination
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
 
         default:
             return .init(
@@ -511,6 +549,28 @@ enum ToolCatalog {
             "startStopped": .object(["type": .string("boolean")])
         ]),
         "required": .array([.string("identifier"), .string("bundleID")])
+    ])
+
+    private static let xcodeDiscoverObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Path to an .xcodeproj or .xcworkspace")
+            ])
+        ]),
+        "required": .array([.string("path")])
+    ])
+
+    private static let xcodeBuildObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object(["type": .string("string")]),
+            "scheme": .object(["type": .string("string")]),
+            "configuration": .object(["type": .string("string")]),
+            "destination": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("path"), .string("scheme"), .string("destination")])
     ])
 
     private static func errorResult(_ error: Error) -> CallTool.Result {
