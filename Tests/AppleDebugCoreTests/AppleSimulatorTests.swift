@@ -21,6 +21,27 @@ final class AppleSimulatorTests: XCTestCase {
         }
     }
 
+    func testExtendedSimulatorControlsArePolicyGated() {
+        XCTAssertThrowsError(
+            try SimulatorService.setLocation(
+                udid: "00000000-0000-0000-0000-000000000000",
+                latitude: 37.0,
+                longitude: -122.0
+            )
+        ) { error in
+            XCTAssertEqual(error as? SimulatorError, .mutationDisabled)
+        }
+        XCTAssertThrowsError(
+            try SimulatorService.recordVideo(
+                udid: "00000000-0000-0000-0000-000000000000",
+                path: "/tmp/apple-debug-mcp-test.mov",
+                durationSeconds: 1
+            )
+        ) { error in
+            XCTAssertEqual(error as? SimulatorError, .mutationDisabled)
+        }
+    }
+
     func testScreenshotIsDisabledByDefault() {
         XCTAssertThrowsError(
             try SimulatorService.screenshot(udid: "00000000-0000-0000-0000-000000000000")

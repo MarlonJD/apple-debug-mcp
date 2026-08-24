@@ -37,6 +37,7 @@ def main() -> int:
     simulator_id = None
     started_here = False
     screenshot_path = None
+    video_path = None
 
     def request(method: str, params: dict) -> dict:
         nonlocal sequence
@@ -86,6 +87,7 @@ def main() -> int:
         ]
         if not candidates:
             raise RuntimeError("no available iOS Simulator found")
+        candidates.sort(key=lambda device: (0 if "iPhone" in device.get("name", "") else 1, device["udid"]))
         simulator_id = candidates[0]["udid"]
         started_here = candidates[0].get("state") != "Booted"
         if started_here:
@@ -137,6 +139,25 @@ def main() -> int:
         )
         if not screenshot_path.is_file() or screenshot_path.stat().st_size == 0:
             raise RuntimeError("Simulator MCP screenshot was missing or empty")
+        tool(
+            "apple_simulator_set_location",
+            {"udid": simulator_id, "latitude": 37.3349, "longitude": -122.0090},
+        )
+        tool("apple_simulator_clear_location", {"udid": simulator_id})
+        with tempfile.NamedTemporaryFile(prefix="apple-debug-mcp-", suffix=".mov", delete=False) as handle:
+            video_path = Path(handle.name)
+        video_path.unlink()
+        tool(
+            "apple_simulator_record_video",
+            {
+                "udid": simulator_id,
+                "path": str(video_path),
+                "durationSeconds": 1,
+                "codec": "h264",
+            },
+        )
+        if not video_path.is_file() or video_path.stat().st_size == 0:
+            raise RuntimeError("Simulator MCP video recording was missing or empty")
         logs = tool(
             "apple_log_show",
             {
@@ -152,7 +173,7 @@ def main() -> int:
             {"udid": simulator_id, "bundleID": "com.burakkarahan.AppleDebugFixture"},
         )
         print(
-            "ios-mcp-tool-smoke: MCP list, boot, install, launch flags, app info, container, screenshot, logs, terminate, and cleanup passed for %s"
+            "ios-mcp-tool-smoke: MCP list, boot, install, launch flags, app info, container, screenshot, location, video, logs, terminate, and cleanup passed for %s"
             % simulator_id
         )
         return 0
@@ -175,6 +196,8 @@ def main() -> int:
                     pass
         if screenshot_path is not None:
             screenshot_path.unlink(missing_ok=True)
+        if video_path is not None:
+            video_path.unlink(missing_ok=True)
         if process.stdin is not None:
             process.stdin.close()
         try:

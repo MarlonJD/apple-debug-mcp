@@ -3,11 +3,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Foundation
+import Darwin
 
 public enum SimulatorError: Error, Equatable, LocalizedError, Sendable {
     case commandFailed(String)
     case mutationDisabled
     case invalidLaunchArguments
+    case invalidURL
+    case invalidLocation
+    case invalidRecordingRequest
     case unknownDevice(String)
     case invalidResponse
 
@@ -19,6 +23,12 @@ public enum SimulatorError: Error, Equatable, LocalizedError, Sendable {
             return "Simulator mutation is disabled. Set APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1 for an authorized local workflow."
         case .invalidLaunchArguments:
             return "Simulator launch arguments are invalid or exceed the safety limit."
+        case .invalidURL:
+            return "Simulator URL must be a bounded URL with a scheme and no embedded control characters."
+        case .invalidLocation:
+            return "Simulator location coordinates are outside the valid latitude/longitude ranges."
+        case .invalidRecordingRequest:
+            return "Simulator video recording request is invalid, unsafe, or targets an existing file."
         case .unknownDevice(let identifier):
             return "Simulator is not in the available inventory: \(identifier)"
         case .invalidResponse:
@@ -78,6 +88,20 @@ public struct SimulatorContainerResult: Codable, Equatable, Sendable {
         self.bundleID = bundleID
         self.container = container
         self.path = path
+    }
+}
+
+public struct SimulatorRecordingResult: Codable, Equatable, Sendable {
+    public let udid: String
+    public let path: String
+    public let durationSeconds: Int
+    public let codec: String
+
+    public init(udid: String, path: String, durationSeconds: Int, codec: String) {
+        self.udid = udid
+        self.path = path
+        self.durationSeconds = durationSeconds
+        self.codec = codec
     }
 }
 
@@ -172,6 +196,94 @@ public enum SimulatorService {
             .path
         let result = try run(arguments: ["simctl", "io", udid, "screenshot", destination])
         return SimulatorActionResult(action: "screenshot", udid: udid, output: result.stdout.isEmpty ? destination : result.stdout)
+    }
+
+    public static func openURL(udid: String, url: String) throws -> SimulatorActionResult {
+        guard let parsed = URL(string: url), parsed.scheme != nil,
+              !url.isEmpty, url.utf8.count <= 2_048, !url.contains("\0") else {
+            throw SimulatorError.invalidURL
+        }
+        return try mutate(action: "openurl", udid: udid, arguments: ["simctl", "openurl", udid, url])
+    }
+
+    public static func setLocation(
+        udid: String,
+        latitude: Double,
+        longitude: Double
+    ) throws -> SimulatorActionResult {
+        guard (-90.0...90.0).contains(latitude), (-180.0...180.0).contains(longitude),
+              latitude.isFinite, longitude.isFinite else {
+            throw SimulatorError.invalidLocation
+        }
+        let coordinate = String(
+            format: "%.7f,%.7f",
+            locale: Locale(identifier: "en_US_POSIX"),
+            latitude,
+            longitude
+        )
+        return try mutate(
+            action: "location-set",
+            udid: udid,
+            arguments: ["simctl", "location", udid, "set", coordinate]
+        )
+    }
+
+    public static func clearLocation(udid: String) throws -> SimulatorActionResult {
+        try mutate(
+            action: "location-clear",
+            udid: udid,
+            arguments: ["simctl", "location", udid, "clear"]
+        )
+    }
+
+    public static func recordVideo(
+        udid: String,
+        path: String,
+        durationSeconds: Int,
+        codec: String = "h264",
+        display: String? = nil
+    ) throws -> SimulatorRecordingResult {
+        try validateMutationTarget(udid: udid)
+        let destination = URL(fileURLWithPath: path)
+        guard !path.isEmpty, path.utf8.count <= 4_096, !path.contains("\0"),
+              destination.path.hasPrefix("/"),
+              !FileManager.default.fileExists(atPath: destination.path),
+              (1...60).contains(durationSeconds),
+              ["h264", "hevc"].contains(codec),
+              display.map({ !$0.isEmpty && $0.utf8.count <= 256 && !$0.contains("\0") }) ?? true else {
+            throw SimulatorError.invalidRecordingRequest
+        }
+
+        var arguments = ["simctl", "io", udid, "recordVideo", "--codec=\(codec)"]
+        if let display { arguments += ["--display=\(display)"] }
+        arguments.append(destination.path)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            Thread.sleep(forTimeInterval: TimeInterval(durationSeconds))
+            if process.isRunning {
+                _ = Darwin.kill(process.processIdentifier, SIGINT)
+            }
+            process.waitUntilExit()
+        } catch {
+            throw SimulatorError.commandFailed(error.localizedDescription)
+        }
+        guard FileManager.default.fileExists(atPath: destination.path),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path),
+              let size = attributes[.size] as? NSNumber,
+              size.intValue > 0 else {
+            throw SimulatorError.commandFailed("simctl recordVideo did not produce a non-empty video file.")
+        }
+        return SimulatorRecordingResult(
+            udid: udid,
+            path: destination.path,
+            durationSeconds: durationSeconds,
+            codec: codec
+        )
     }
 
     public static func appInfo(udid: String, bundleID: String) throws -> SimulatorAppInfoResult {

@@ -17,6 +17,7 @@ The current product surface includes:
 - `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
 - crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
+- Simulator URL opening, deterministic location injection/clear, and bounded video recording for automated reproduction;
 - Xcode project discovery and explicitly authorized builds with derived-data, `.app`, and `.dSYM` artifact manifests;
 - CoreDevice physical-device inventory plus authorization-gated development-app install/launch.
 

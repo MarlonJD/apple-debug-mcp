@@ -264,6 +264,26 @@ enum ToolCatalog {
             inputSchema: simulatorScreenshotObjectSchema
         ),
         Tool(
+            name: "apple_simulator_open_url",
+            description: "Open a URL in an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorURLObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_set_location",
+            description: "Set a simulated latitude/longitude on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorLocationObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_clear_location",
+            description: "Clear the simulated location on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_record_video",
+            description: "Record a bounded Simulator display video. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorRecordVideoObjectSchema
+        ),
+        Tool(
             name: "apple_simulator_app_info",
             description: "Read metadata for an installed Simulator application without changing target state.",
             inputSchema: simulatorAppInfoObjectSchema
@@ -1000,6 +1020,60 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_simulator_open_url":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let url = params.arguments?["url"]?.stringValue else {
+                return errorResult("Missing required udid or url argument.")
+            }
+            do {
+                return result(for: try SimulatorService.openURL(udid: udid, url: url))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_set_location":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let latitude = doubleValue(from: params.arguments?["latitude"]),
+                  let longitude = doubleValue(from: params.arguments?["longitude"]) else {
+                return errorResult("Missing required udid, latitude, or longitude argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorService.setLocation(
+                        udid: udid,
+                        latitude: latitude,
+                        longitude: longitude
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_clear_location":
+            guard let udid = params.arguments?["udid"]?.stringValue else {
+                return errorResult("Missing required udid argument.")
+            }
+            do {
+                return result(for: try SimulatorService.clearLocation(udid: udid))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_record_video":
+            guard let udid = params.arguments?["udid"]?.stringValue,
+                  let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required udid or path argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorService.recordVideo(
+                        udid: udid,
+                        path: path,
+                        durationSeconds: intValue(from: params.arguments?["durationSeconds"]) ?? 1,
+                        codec: params.arguments?["codec"]?.stringValue ?? "h264",
+                        display: params.arguments?["display"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_simulator_app_info":
             guard let udid = params.arguments?["udid"]?.stringValue,
                   let bundleID = params.arguments?["bundleID"]?.stringValue else {
@@ -1672,6 +1746,43 @@ enum ToolCatalog {
         "required": .array([.string("udid")])
     ])
 
+    private static let simulatorURLObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "url": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("url")])
+    ])
+
+    private static let simulatorLocationObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "latitude": .object(["type": .string("number")]),
+            "longitude": .object(["type": .string("number")])
+        ]),
+        "required": .array([.string("udid"), .string("latitude"), .string("longitude")])
+    ])
+
+    private static let simulatorRecordVideoObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "path": .object(["type": .string("string")]),
+            "durationSeconds": .object([
+                "type": .string("integer"),
+                "description": .string("Recording duration from 1 to 60 seconds; defaults to 1")
+            ]),
+            "codec": .object([
+                "type": .string("string"),
+                "enum": .array([.string("h264"), .string("hevc")])
+            ]),
+            "display": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("udid"), .string("path")])
+    ])
+
     private static let simulatorAppInfoObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1854,6 +1965,10 @@ enum ToolCatalog {
 
     private static func intValue(from value: Value?) -> Int? {
         value?.intValue
+    }
+
+    private static func doubleValue(from value: Value?) -> Double? {
+        value?.doubleValue ?? value?.intValue.map(Double.init)
     }
 
     private static func result<T: Encodable>(for value: T) -> CallTool.Result {
