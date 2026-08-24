@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "2c6ec31a876a8e475ba9f6fe5fe84aa7e996b7e1",
+  "repository_commit": "1d5899bd9ed860793fdaf3727a91a06e7339c59d",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,12 +9,12 @@
   "environment": "local",
   "command": "make check",
   "exit_code": 0,
-  "observed_at": "2026-08-24T02:24:22Z",
+  "observed_at": "2026-08-24T02:28:40Z",
   "result": "passed",
   "artifacts": [
     "docs/agent-harness/coverage-matrix.md"
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "c4a3cc7545e494bde4125e9443f0f0dc931ee05c875e84bbcb36b4b20b4020d6"
+  "signature": "96ee237a32e67cc10ca456564f618e47ce529843cdd04db51fe4eb3e0fbb90c9"
 }
