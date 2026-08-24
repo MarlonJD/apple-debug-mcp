@@ -20,7 +20,7 @@ The current product surface includes:
 - typed vmmap region reports, persisted memory snapshots, and region diffs;
 - Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
 - read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;
-- a native SwiftUI macOS workbench plus safe plugin manifest/registry APIs that never load external dylibs;
+- a native SwiftUI macOS workbench with session launch/threads/snapshots/pause/continue/instruction stepping/evaluation controls plus safe plugin manifest/registry APIs that never load external dylibs;
 - signed plugin-host validation and sandbox-required execution plans that remain non-executing until a separately reviewed host exists;
 - explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;

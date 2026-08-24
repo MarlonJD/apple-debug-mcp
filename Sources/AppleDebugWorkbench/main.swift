@@ -35,6 +35,7 @@ private final class WorkbenchModel: ObservableObject {
     @Published var sessionID: String?
     @Published var debuggerOutput = ""
     @Published var debuggerThreadID = ""
+    @Published var debuggerExpression = ""
     @Published var architecture = "arm64"
     @Published var assemblySource = "mov x0, x0\nret\n"
     @Published var assemblyOutput = ""
@@ -147,6 +148,58 @@ private final class WorkbenchModel: ObservableObject {
             } catch { errorMessage = error.localizedDescription }
         }
     }
+
+    func pause() {
+        guard let sessionID else { errorMessage = "Create a debugger session first."; return }
+        Task {
+            do {
+                debuggerOutput = String(describing: try await sessions.pause(sessionID: sessionID))
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func continueExecution() {
+        guard let sessionID, let threadID = Int(debuggerThreadID) else {
+            errorMessage = "Enter a stopped thread ID first."
+            return
+        }
+        Task {
+            do {
+                debuggerOutput = String(describing: try await sessions.continueExecution(sessionID: sessionID, threadID: threadID))
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func step(_ kind: DebugStepKind) {
+        guard let sessionID, let threadID = Int(debuggerThreadID) else {
+            errorMessage = "Enter a stopped thread ID first."
+            return
+        }
+        Task {
+            do {
+                debuggerOutput = String(describing: try await sessions.step(sessionID: sessionID, threadID: threadID, kind: kind, granularity: .instruction))
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func evaluate() {
+        guard let sessionID else { errorMessage = "Create a debugger session first."; return }
+        Task {
+            do {
+                let response = try await sessions.evaluate(
+                    sessionID: sessionID,
+                    expression: debuggerExpression,
+                    frameID: nil,
+                    context: "repl"
+                )
+                debuggerOutput = String(describing: response)
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
 }
 
 private struct WorkbenchView: View {
@@ -201,23 +254,39 @@ private struct DebuggerPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("LLDB-DAP Debugger").font(.title.bold())
-            Text("Session control is backed by the same policy-gated DebugSessionManager as the MCP server.")
+            Text("Session control is backed by the same policy-gated DebugSessionManager as the MCP server. Expression evaluation still requires its separate explicit grant.")
                 .foregroundStyle(.secondary)
             HStack {
                 Button("Create session") { model.createSession() }
                 Button("Launch stopped target") { model.launchTarget() }
-                    .disabled(model.sessionID == nil)
+                .disabled(model.sessionID == nil)
                 Button("Threads") { model.inspectThreads() }
                     .disabled(model.sessionID == nil)
                 Button("Stop snapshot") { model.snapshot() }
                     .disabled(model.sessionID == nil)
+                Button("Pause") { model.pause() }
+                    .disabled(model.sessionID == nil)
+                Button("Continue") { model.continueExecution() }
+                    .disabled(model.sessionID == nil)
                 Button("Close") { model.closeSession() }
                     .disabled(model.sessionID == nil)
             }
+            HStack {
+                Button("Step in") { model.step(.inInstruction) }
+                Button("Step over") { model.step(.over) }
+                Button("Step out") { model.step(.out) }
+            }
+            .disabled(model.sessionID == nil)
             TextField("Absolute signed target path", text: $model.targetPath)
                 .textFieldStyle(.roundedBorder)
             TextField("Optional thread ID for snapshot", text: $model.debuggerThreadID)
                 .textFieldStyle(.roundedBorder)
+            HStack {
+                TextField("Authorized LLDB expression", text: $model.debuggerExpression)
+                    .textFieldStyle(.roundedBorder)
+                Button("Evaluate") { model.evaluate() }
+                    .disabled(model.sessionID == nil || model.debuggerExpression.isEmpty)
+            }
             if let sessionID = model.sessionID {
                 Label("Session: \(sessionID)", systemImage: "circle.fill")
                     .foregroundStyle(.green)
