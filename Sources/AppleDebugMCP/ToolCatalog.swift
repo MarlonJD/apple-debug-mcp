@@ -29,6 +29,11 @@ enum ToolCatalog {
             inputSchema: pathObjectSchema
         ),
         Tool(
+            name: "apple_binary_inspect",
+            description: "Inspect an authorized Apple binary for Mach-O metadata, code signature/entitlements, linked libraries, symbols, and dyld exports.",
+            inputSchema: binaryInspectObjectSchema
+        ),
+        Tool(
             name: "apple_crash_inspect",
             description: "Parse an Apple .crash or .ips report into process, exception, thread, and image metadata without executing it.",
             inputSchema: crashObjectSchema
@@ -305,6 +310,20 @@ enum ToolCatalog {
                     content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
                     isError: true
                 )
+            }
+        case "apple_binary_inspect":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(
+                    for: try AppleBinaryIntelligenceService.inspect(
+                        path: path,
+                        architecture: params.arguments?["architecture"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
             }
         case "apple_crash_inspect":
             guard let path = params.arguments?["path"]?.stringValue else {
@@ -927,6 +946,21 @@ enum ToolCatalog {
             "path": .object([
                 "type": .string("string"),
                 "description": .string("Absolute path to an authorized Mach-O file")
+            ])
+        ]),
+        "required": .array([.string("path")])
+    ])
+
+    private static let binaryInspectObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute path to an authorized Mach-O binary")
+            ]),
+            "architecture": .object([
+                "type": .string("string"),
+                "description": .string("Optional architecture such as arm64e or x86_64")
             ])
         ]),
         "required": .array([.string("path")])

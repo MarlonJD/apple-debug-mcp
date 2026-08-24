@@ -42,7 +42,10 @@ final class CapabilitiesTests: XCTestCase {
 
         XCTAssertEqual(
             names,
-            ["lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild"]
+            [
+                "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
+                "codesign", "otool", "nm", "dyld_info", "swift-demangle"
+            ]
         )
     }
 }

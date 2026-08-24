@@ -24,7 +24,8 @@ error_file="$tmp_dir/stderr.log"
         '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"apple_macho_inspect","arguments":{"path":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"apple_simulator_list","arguments":{}}}' \
         '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"apple_crash_inspect","arguments":{"path":"Tests/Fixtures/example.crash"}}}' \
-        '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"apple_log_show","arguments":{"target":"host","last":"1s","predicate":"process == \"apple-debug-mcp\""}}}'
+        '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"apple_log_show","arguments":{"target":"host","last":"1s","predicate":"process == \"apple-debug-mcp\""}}}' \
+        '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"apple_binary_inspect","arguments":{"path":"/bin/echo"}}}'
     sleep 2
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
@@ -47,5 +48,8 @@ grep -q 'apple_simulator_get_app_container' "$output_file"
 grep -q 'apple_simulator_ui_snapshot' "$output_file"
 grep -q 'apple_simulator_ui_action' "$output_file"
 grep -q '"id":9.*"isError":false' "$output_file"
+grep -q '"id":10.*"isError":false' "$output_file"
+grep -q 'codeSignature' "$output_file"
+grep -q 'dyldExports' "$output_file"
 
 printf '%s\n' 'smoke: MCP initialize, tool discovery, capability, and toolchain calls passed'

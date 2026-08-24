@@ -125,7 +125,10 @@ public struct ToolchainStatus: Codable, Equatable, Sendable {
 
 public enum ToolchainProbe {
     public static func collect() -> ToolchainStatus {
-        let toolNames = ["lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild"]
+        let toolNames = [
+            "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
+            "codesign", "otool", "nm", "dyld_info", "swift-demangle"
+        ]
         let tools = toolNames.map { name in
             ToolchainToolStatus(name: name, path: path(for: name))
         }

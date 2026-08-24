@@ -16,6 +16,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/DebugSessions.swift | Session ownership, debugger operations, bounds, and mutation policy | Maintainers; update when session permissions or cleanup changes |
 | Sources/AppleDebugCore/MachO.swift | Read-only Mach-O/universal-binary headers, segments, symbols, and strings | Maintainers; update with static-analysis behavior |
 | Sources/AppleDebugCore/AppleSymbolication.swift | `atos` address resolution | Maintainers; update with symbolication inputs or output contract |
+| Sources/AppleDebugCore/AppleBinaryIntelligence.swift | Code signatures, entitlements, linked libraries, nm symbols, and dyld exports | Maintainers; update with Apple toolchain output changes |
 | Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
 | Sources/AppleDebugCore/AppleSimulatorUI.swift | XCUITest accessibility-tree probe and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
@@ -50,7 +51,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 6. `apple_debug_session_create` creates an owned persistent adapter session.
 7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, stack, scopes, variables, memory, disassembly, stepping, watchpoints, evaluation, and continuation.
 8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
-9. `apple_macho_inspect`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
+9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
 10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
