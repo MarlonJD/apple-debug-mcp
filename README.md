@@ -45,6 +45,7 @@ swift build
 swift test
 make check
 make harness-check
+make package
 make fixture
 make ios-fixture
 make ios-fixture-smoke
@@ -86,7 +87,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Release packaging, signing/notarization, and accessibility-tree inspection are not included yet.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. `make package` produces an unsigned relocatable macOS archive. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Signing/notarization and accessibility-tree inspection are not included yet.
 
 ## License
 

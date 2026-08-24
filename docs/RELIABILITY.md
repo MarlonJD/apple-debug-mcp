@@ -24,6 +24,7 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | Crash report is malformed or unsupported | apple_crash_inspect returns a typed analysis error | Preserve the artifact and inspect it with the supported `.crash`/`.ips` parser | CrashReportTests |
 | Unified log query is too broad or unavailable | apple_log_show returns a bounded-output or command error | Narrow duration/predicate and verify host/Simulator logging availability | AppleLogsTests and tool error path |
 | Simulator screenshot cannot be written | apple_simulator_screenshot returns a typed command error | Use a writable PNG path and keep the Simulator mutation gate explicit | SimulatorService and iOS fixture smoke |
+| Unsigned package cannot be produced | make package or the release SwiftPM build fails | Inspect the first SwiftPM/archive error; signing and notarization are separate release steps | scripts/package_macos.sh |
 | Hosted availability, failover, and production rollback | Not applicable to the current local CLI | N/A; define only when a hosted service is introduced | N/A |
 
 ## Failure policy

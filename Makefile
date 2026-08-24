@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke check harness-check clean
+.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke package check harness-check clean
 
 build:
 	swift build
@@ -17,6 +17,9 @@ ios-fixture-smoke:
 
 ios-debug-fixture-smoke:
 	APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1 ./scripts/ios_debug_fixture_smoke.sh
+
+package:
+	./scripts/package_macos.sh
 
 check:
 	./scripts/check.sh

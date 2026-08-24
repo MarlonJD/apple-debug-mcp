@@ -26,4 +26,5 @@
 | iOS Simulator debugger smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture | Attach, threads, stack, memory, disassembly, and cleanup evidence | Maintainers; explicit mutation-authorized task | verified |
 | Crash report analysis | apple_crash_inspect | Parse bounded Apple .crash/.ips artifacts | Fixture report returns exception, threads, and frames | Maintainers; crash schema changes | verified |
 | Symbolication | apple_symbolicate | Resolve an address with atos | Universal-binary symbolication test passes | Maintainers; Xcode tool changes | verified |
+| Unsigned packaging | make package | Create a relocatable macOS archive from the release build | Archive contains executable, GPL license, README, and architecture docs | Maintainers; release workflow changes | verified-with-boundary |
 | Logs, metrics, or traces | apple_log_show; stderr transcript; metrics/traces N/A | Read bounded unified logs and diagnose CLI failures | Typed log result or actionable stderr | Maintainers; runtime changes | verified-with-boundary |

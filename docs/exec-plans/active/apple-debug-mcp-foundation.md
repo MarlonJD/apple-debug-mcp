@@ -31,6 +31,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [ ] Add a paired physical-device fixture for remote LLDB attach and lifecycle evidence.
 - [ ] Add dedicated Objective-C/Swift metadata reports and richer UI inspection.
 - [ ] Add signed/notarized packaging and CI release artifacts.
+- [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 
 ## Surprises & Discoveries
