@@ -9,6 +9,8 @@ public enum DyldSharedCacheError: Error, Equatable, LocalizedError, Sendable {
     case inputNotFound
     case notSharedCache
     case malformedHeader
+    case imageNotFound
+    case malformedImage
     case outputTooLarge
 
     public var errorDescription: String? {
@@ -21,6 +23,10 @@ public enum DyldSharedCacheError: Error, Equatable, LocalizedError, Sendable {
             return "The input does not have a dyld shared-cache header."
         case .malformedHeader:
             return "The dyld shared-cache header or table ranges are malformed."
+        case .imageNotFound:
+            return "The requested image was not found in the dyld shared-cache image table."
+        case .malformedImage:
+            return "The selected shared-cache image does not contain a bounded, readable Mach-O image."
         case .outputTooLarge:
             return "The requested dyld shared-cache report exceeds its bounded limits."
         }
@@ -54,6 +60,84 @@ public struct DyldSharedCacheImage: Codable, Equatable, Sendable {
         self.path = path
         self.modificationTime = modificationTime
         self.inode = inode
+    }
+}
+
+public struct DyldSharedCacheImageSegment: Codable, Equatable, Sendable {
+    public let name: String
+    public let virtualAddress: String
+    public let virtualSize: UInt64
+    public let fileOffset: UInt64
+    public let fileSize: UInt64
+    public let maximumProtection: Int32
+    public let initialProtection: Int32
+
+    public init(name: String, virtualAddress: String, virtualSize: UInt64, fileOffset: UInt64, fileSize: UInt64, maximumProtection: Int32, initialProtection: Int32) {
+        self.name = name
+        self.virtualAddress = virtualAddress
+        self.virtualSize = virtualSize
+        self.fileOffset = fileOffset
+        self.fileSize = fileSize
+        self.maximumProtection = maximumProtection
+        self.initialProtection = initialProtection
+    }
+}
+
+public struct DyldSharedCacheExport: Codable, Equatable, Sendable {
+    public let name: String
+    public let address: String?
+    public let flags: UInt64
+    public let reexportName: String?
+
+    public init(name: String, address: String?, flags: UInt64, reexportName: String?) {
+        self.name = name
+        self.address = address
+        self.flags = flags
+        self.reexportName = reexportName
+    }
+}
+
+public struct DyldSharedCacheSymbol: Codable, Equatable, Sendable {
+    public let name: String
+    public let address: String
+    public let type: UInt8
+    public let section: UInt8
+    public let description: UInt16
+
+    public init(name: String, address: String, type: UInt8, section: UInt8, description: UInt16) {
+        self.name = name
+        self.address = address
+        self.type = type
+        self.section = section
+        self.description = description
+    }
+}
+
+public struct DyldSharedCacheImageAnalysis: Codable, Equatable, Sendable {
+    public let cachePath: String
+    public let image: DyldSharedCacheImage
+    public let fileOffset: UInt64
+    public let magic: String
+    public let cpuType: Int32
+    public let cpuSubtype: Int32
+    public let uuid: String?
+    public let segments: [DyldSharedCacheImageSegment]
+    public let exports: [DyldSharedCacheExport]
+    public let symbols: [DyldSharedCacheSymbol]
+    public let notes: [String]
+
+    public init(cachePath: String, image: DyldSharedCacheImage, fileOffset: UInt64, magic: String, cpuType: Int32, cpuSubtype: Int32, uuid: String?, segments: [DyldSharedCacheImageSegment], exports: [DyldSharedCacheExport], symbols: [DyldSharedCacheSymbol], notes: [String]) {
+        self.cachePath = cachePath
+        self.image = image
+        self.fileOffset = fileOffset
+        self.magic = magic
+        self.cpuType = cpuType
+        self.cpuSubtype = cpuSubtype
+        self.uuid = uuid
+        self.segments = segments
+        self.exports = exports
+        self.symbols = symbols
+        self.notes = notes
     }
 }
 
@@ -321,6 +405,347 @@ public enum AppleDyldSharedCacheService {
         )
     }
 
+    public static func analyzeImage(
+        path: String,
+        imagePath: String,
+        maximumExports: Int = 5_000,
+        maximumSymbols: Int = 5_000
+    ) throws -> DyldSharedCacheImageAnalysis {
+        guard !imagePath.isEmpty, imagePath.utf8.count <= maximumPathLength, !imagePath.contains("\0"),
+              (1...20_000).contains(maximumExports), (1...20_000).contains(maximumSymbols) else {
+            throw DyldSharedCacheError.invalidRequest
+        }
+        let report = try inspect(path: path, imageFilter: imagePath, maximumImages: 10_000)
+        guard let image = report.images.first(where: { $0.path == imagePath }) else {
+            throw DyldSharedCacheError.imageNotFound
+        }
+        let attributes = try FileManager.default.attributesOfItem(atPath: path)
+        guard let fileSize = attributes[.size] as? NSNumber else { throw DyldSharedCacheError.malformedHeader }
+        guard let imageAddress = parseAddress(image.address),
+              let imageFileOffset = fileOffset(for: imageAddress, mappings: report.mappings) else {
+            throw DyldSharedCacheError.malformedImage
+        }
+        let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+        defer { try? handle.close() }
+        return try parseImage(
+            handle: handle,
+            cachePath: path,
+            image: image,
+            imageFileOffset: imageFileOffset,
+            imageBaseAddress: imageAddress,
+            fileSize: fileSize.uint64Value,
+            maximumExports: maximumExports,
+            maximumSymbols: maximumSymbols
+        )
+    }
+
+    private static func parseImage(
+        handle: FileHandle,
+        cachePath: String,
+        image: DyldSharedCacheImage,
+        imageFileOffset: UInt64,
+        imageBaseAddress: UInt64,
+        fileSize: UInt64,
+        maximumExports: Int,
+        maximumSymbols: Int
+    ) throws -> DyldSharedCacheImageAnalysis {
+        let header = try read(handle: handle, offset: imageFileOffset, length: 32)
+        let magicValue = try uint32(header, offset: 0)
+        let is64Bit: Bool
+        let magic: String
+        switch magicValue {
+        case 0xfeedfacf:
+            is64Bit = true
+            magic = "MH_MAGIC_64"
+        case 0xfeedface:
+            is64Bit = false
+            magic = "MH_MAGIC"
+        default:
+            throw DyldSharedCacheError.malformedImage
+        }
+        guard is64Bit else {
+            return DyldSharedCacheImageAnalysis(
+                cachePath: cachePath,
+                image: image,
+                fileOffset: imageFileOffset,
+                magic: magic,
+                cpuType: Int32(bitPattern: try uint32(header, offset: 4)),
+                cpuSubtype: Int32(bitPattern: try uint32(header, offset: 8)),
+                uuid: nil,
+                segments: [],
+                exports: [],
+                symbols: [],
+                notes: ["32-bit shared-cache Mach-O images are identified but deep export/symbol extraction is only enabled for bounded 64-bit images."]
+            )
+        }
+
+        let cpuType = Int32(bitPattern: try uint32(header, offset: 4))
+        let cpuSubtype = Int32(bitPattern: try uint32(header, offset: 8))
+        let commandCount = try uint32(header, offset: 16)
+        let commandSize = try uint32(header, offset: 20)
+        guard commandCount <= 4_096, commandSize <= 8 * 1024 * 1024,
+              rangeIsValid(offset: imageFileOffset + 32, length: UInt64(commandSize), fileSize: fileSize) else {
+            throw DyldSharedCacheError.malformedImage
+        }
+        let commands = try read(handle: handle, offset: imageFileOffset + 32, length: Int(commandSize))
+        var segments: [DyldSharedCacheImageSegment] = []
+        var uuid: String?
+        var exportOffset: UInt64?
+        var exportSize: UInt64 = 0
+        var symbolOffset: UInt64?
+        var symbolCount: UInt32 = 0
+        var stringOffset: UInt64?
+        var stringSize: UInt64 = 0
+        var cursor = 0
+        for _ in 0..<commandCount {
+            guard cursor + 8 <= commands.count else { throw DyldSharedCacheError.malformedImage }
+            let command = try uint32(commands, offset: cursor)
+            let size = try uint32(commands, offset: cursor + 4)
+            guard size >= 8, Int(size) <= commands.count - cursor else { throw DyldSharedCacheError.malformedImage }
+            let commandData = commands.subdata(in: cursor..<(cursor + Int(size)))
+            switch command {
+            case 0x19 where size >= 72:
+                let segmentName = readFixedCString(commandData, offset: 8, length: 16)
+                segments.append(
+                    DyldSharedCacheImageSegment(
+                        name: segmentName,
+                        virtualAddress: format(try uint64(commandData, offset: 24)),
+                        virtualSize: try uint64(commandData, offset: 32),
+                        fileOffset: try uint64(commandData, offset: 40),
+                        fileSize: try uint64(commandData, offset: 48),
+                        maximumProtection: Int32(bitPattern: try uint32(commandData, offset: 56)),
+                        initialProtection: Int32(bitPattern: try uint32(commandData, offset: 60))
+                    )
+                )
+            case 0x1b where size >= 24:
+                uuid = parseUUID(commandData, offset: 8)
+            case 0x2 where size >= 24:
+                symbolOffset = UInt64(try uint32(commandData, offset: 8))
+                symbolCount = try uint32(commandData, offset: 12)
+                stringOffset = UInt64(try uint32(commandData, offset: 16))
+                stringSize = UInt64(try uint32(commandData, offset: 20))
+            case 0x22 where size >= 48:
+                exportOffset = UInt64(try uint32(commandData, offset: 40))
+                exportSize = UInt64(try uint32(commandData, offset: 44))
+            case 0x80000033 where size >= 16:
+                exportOffset = try uint64(commandData, offset: 8)
+                exportSize = try uint64(commandData, offset: 16)
+            default:
+                break
+            }
+            cursor += Int(size)
+        }
+
+        var exports: [DyldSharedCacheExport] = []
+        if let exportOffset, exportSize > 0,
+           let data = try readMachOData(handle: handle, rawOffset: exportOffset, imageFileOffset: imageFileOffset, size: exportSize, fileSize: fileSize) {
+            exports = parseExportTrie(data: data, imageBaseAddress: imageBaseAddress, maximumExports: maximumExports)
+        }
+        var symbols: [DyldSharedCacheSymbol] = []
+        if let symbolOffset, let stringOffset, symbolCount > 0, stringSize > 0 {
+            symbols = try parseSymbols(
+                handle: handle,
+                symbolOffset: symbolOffset,
+                symbolCount: symbolCount,
+                stringOffset: stringOffset,
+                stringSize: stringSize,
+                imageFileOffset: imageFileOffset,
+                fileSize: fileSize,
+                maximumSymbols: maximumSymbols
+            )
+        }
+        var notes = [
+            "Mach-O load commands and exports are decoded from public shared-cache bytes; no private dyld database is accessed."
+        ]
+        if exports.isEmpty { notes.append("The image did not expose a bounded export trie through its public load commands.") }
+        if symbols.isEmpty { notes.append("The image did not expose a bounded LC_SYMTAB symbol table; modern shared caches may keep local symbols in separate tables.") }
+        if symbolCount > UInt32(maximumSymbols) { notes.append("The symbol table was bounded at maximumSymbols=\(maximumSymbols).") }
+        return DyldSharedCacheImageAnalysis(
+            cachePath: cachePath,
+            image: image,
+            fileOffset: imageFileOffset,
+            magic: magic,
+            cpuType: cpuType,
+            cpuSubtype: cpuSubtype,
+            uuid: uuid,
+            segments: segments,
+            exports: exports,
+            symbols: symbols,
+            notes: notes
+        )
+    }
+
+    private static func fileOffset(for address: UInt64, mappings: [DyldSharedCacheMapping]) -> UInt64? {
+        for mapping in mappings {
+            guard let mappingAddress = parseAddress(mapping.address),
+                  address >= mappingAddress,
+                  address - mappingAddress < mapping.size else { continue }
+            return mapping.fileOffset + (address - mappingAddress)
+        }
+        return nil
+    }
+
+    private static func readMachOData(
+        handle: FileHandle,
+        rawOffset: UInt64,
+        imageFileOffset: UInt64,
+        size: UInt64,
+        fileSize: UInt64
+    ) throws -> Data? {
+        guard size > 0, size <= 32 * 1024 * 1024 else { return nil }
+        var offsets = [rawOffset]
+        let relative = imageFileOffset.addingReportingOverflow(rawOffset)
+        if !relative.overflow, relative.partialValue != rawOffset {
+            offsets.append(relative.partialValue)
+        }
+        for offset in offsets where rangeIsValid(offset: offset, length: size, fileSize: fileSize) {
+            return try read(handle: handle, offset: offset, length: Int(size))
+        }
+        return nil
+    }
+
+    private static func readFixedCString(_ data: Data, offset: Int, length: Int) -> String {
+        guard offset >= 0, length >= 0, offset + length <= data.count else { return "" }
+        let bytes = data[offset..<(offset + length)]
+        let prefix = bytes.prefix { $0 != 0 }
+        return String(data: prefix, encoding: .utf8) ?? ""
+    }
+
+    private static func parseSymbols(
+        handle: FileHandle,
+        symbolOffset: UInt64,
+        symbolCount: UInt32,
+        stringOffset: UInt64,
+        stringSize: UInt64,
+        imageFileOffset: UInt64,
+        fileSize: UInt64,
+        maximumSymbols: Int
+    ) throws -> [DyldSharedCacheSymbol] {
+        let count = min(Int(symbolCount), maximumSymbols)
+        guard let symbolData = try readMachOData(
+            handle: handle,
+            rawOffset: symbolOffset,
+            imageFileOffset: imageFileOffset,
+            size: UInt64(count) * 16,
+            fileSize: fileSize
+        ),
+        let stringData = try readMachOData(
+            handle: handle,
+            rawOffset: stringOffset,
+            imageFileOffset: imageFileOffset,
+            size: stringSize,
+            fileSize: fileSize
+        ) else {
+            return []
+        }
+        var values: [DyldSharedCacheSymbol] = []
+        for index in 0..<count {
+            let offset = index * 16
+            guard let stringIndex = try? uint32(symbolData, offset: offset),
+                  Int(stringIndex) < stringData.count else { continue }
+            let nameBytes = stringData[Int(stringIndex)...]
+            let namePrefix = nameBytes.prefix { $0 != 0 }
+            guard let name = String(data: namePrefix, encoding: .utf8), !name.isEmpty else { continue }
+            guard let type = try? uint32(symbolData, offset: offset + 4),
+                  let section = try? uint32(symbolData, offset: offset + 5),
+                  let description = try? uint32(symbolData, offset: offset + 6),
+                  let address = try? uint64(symbolData, offset: offset + 8) else { continue }
+            values.append(
+                DyldSharedCacheSymbol(
+                    name: name,
+                    address: format(address),
+                    type: UInt8(type & 0xff),
+                    section: UInt8(section & 0xff),
+                    description: UInt16(description & 0xffff)
+                )
+            )
+        }
+        return values.sorted { $0.name == $1.name ? $0.address < $1.address : $0.name < $1.name }
+    }
+
+    private static func parseExportTrie(
+        data: Data,
+        imageBaseAddress: UInt64,
+        maximumExports: Int
+    ) -> [DyldSharedCacheExport] {
+        var visited = Set<Int>()
+        var exports: [DyldSharedCacheExport] = []
+
+        func readULEB(_ offset: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            for _ in 0..<10 {
+                guard offset < data.count else { return nil }
+                let byte = data[offset]
+                offset += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+
+        func readCString(_ offset: inout Int) -> String? {
+            let start = offset
+            while offset < data.count, data[offset] != 0 { offset += 1 }
+            guard offset < data.count else { return nil }
+            let value = String(data: data[start..<offset], encoding: .utf8)
+            offset += 1
+            return value
+        }
+
+        func visit(_ nodeOffset: Int, name: String, depth: Int) {
+            guard exports.count < maximumExports,
+                  depth <= 256,
+                  nodeOffset >= 0,
+                  nodeOffset < data.count,
+                  visited.insert(nodeOffset).inserted else { return }
+            var cursor = nodeOffset
+            guard let terminalSize = readULEB(&cursor),
+                  terminalSize <= UInt64(data.count - cursor) else { return }
+            let terminalEnd = cursor + Int(terminalSize)
+            if terminalSize > 0 {
+                var terminalCursor = cursor
+                guard let flags = readULEB(&terminalCursor) else { return }
+                if flags & 0x8 != 0 {
+                    _ = readULEB(&terminalCursor)
+                    let reexportName = readCString(&terminalCursor)
+                    if !name.isEmpty {
+                        exports.append(DyldSharedCacheExport(name: name, address: nil, flags: flags, reexportName: reexportName))
+                    }
+                } else if let addressOffset = readULEB(&terminalCursor) {
+                    if flags & 0x10 != 0 {
+                        _ = readULEB(&terminalCursor)
+                        _ = readULEB(&terminalCursor)
+                    }
+                    if !name.isEmpty {
+                        let (address, overflow) = imageBaseAddress.addingReportingOverflow(addressOffset)
+                        exports.append(
+                            DyldSharedCacheExport(
+                                name: name,
+                                address: overflow ? nil : format(address),
+                                flags: flags,
+                                reexportName: nil
+                            )
+                        )
+                    }
+                }
+            }
+            cursor = terminalEnd
+            guard cursor < data.count else { return }
+            let childCount = Int(data[cursor])
+            cursor += 1
+            for _ in 0..<childCount {
+                guard let edge = readCString(&cursor), let child = readULEB(&cursor) else { return }
+                visit(Int(child), name: name + edge, depth: depth + 1)
+                if exports.count >= maximumExports { return }
+            }
+        }
+
+        visit(0, name: "", depth: 0)
+        return exports.sorted { $0.name == $1.name ? ($0.address ?? "") < ($1.address ?? "") : $0.name < $1.name }
+    }
+
     private static func parseMappings(handle: FileHandle, offset: UInt64, count: UInt32, fileSize: UInt64) throws -> [DyldSharedCacheMapping] {
         var values: [DyldSharedCacheMapping] = []
         for index in 0..<UInt64(count) {
@@ -412,5 +837,10 @@ public enum AppleDyldSharedCacheService {
 
     private static func format(_ value: UInt64) -> String {
         "0x\(String(value, radix: 16))"
+    }
+
+    private static func parseAddress(_ value: String) -> UInt64? {
+        let normalized = value.hasPrefix("0x") ? String(value.dropFirst(2)) : value
+        return UInt64(normalized, radix: 16)
     }
 }

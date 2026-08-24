@@ -69,6 +69,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 23:45Z) Add Mach-O relocation records and bounded dyld cache/helper discovery evidence; smoke the object-file `_usleep` relocation and the current runtime-helper/no-cache state.
 - [x] (2026-08-24 23:55Z) Add template-specific semantic reports and MCP dispatch for public xctrace domains; verify the live Time Profiler report plus allocation/concurrency domain unit cases.
 - [x] (2026-08-25 00:05Z) Surface template semantic metrics and CFG xref/relocation counts in the native workbench; verify the SwiftUI product build.
+- [x] (2026-08-25 00:45Z) Replace the non-executing plugin plan with a separately built signed-audit/sandbox-exec host boundary, explicit execution grant, JSON stdin/stdout protocol, timeout/output caps, and standalone/MCP smoke evidence.
+- [x] (2026-08-25 00:55Z) Add source-backed public Swift AST inspection with typed node/declaration summaries and a fixture MCP smoke.
+- [x] (2026-08-25 01:05Z) Add coordinateTap/coordinateLongPress/coordinateSwipe actions to project-backed and arbitrary installed-app XCUITest probes for custom-drawn UI surfaces.
 - [x] (2026-08-24 23:25Z) Expand the native workbench debugger panel with pause/continue/instruction stepping and explicitly grant-gated expression evaluation; verify the SwiftUI product build.
 - [x] (2026-08-24 04:06Z) Commit and push every verified implementation checkpoint to `main`.
 

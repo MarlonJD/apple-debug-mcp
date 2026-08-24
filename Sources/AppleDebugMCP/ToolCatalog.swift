@@ -40,8 +40,13 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_plugin_host_plan",
-            description: "Validate a signed plugin executable and return a sandboxed-host plan without executing it.",
+            description: "Validate a signed plugin executable and return a non-executing plan for the available separate sandboxed host.",
             inputSchema: pluginHostPlanObjectSchema
+        ),
+        Tool(
+            name: "apple_plugin_host_execute",
+            description: "Execute a signed plugin as a separate deny-by-default, no-network sandboxed process after an explicit execution grant; MCP never loads plugin code in-process.",
+            inputSchema: pluginHostExecuteObjectSchema
         ),
         Tool(
             name: "apple_macho_inspect",
@@ -79,6 +84,11 @@ enum ToolCatalog {
             inputSchema: binaryInspectObjectSchema
         ),
         Tool(
+            name: "apple_swift_ast_inspect",
+            description: "Emit a bounded typed source-backed Swift AST with declarations, types, functions, variables, imports, and compiler locations through public swiftc -dump-ast.",
+            inputSchema: swiftASTObjectSchema
+        ),
+        Tool(
             name: "apple_assemble",
             description: "Assemble bounded arm64 or x86_64 Apple assembly into bytes and llvm-objdump disassembly without executing or patching it.",
             inputSchema: assembleObjectSchema
@@ -92,6 +102,11 @@ enum ToolCatalog {
             name: "apple_dyld_shared_cache_inspect",
             description: "Inspect a dyld shared-cache header, mappings, UUID, code-signature ranges, and bounded image paths without executing the cache.",
             inputSchema: dyldSharedCacheObjectSchema
+        ),
+        Tool(
+            name: "apple_dyld_shared_cache_image_analyze",
+            description: "Decode one selected shared-cache image's public Mach-O load commands, segments, export trie, UUID, and bounded nlist symbols without executing the cache.",
+            inputSchema: dyldSharedCacheImageObjectSchema
         ),
         Tool(
             name: "apple_dyld_shared_cache_discover",
@@ -509,6 +524,25 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_plugin_host_execute":
+            guard let executablePath = params.arguments?["executablePath"]?.stringValue,
+                  let manifestPath = params.arguments?["manifestPath"]?.stringValue,
+                  let input = params.arguments?["input"]?.stringValue else {
+                return errorResult("Missing required executablePath, manifestPath, or input argument.")
+            }
+            do {
+                return result(
+                    for: try ApplePluginHostService.execute(
+                        executablePath: executablePath,
+                        manifestPath: manifestPath,
+                        input: input,
+                        requiredTeamIdentifier: params.arguments?["requiredTeamIdentifier"]?.stringValue,
+                        timeoutSeconds: doubleValue(from: params.arguments?["timeoutSeconds"]) ?? 10.0
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_toolchain_status":
             return result(for: ToolchainProbe.collect())
         case "apple_lldb_dap_initialize":
@@ -644,6 +678,21 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_swift_ast_inspect":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(
+                    for: try SwiftASTService.inspect(
+                        path: path,
+                        moduleName: params.arguments?["moduleName"]?.stringValue ?? "AppleDebugSource",
+                        includeRaw: boolValue(from: params.arguments?["includeRaw"], default: false)
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_assemble":
             guard let source = params.arguments?["source"]?.stringValue,
                   let architecture = params.arguments?["architecture"]?.stringValue else {
@@ -674,6 +723,23 @@ enum ToolCatalog {
                         path: path,
                         imageFilter: params.arguments?["imageFilter"]?.stringValue,
                         maximumImages: intValue(from: params.arguments?["maximumImages"]) ?? 10_000
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_dyld_shared_cache_image_analyze":
+            guard let path = params.arguments?["path"]?.stringValue,
+                  let imagePath = params.arguments?["imagePath"]?.stringValue else {
+                return errorResult("Missing required path or imagePath argument.")
+            }
+            do {
+                return result(
+                    for: try AppleDyldSharedCacheService.analyzeImage(
+                        path: path,
+                        imagePath: imagePath,
+                        maximumExports: intValue(from: params.arguments?["maximumExports"]) ?? 5_000,
+                        maximumSymbols: intValue(from: params.arguments?["maximumSymbols"]) ?? 5_000
                     )
                 )
             } catch {
@@ -1684,7 +1750,11 @@ enum ToolCatalog {
                             direction: params.arguments?["direction"]?.stringValue,
                             durationSeconds: doubleValue(from: params.arguments?["durationSeconds"]),
                             scale: doubleValue(from: params.arguments?["scale"]),
-                            velocity: doubleValue(from: params.arguments?["velocity"])
+                            velocity: doubleValue(from: params.arguments?["velocity"]),
+                            x: doubleValue(from: params.arguments?["x"]),
+                            y: doubleValue(from: params.arguments?["y"]),
+                            endX: doubleValue(from: params.arguments?["endX"]),
+                            endY: doubleValue(from: params.arguments?["endY"])
                         )
                     )
                 )
@@ -1726,7 +1796,11 @@ enum ToolCatalog {
                             direction: params.arguments?["direction"]?.stringValue,
                             durationSeconds: doubleValue(from: params.arguments?["durationSeconds"]),
                             scale: doubleValue(from: params.arguments?["scale"]),
-                            velocity: doubleValue(from: params.arguments?["velocity"])
+                            velocity: doubleValue(from: params.arguments?["velocity"]),
+                            x: doubleValue(from: params.arguments?["x"]),
+                            y: doubleValue(from: params.arguments?["y"]),
+                            endX: doubleValue(from: params.arguments?["endX"]),
+                            endY: doubleValue(from: params.arguments?["endY"])
                         )
                     )
                 )
@@ -1890,6 +1964,21 @@ enum ToolCatalog {
         "required": .array([.string("executablePath")])
     ])
 
+    private static let pluginHostExecuteObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "executablePath": .object(["type": .string("string")]),
+            "manifestPath": .object(["type": .string("string")]),
+            "input": .object([
+                "type": .string("string"),
+                "description": .string("Bounded JSON-line input delivered to the sandboxed plugin process")
+            ]),
+            "requiredTeamIdentifier": .object(["type": .string("string")]),
+            "timeoutSeconds": .object(["type": .string("number")])
+        ]),
+        "required": .array([.string("executablePath"), .string("manifestPath"), .string("input")])
+    ])
+
     private static let pathObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -1991,6 +2080,29 @@ enum ToolCatalog {
         "required": .array([.string("path")])
     ])
 
+    private static let dyldSharedCacheImageObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute dyld_shared_cache file path")
+            ]),
+            "imagePath": .object([
+                "type": .string("string"),
+                "description": .string("Exact image path from the shared-cache image table")
+            ]),
+            "maximumExports": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum decoded export-trie entries from 1 to 20000")
+            ]),
+            "maximumSymbols": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum decoded nlist symbols from 1 to 20000")
+            ])
+        ]),
+        "required": .array([.string("path"), .string("imagePath")])
+    ])
+
     private static let binaryDiffObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -2008,6 +2120,25 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("leftPath"), .string("rightPath")])
+    ])
+
+    private static let swiftASTObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute .swift source file path")
+            ]),
+            "moduleName": .object([
+                "type": .string("string"),
+                "description": .string("Bounded Swift module name passed to public swiftc")
+            ]),
+            "includeRaw": .object([
+                "type": .string("boolean"),
+                "description": .string("Include bounded raw swiftc AST text")
+            ])
+        ]),
+        "required": .array([.string("path")])
     ])
 
     private static let dwarfInspectObjectSchema: Value = .object([
@@ -2854,7 +2985,10 @@ enum ToolCatalog {
                     .string("typeText"),
                     .string("swipe"),
                     .string("pinch"),
-                    .string("wait")
+                    .string("wait"),
+                    .string("coordinateTap"),
+                    .string("coordinateLongPress"),
+                    .string("coordinateSwipe")
                 ])
             ]),
             "identifier": .object(["type": .string("string")]),
@@ -2862,6 +2996,16 @@ enum ToolCatalog {
             "durationSeconds": .object(["type": .string("number")]),
             "scale": .object(["type": .string("number")]),
             "velocity": .object(["type": .string("number")]),
+            "x": .object([
+                "type": .string("number"),
+                "description": .string("Normalized horizontal coordinate from 0.0 to 1.0 for coordinate actions")
+            ]),
+            "y": .object([
+                "type": .string("number"),
+                "description": .string("Normalized vertical coordinate from 0.0 to 1.0 for coordinate actions")
+            ]),
+            "endX": .object(["type": .string("number")]),
+            "endY": .object(["type": .string("number")]),
             "direction": .object([
                 "type": .string("string"),
                 "enum": .array([
@@ -2905,6 +3049,7 @@ enum ToolCatalog {
                 "enum": .array([
                     .string("tap"), .string("doubleTap"), .string("longPress"),
                     .string("typeText"), .string("swipe"), .string("pinch"), .string("wait")
+                    , .string("coordinateTap"), .string("coordinateLongPress"), .string("coordinateSwipe")
                 ])
             ]),
             "identifier": .object(["type": .string("string")]),
@@ -2912,6 +3057,10 @@ enum ToolCatalog {
             "durationSeconds": .object(["type": .string("number")]),
             "scale": .object(["type": .string("number")]),
             "velocity": .object(["type": .string("number")]),
+            "x": .object(["type": .string("number")]),
+            "y": .object(["type": .string("number")]),
+            "endX": .object(["type": .string("number")]),
+            "endY": .object(["type": .string("number")]),
             "direction": .object([
                 "type": .string("string"),
                 "enum": .array([.string("up"), .string("down"), .string("left"), .string("right")])

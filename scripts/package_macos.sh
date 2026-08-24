@@ -22,6 +22,7 @@ trap 'rm -rf "$staging_directory"' EXIT HUP INT TERM
 package_directory="$staging_directory/apple-debug-mcp"
 mkdir -p "$package_directory"
 cp .build/release/apple-debug-mcp "$package_directory/apple-debug-mcp"
+cp .build/release/apple-debug-plugin-host "$package_directory/apple-debug-plugin-host"
 cp LICENSE README.md ARCHITECTURE.md "$package_directory/"
 
 tar -czf "$output_path" -C "$staging_directory" apple-debug-mcp

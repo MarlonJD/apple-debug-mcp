@@ -10,6 +10,6 @@ NOTARY_PROFILE=general-notary \
 make release-package
 ```
 
-The resulting MCP executable is inside `AppleDebugMCP.app/Contents/MacOS/apple-debug-mcp`. An MCP client can use that executable path after extracting the archive. The signing identity and notary credentials are read from the local keychain and are never stored in this repository.
+The resulting MCP executable is inside `AppleDebugMCP.app/Contents/MacOS/apple-debug-mcp`; the separately signed `apple-debug-plugin-host` is colocated in the same app bundle for explicit sandboxed plugin execution. An MCP client can use the MCP executable path after extracting the archive. The signing identity and notary credentials are read from the local keychain and are never stored in this repository.
 
 The release script verifies the Developer ID signature before submission and runs `codesign --verify`, `stapler validate`, and `spctl --assess` after Apple accepts the submission. Release credentials, Apple account authorization, and external notarization are intentionally not part of ordinary `make check` or pull-request CI.

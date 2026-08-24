@@ -19,24 +19,26 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleBinaryIntelligence.swift | Code signatures, entitlements, linked libraries, nm symbols, and dyld exports | Maintainers; update with Apple toolchain output changes |
 | Sources/AppleDebugCore/AppleRuntimeMetadata.swift | Objective-C metadata parsing and Swift symbol demangling | Maintainers; update with Objective-C/Swift ABI/toolchain changes |
 | Sources/AppleDebugCore/AppleDWARF.swift | Bounded `dwarfdump` DIE hierarchy, attributes, source paths, line tables, statistics, and address lookup reports | Maintainers; update with DWARF/Xcode output changes |
+| Sources/AppleDebugCore/AppleSwiftAST.swift | Source-backed public `swiftc -dump-ast` nodes, declarations, types, functions, variables, imports, and locations | Maintainers; update with Swift compiler AST output changes |
 | Sources/AppleDebugCore/AppleAssembler.swift | Self-contained arm64/x86_64 assembly, Mach-O text extraction, disassembly, and patch payload generation | Maintainers; update with clang/LLVM output changes |
 | Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, address-based xrefs, relocations, call graph, external calls, indirect symbols, and data-in-code reports | Maintainers; update with LLVM disassembly output changes |
 | Sources/AppleDebugCore/AppleSwiftConcurrencyGraph.swift | Public xctrace Swift Concurrency task, actor, continuation, and relationship graph reconstruction | Maintainers; update with Instruments schema changes |
-| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery, runtime-helper/mount evidence, plus direct header, mapping, UUID, code-signature, local-symbol, and image-table parser | Maintainers; update with public dyld cache layout changes |
+| Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery, runtime-helper/mount evidence, direct header/image-table parsing, and selected-image Mach-O/export/nlist extraction | Maintainers; update with public dyld cache layout changes |
 | Sources/AppleDebugCore/AppleMemoryMaps.swift | Typed vmmap regions, persisted snapshots, and region diffs | Maintainers; update with vmmap report format changes |
 | Sources/AppleDebugCore/AppleSimulatorEnvironment.swift | Fixed simctl environment controls and bounded input validation | Maintainers; update with simctl public subcommands |
 | Sources/AppleDebugCore/AppleReproBundle.swift | Screenshot/appinfo/log/trace/crash evidence bundle capture | Maintainers; update with Simulator evidence surfaces |
 | Sources/AppleDebugCore/AppleSigningAudit.swift | codesign, entitlements, provisioning, and Gatekeeper audit reports | Maintainers; update with signing tool output |
 | Sources/AppleDebugCore/ApplePatchWorkflow.swift | Non-destructive file patch previews and release-authority re-sign plans | Maintainers; update with packaging/signing policy |
 | Sources/AppleDebugCore/AppleDebugPlugins.swift | In-process plugin protocol, bounded manifest discovery, and registry | Maintainers; update only with a reviewed extension boundary |
-| Sources/AppleDebugCore/ApplePluginHost.swift | Signed executable validation and sandbox-required, non-executing plugin-host plans | Maintainers; update only with a reviewed sandbox/IPC boundary |
+| Sources/AppleDebugCore/ApplePluginHost.swift | Signed executable validation and explicit-grant sandboxed plugin-host execution protocol | Maintainers; update only with a reviewed sandbox/IPC boundary |
+| Sources/AppleDebugPluginHost/ | Separate JSON-line plugin host executable with timeout/output limits and sandbox boundary | Maintainers; update only with signed host/release changes |
 | Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench | Maintainers; update with GUI panels and core API changes |
 | Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
 | Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
 | Sources/AppleDebugCore/AppleKernelCapabilities.swift | Kernel-debugging boundary report and supported user-process alternatives | Maintainers; update with SIP/KDK/entitlement boundary changes |
 | Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
-| Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
+| Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded identifier/coordinate UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
 | Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
 | Sources/AppleDebugCore/AppleDevice.swift | CoreDevice inventory and authorization-gated development-app operations | Maintainers; update with pairing/tunnel policy changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
@@ -63,7 +65,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `ReverseExecutionService` and `AppleKernelCapabilityService`: expose the installed backend’s actual reverse/time-travel and kernel-debugging boundary instead of claiming Windows/x64dbg semantics on Apple.
 - `AppleControlFlowService`, `AppleDyldSharedCacheService`, `AppleMemoryMapService`, `AppleSimulatorEnvironmentService`, `AppleReproBundleService`, `AppleSigningAuditService`, and `ApplePatchWorkflowService` provide the next Apple-native reverse-engineering and reproducibility layer.
 - `AppleDebugPlugin` is an in-process extension contract; `AppleDebugPluginManifestService` only discovers explicit JSON manifests. Dynamic dylib loading and arbitrary plugin process execution are deliberately outside the MCP trust boundary.
-- `ApplePluginHostService` verifies a candidate executable’s Apple signature and optional team identity but returns a plan only; a future host must be separately signed, sandboxed, and explicitly authorized.
+- `ApplePluginHostService` verifies a candidate executable’s Apple signature and optional team identity, then can launch it only through the separate `apple-debug-plugin-host` process under a deny-by-default, no-network sandbox and explicit environment grant; the MCP server never loads plugin code in-process.
 - `AppleDebugWorkbench` is a SwiftUI macOS executable that consumes read-only core analyzers directly; the MCP server remains the automation surface.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 

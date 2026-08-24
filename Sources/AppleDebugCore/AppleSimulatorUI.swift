@@ -100,6 +100,10 @@ public struct SimulatorUIActionRequest: Codable, Equatable, Sendable {
     public let durationSeconds: Double?
     public let scale: Double?
     public let velocity: Double?
+    public let x: Double?
+    public let y: Double?
+    public let endX: Double?
+    public let endY: Double?
 
     public init(
         action: String,
@@ -108,7 +112,11 @@ public struct SimulatorUIActionRequest: Codable, Equatable, Sendable {
         direction: String? = nil,
         durationSeconds: Double? = nil,
         scale: Double? = nil,
-        velocity: Double? = nil
+        velocity: Double? = nil,
+        x: Double? = nil,
+        y: Double? = nil,
+        endX: Double? = nil,
+        endY: Double? = nil
     ) {
         self.action = action
         self.identifier = identifier
@@ -117,6 +125,10 @@ public struct SimulatorUIActionRequest: Codable, Equatable, Sendable {
         self.durationSeconds = durationSeconds
         self.scale = scale
         self.velocity = velocity
+        self.x = x
+        self.y = y
+        self.endX = endX
+        self.endY = endY
     }
 }
 
@@ -370,7 +382,7 @@ public enum SimulatorUIService {
     }
 
     private static func validate(action: SimulatorUIActionRequest) throws {
-        guard ["tap", "doubleTap", "longPress", "typeText", "swipe", "pinch", "wait"].contains(action.action) else {
+        guard ["tap", "doubleTap", "longPress", "typeText", "swipe", "pinch", "wait", "coordinateTap", "coordinateLongPress", "coordinateSwipe"].contains(action.action) else {
             throw SimulatorUIError.invalidAction
         }
         if let identifier = action.identifier {
@@ -408,9 +420,25 @@ public enum SimulatorUIService {
                   (-10.0...10.0).contains(velocity), velocity != 0 else {
                 throw SimulatorUIError.invalidAction
             }
+        case "coordinateTap":
+            guard validCoordinate(action.x), validCoordinate(action.y) else { throw SimulatorUIError.invalidAction }
+        case "coordinateLongPress":
+            let duration = action.durationSeconds ?? 1.0
+            guard validCoordinate(action.x), validCoordinate(action.y), duration.isFinite, (0.1...10.0).contains(duration) else {
+                throw SimulatorUIError.invalidAction
+            }
+        case "coordinateSwipe":
+            guard validCoordinate(action.x), validCoordinate(action.y), validCoordinate(action.endX), validCoordinate(action.endY) else {
+                throw SimulatorUIError.invalidAction
+            }
         default:
             throw SimulatorUIError.invalidAction
         }
+    }
+
+    private static func validCoordinate(_ value: Double?) -> Bool {
+        guard let value else { return false }
+        return value.isFinite && (0.0...1.0).contains(value)
     }
 
     private struct AccessibilityPayload: Codable {
@@ -697,6 +725,19 @@ final class AppleDebugMCPUIProbeTests: XCTestCase {
             element.pinch(withScale: CGFloat(scale), velocity: CGFloat(action.velocity ?? 1.0))
         case "wait":
             guard element?.waitForExistence(timeout: 10) == true else { throw invalidAction("wait requires identifier") }
+        case "coordinateTap":
+            guard let x = action.x, let y = action.y else { throw invalidAction("coordinateTap requires x and y") }
+            app.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y)).tap()
+        case "coordinateLongPress":
+            guard let x = action.x, let y = action.y else { throw invalidAction("coordinateLongPress requires x and y") }
+            app.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y)).press(forDuration: action.durationSeconds ?? 1.0)
+        case "coordinateSwipe":
+            guard let x = action.x, let y = action.y, let endX = action.endX, let endY = action.endY else {
+                throw invalidAction("coordinateSwipe requires x, y, endX, and endY")
+            }
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: endX, dy: endY))
+            start.press(forDuration: 0.1, thenDragTo: end)
         default:
             throw invalidAction("unsupported UI action")
         }
@@ -722,6 +763,10 @@ private struct UIActionCommand: Codable {
     let durationSeconds: Double?
     let scale: Double?
     let velocity: Double?
+    let x: Double?
+    let y: Double?
+    let endX: Double?
+    let endY: Double?
 }
 
 private struct ElementRecord: Codable {

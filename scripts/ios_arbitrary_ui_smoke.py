@@ -103,8 +103,20 @@ def main() -> int:
         )
         if action_result.get("action") != "tap":
             raise RuntimeError("generated UI probe action did not preserve the action")
+        coordinate_result = tool(
+            "apple_simulator_ui_probe_action",
+            {
+                "udid": simulator_id,
+                "bundleID": "com.burakkarahan.AppleDebugFixture",
+                "action": "coordinateTap",
+                "x": 0.5,
+                "y": 0.5,
+            },
+        )
+        if coordinate_result.get("action") != "coordinateTap":
+            raise RuntimeError("generated UI probe coordinate action did not preserve the action")
         print(
-            "ios-arbitrary-ui-smoke: generated XCUITest runner inspected and tapped an installed app (%s elements)"
+            "ios-arbitrary-ui-smoke: generated XCUITest runner inspected and completed identifier/coordinate actions on an installed app (%s elements)"
             % len(snapshot.get("elements", []))
         )
         return 0

@@ -27,6 +27,7 @@ public enum AppleDebugCapability: String, Codable, CaseIterable, Sendable {
     case binaryIntelligence = "binary-intelligence"
     case runtimeMetadata = "runtime-metadata"
     case dwarfAnalysis = "dwarf-analysis"
+    case swiftASTAnalysis = "swift-ast-analysis"
     case performanceAnalysis = "performance-analysis"
     case runtimeDiagnostics = "runtime-diagnostics"
     case memoryMapAnalysis = "memory-map-analysis"
@@ -78,7 +79,7 @@ public enum CapabilityMatrix {
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
                     .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
-                    .runtimeMetadata, .dwarfAnalysis, .performanceAnalysis,
+                    .runtimeMetadata, .dwarfAnalysis, .swiftASTAnalysis, .performanceAnalysis,
                     .runtimeDiagnostics, .memoryMapAnalysis, .assembler,
                     .binaryDiff, .crashAnalysis, .forwardExecutionTrace,
                     .signingAudit, .patchWorkflow, .nativeWorkbench,
@@ -100,7 +101,7 @@ public enum CapabilityMatrix {
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
                     .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
-                    .runtimeMetadata, .dwarfAnalysis, .performanceAnalysis,
+                    .runtimeMetadata, .dwarfAnalysis, .swiftASTAnalysis, .performanceAnalysis,
                     .assembler, .binaryDiff, .crashAnalysis, .simulatorControl,
                     .simulatorEnvironment, .reproducibleEvidence, .uiInspection,
                     .forwardExecutionTrace, .signingAudit, .patchWorkflow,
@@ -120,7 +121,7 @@ public enum CapabilityMatrix {
                 supported: [
                     .launch, .machOAnalysis, .symbolication, .crashAnalysis,
                     .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
-                    .runtimeMetadata, .dwarfAnalysis, .assembler, .binaryDiff,
+                    .runtimeMetadata, .dwarfAnalysis, .swiftASTAnalysis, .assembler, .binaryDiff,
                     .signingAudit, .patchWorkflow, .deviceControl
                 ],
                 restricted: [
@@ -165,7 +166,7 @@ public enum ToolchainProbe {
     public static func collect() -> ToolchainStatus {
         let toolNames = [
             "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
-            "codesign", "otool", "nm", "dyld_info", "swift-demangle", "dwarfdump", "vmmap", "xctrace",
+            "codesign", "otool", "nm", "dyld_info", "swiftc", "swift-demangle", "dwarfdump", "vmmap", "xctrace",
             "heap", "leaks", "malloc_history", "sample", "clang", "llvm-objdump"
         ]
         let tools = toolNames.map { name in

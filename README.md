@@ -17,18 +17,19 @@ The current product surface includes:
 - trace-backed Swift Concurrency task/actor/continuation graphs that merge the public `swift-task-*` and `swift-actor-*` xctrace schemas with explicit sampling and private-runtime boundaries;
 - Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
 - bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
-- Mach-O CFG/basic-block/call-graph/xref/relocation reports with address-based branch/call references and a direct dyld shared-cache header/mapping/image parser plus bounded mount/helper discovery;
+- Mach-O CFG/basic-block/call-graph/xref/relocation reports with address-based branch/call references and a direct dyld shared-cache header/mapping/image parser plus selected-image Mach-O/export/nlist extraction and bounded mount/helper discovery;
 - typed vmmap region reports, persisted memory snapshots, and region diffs;
 - Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
 - read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;
 - a native SwiftUI macOS workbench with session launch/threads/snapshots/pause/continue/instruction stepping/evaluation controls plus safe plugin manifest/registry APIs that never load external dylibs;
-- signed plugin-host validation and sandbox-required execution plans that remain non-executing until a separately reviewed host exists;
+- signed plugin-host validation plus a separately built deny-by-default/no-network host executable with explicit execution grant and bounded JSON IPC;
 - explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
 - structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
 - Objective-C classes/protocols/selectors and demangled Swift symbol metadata;
 - deep bounded DWARF inspection from Mach-O/dSYM inputs, including DIE hierarchy, typed attributes, declaration locations, source lists, line-table rows, statistics, and address lookups;
+- source-backed typed Swift AST inspection through public `swiftc -dump-ast`, with declarations, types, functions, variables, imports, and compiler locations;
 - read-only binary diffing for Mach-O files, `.app` bundles, and `.dSYM` bundles, including symbols, exports, dependencies, signatures, entitlements, hashes, and UUIDs;
 - `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
 - crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
@@ -79,6 +80,7 @@ make ios-mcp-tool-smoke
 make ios-ui-tree-smoke
 make ios-arbitrary-ui-smoke
 make dwarf-smoke
+make swift-ast-smoke
 make performance-analysis-smoke
 make swift-concurrency-graph-smoke
 make runtime-diagnostics-smoke
@@ -91,6 +93,7 @@ make repro-bundle-smoke
 make signing-audit-smoke
 make patch-workflow-smoke
 make plugin-smoke
+make plugin-host-build-smoke
 make workbench-build-smoke
 ```
 
