@@ -14,6 +14,7 @@ The current implementation is intentionally read-only: it reports the supported 
 | Sources/AppleDebugCore/ | Platform-neutral capability reports and safe toolchain probing | Apple Debug MCP maintainers; update when a platform capability changes |
 | Sources/AppleDebugCore/DAP.swift | DAP value model, Content-Length framing, and LLDB-DAP session lifecycle | Apple Debug MCP maintainers; update with DAP/backend behavior |
 | Sources/AppleDebugCore/MachO.swift | Read-only Mach-O and universal-binary header, architecture, load-command, and segment inspection | Apple Debug MCP maintainers; update with static-analysis behavior |
+| Sources/AppleDebugCore/DebugSessions.swift | Capability-aware LLDB-DAP session manager and launch policy | Apple Debug MCP maintainers; update when session permissions or cleanup changes |
 | Sources/AppleDebugMCP/ | MCP server startup and tool dispatch | Apple Debug MCP maintainers; update when MCP surface changes |
 | Tests/AppleDebugCoreTests/ | Core behavior and platform-boundary tests | Update with core behavior changes |
 | scripts/ | Build, smoke, and repository-native harness commands | Update when verification or lifecycle commands change |
@@ -40,7 +41,9 @@ Backends may be added only behind capability checks. The MCP layer must not expo
 4. apple_toolchain_status runs only fixed, allowlisted Xcode discovery commands without a shell.
 5. apple_lldb_dap_initialize starts LLDB-DAP, completes the initialize handshake, drains adapter events, and tears down the adapter.
 6. apple_macho_inspect reads a regular, size-bounded Mach-O file without executing it and returns structured architecture/header/segment data.
-7. Future debugger calls create a target session in the core, select a backend, enforce policy, and return structured observations.
+7. apple_debug_session_create/list/close manage initialized local LLDB-DAP adapter sessions.
+8. apple_debug_launch validates the explicit launch policy before sending a target launch request and tears down failed sessions.
+9. Future debugger calls select a backend, enforce policy, and return structured observations.
 
 ## Runtime topology
 
@@ -52,7 +55,7 @@ The current topology is local macOS only. There is no hosted service, persistent
 - Authorization: capability reports and SecurityPolicy gate target selection and mutating operations.
 - Configuration: no secrets or persistent configuration are required by the current foundation.
 - Telemetry: current tools return structured MCP results; long-lived logging, metrics, and traces are not yet applicable.
-- Reliability: failed discovery returns an absent tool path, DAP probe failures tear down the adapter, and Mach-O input is regular-file and size-bounded before parsing.
+- Reliability: failed discovery returns an absent tool path, DAP probe failures tear down the adapter, failed launch tears down its session, and Mach-O input is regular-file and size-bounded before parsing.
 - Licensing: project code is GPL-3.0-or-later under Burak Karahan; upstream dependencies retain their own licenses.
 
 ## Mechanically enforced invariants
