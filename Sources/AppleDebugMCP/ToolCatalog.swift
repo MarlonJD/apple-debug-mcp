@@ -29,6 +29,16 @@ enum ToolCatalog {
             inputSchema: pathObjectSchema
         ),
         Tool(
+            name: "apple_crash_inspect",
+            description: "Parse an Apple .crash or .ips report into process, exception, thread, and image metadata without executing it.",
+            inputSchema: crashObjectSchema
+        ),
+        Tool(
+            name: "apple_log_show",
+            description: "Read bounded host or Simulator unified logs without mutating the target.",
+            inputSchema: logShowObjectSchema
+        ),
+        Tool(
             name: "apple_debug_session_create",
             description: "Create and initialize an authorized local LLDB-DAP debug session without launching a target.",
             inputSchema: emptyObjectSchema
@@ -84,6 +94,46 @@ enum ToolCatalog {
             inputSchema: threadObjectSchema
         ),
         Tool(
+            name: "apple_debug_pause",
+            description: "Pause a running target in an active debug session.",
+            inputSchema: sessionObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_step",
+            description: "Step into, over, or out of the selected thread in a stopped debug session.",
+            inputSchema: stepObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_scopes",
+            description: "Read register, local, and argument scopes for a stack frame.",
+            inputSchema: frameObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_variables",
+            description: "Read variables for a DAP variables reference returned by a scope or evaluate request.",
+            inputSchema: variablesObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_evaluate",
+            description: "Evaluate an expression in a stopped frame. Disabled unless APPLE_DEBUG_ALLOW_EVALUATE=1.",
+            inputSchema: evaluateObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_data_breakpoint_info",
+            description: "Resolve a DAP data breakpoint identifier for a variable.",
+            inputSchema: dataBreakpointInfoObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_set_data_breakpoint",
+            description: "Set a watchpoint using a DAP data breakpoint identifier.",
+            inputSchema: dataBreakpointObjectSchema
+        ),
+        Tool(
+            name: "apple_debug_write_memory",
+            description: "Write up to 4096 bytes to a stopped target. Disabled unless APPLE_DEBUG_ALLOW_MEMORY_WRITE=1.",
+            inputSchema: writeMemoryObjectSchema
+        ),
+        Tool(
             name: "apple_simulator_list",
             description: "List available iOS Simulator devices without changing simulator state.",
             inputSchema: emptyObjectSchema
@@ -112,6 +162,11 @@ enum ToolCatalog {
             name: "apple_simulator_terminate",
             description: "Terminate an app on an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
             inputSchema: simulatorLaunchObjectSchema
+        ),
+        Tool(
+            name: "apple_simulator_screenshot",
+            description: "Capture a PNG screenshot from an iOS Simulator. Disabled unless APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.",
+            inputSchema: simulatorScreenshotObjectSchema
         ),
         Tool(
             name: "apple_device_list",
@@ -190,6 +245,27 @@ enum ToolCatalog {
                     content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
                     isError: true
                 )
+            }
+        case "apple_crash_inspect":
+            guard let path = params.arguments?["path"]?.stringValue else {
+                return errorResult("Missing required path argument.")
+            }
+            do {
+                return result(for: try CrashReportAnalyzer.inspect(path: path))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_log_show":
+            do {
+                return result(
+                    for: try AppleLogService.show(
+                        target: params.arguments?["target"]?.stringValue ?? "host",
+                        last: params.arguments?["last"]?.stringValue ?? "5m",
+                        predicate: params.arguments?["predicate"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
             }
         case "apple_debug_session_create":
             do {
@@ -305,6 +381,116 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_debug_pause":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            do {
+                return result(for: try await sessions.pause(sessionID: sessionID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_step":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let threadID = intValue(from: params.arguments?["threadID"]),
+                  let kind = params.arguments?["kind"]?.stringValue,
+                  let stepKind = DebugStepKind(rawValue: kind) else {
+                return errorResult("Missing or invalid sessionID, threadID, or kind argument. kind must be stepIn, next, or stepOut.")
+            }
+            do {
+                return result(for: try await sessions.step(sessionID: sessionID, threadID: threadID, kind: stepKind))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_scopes":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let frameID = intValue(from: params.arguments?["frameID"]) else {
+                return errorResult("Missing required sessionID or frameID argument.")
+            }
+            do {
+                return result(for: try await sessions.scopes(sessionID: sessionID, frameID: frameID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_variables":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let variablesReference = intValue(from: params.arguments?["variablesReference"]) else {
+                return errorResult("Missing required sessionID or variablesReference argument.")
+            }
+            do {
+                return result(for: try await sessions.variables(sessionID: sessionID, variablesReference: variablesReference))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_evaluate":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let expression = params.arguments?["expression"]?.stringValue else {
+                return errorResult("Missing required sessionID or expression argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.evaluate(
+                        sessionID: sessionID,
+                        expression: expression,
+                        frameID: intValue(from: params.arguments?["frameID"]),
+                        context: params.arguments?["context"]?.stringValue ?? "repl"
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_data_breakpoint_info":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let variablesReference = intValue(from: params.arguments?["variablesReference"]),
+                  let name = params.arguments?["name"]?.stringValue else {
+                return errorResult("Missing required sessionID, variablesReference, or name argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.dataBreakpointInfo(
+                        sessionID: sessionID,
+                        variablesReference: variablesReference,
+                        name: name
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_set_data_breakpoint":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let dataID = params.arguments?["dataID"]?.stringValue else {
+                return errorResult("Missing required sessionID or dataID argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.setDataBreakpoint(
+                        sessionID: sessionID,
+                        dataID: dataID,
+                        accessType: params.arguments?["accessType"]?.stringValue
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_write_memory":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue,
+                  let memoryReference = params.arguments?["memoryReference"]?.stringValue,
+                  let encodedData = params.arguments?["data"]?.stringValue,
+                  let data = Data(base64Encoded: encodedData) else {
+                return errorResult("Missing required sessionID, memoryReference, or valid base64 data argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.writeMemory(
+                        sessionID: sessionID,
+                        memoryReference: memoryReference,
+                        offset: intValue(from: params.arguments?["offset"]) ?? 0,
+                        data: data
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_simulator_list":
             do {
                 return result(for: try SimulatorService.list())
@@ -343,6 +529,20 @@ enum ToolCatalog {
                     ? try SimulatorService.launch(udid: udid, bundleID: bundleID)
                     : try SimulatorService.terminate(udid: udid, bundleID: bundleID)
                 return result(for: action)
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_simulator_screenshot":
+            guard let udid = params.arguments?["udid"]?.stringValue else {
+                return errorResult("Missing required udid argument.")
+            }
+            do {
+                return result(
+                    for: try SimulatorService.screenshot(
+                        udid: udid,
+                        path: params.arguments?["path"]?.stringValue
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -468,6 +668,32 @@ enum ToolCatalog {
         "required": .array([.string("path")])
     ])
 
+    private static let crashObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute path to an authorized .crash or .ips report")
+            ])
+        ]),
+        "required": .array([.string("path")])
+    ])
+
+    private static let logShowObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "target": .object([
+                "type": .string("string"),
+                "description": .string("host or an available iOS Simulator UDID")
+            ]),
+            "last": .object([
+                "type": .string("string"),
+                "description": .string("Bounded duration such as 30s, 5m, 1h, or 1d")
+            ]),
+            "predicate": .object(["type": .string("string")])
+        ])
+    ])
+
     private static let sessionObjectSchema: Value = .object([
         "type": .string("object"),
         "properties": .object([
@@ -519,6 +745,85 @@ enum ToolCatalog {
             "threadID": .object(["type": .string("integer")])
         ]),
         "required": .array([.string("sessionID"), .string("threadID")])
+    ])
+
+    private static let stepObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "threadID": .object(["type": .string("integer")]),
+            "kind": .object([
+                "type": .string("string"),
+                "enum": .array([.string("stepIn"), .string("next"), .string("stepOut")])
+            ])
+        ]),
+        "required": .array([.string("sessionID"), .string("threadID"), .string("kind")])
+    ])
+
+    private static let frameObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "frameID": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("frameID")])
+    ])
+
+    private static let variablesObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "variablesReference": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID"), .string("variablesReference")])
+    ])
+
+    private static let evaluateObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "expression": .object(["type": .string("string")]),
+            "frameID": .object(["type": .string("integer")]),
+            "context": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("sessionID"), .string("expression")])
+    ])
+
+    private static let dataBreakpointInfoObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "variablesReference": .object(["type": .string("integer")]),
+            "name": .object(["type": .string("string")])
+        ]),
+        "required": .array([.string("sessionID"), .string("variablesReference"), .string("name")])
+    ])
+
+    private static let dataBreakpointObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "dataID": .object(["type": .string("string")]),
+            "accessType": .object([
+                "type": .string("string"),
+                "enum": .array([.string("read"), .string("write"), .string("readWrite")])
+            ])
+        ]),
+        "required": .array([.string("sessionID"), .string("dataID")])
+    ])
+
+    private static let writeMemoryObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "memoryReference": .object(["type": .string("string")]),
+            "offset": .object(["type": .string("integer")]),
+            "data": .object([
+                "type": .string("string"),
+                "description": .string("Base64-encoded bytes; maximum 4096 bytes")
+            ])
+        ]),
+        "required": .array([.string("sessionID"), .string("memoryReference"), .string("data")])
     ])
 
     private static let stackTraceObjectSchema: Value = .object([
@@ -577,6 +882,18 @@ enum ToolCatalog {
             "bundleID": .object(["type": .string("string")])
         ]),
         "required": .array([.string("udid"), .string("bundleID")])
+    ])
+
+    private static let simulatorScreenshotObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "udid": .object(["type": .string("string")]),
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Optional absolute PNG output path; defaults to a temporary file")
+            ])
+        ]),
+        "required": .array([.string("udid")])
     ])
 
     private static let deviceInstallObjectSchema: Value = .object([

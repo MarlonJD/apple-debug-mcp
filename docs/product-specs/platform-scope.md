@@ -8,11 +8,11 @@ Provide an MCP-native Apple debugging and reverse-engineering workbench that let
 
 ### macOS
 
-The target is a local macOS process or binary for which the user has debugging authority. The intended full surface includes LLDB session control, breakpoints, stepping, registers, stack, memory, Mach-O analysis, Objective-C/Swift metadata, crash analysis, dSYM symbolication, and controlled mutation.
+The target is a local macOS process or binary for which the user has debugging authority. The implemented surface includes LLDB-DAP session control, launch/attach, breakpoints, stepping, scopes/variables, stack, bounded memory read, explicitly gated expression evaluation and memory write, Mach-O headers/segments/symbols/strings, crash analysis, `atos` symbolication, and unified logs. Objective-C/Swift metadata extraction remains a future static-analysis increment.
 
 ### iOS Simulator
 
-The target is an application installed in a local Simulator. The intended surface includes build, install, launch, logs, UI inspection, LLDB debugging, Mach-O analysis, and symbolication. Simulator results do not replace physical-device evidence.
+The target is an application installed in a local Simulator. The implemented surface includes Xcode build/discovery, install, launch, terminate, screenshot, logs, LLDB-DAP attach/inspection, Mach-O analysis, crash analysis, and symbolication. Accessibility-tree inspection remains restricted. Simulator results do not replace physical-device evidence.
 
 ### Physical iOS device
 
@@ -33,6 +33,6 @@ The product is successful in stages:
 2. macOS LLDB inspection and controlled process operations work against a signed fixture binary.
 3. macOS controlled process operations remain policy-gated and cleanup-tested.
 4. Simulator build/run/debug and UI/log evidence work against a fixture app.
-5. Physical-device workflows work only for paired, development-authorized fixtures.
+5. Physical-device inventory and development-app lifecycle work only for paired, development-authorized fixtures; remote LLDB attach remains gated until a paired-device fixture is available.
 
 Each stage must have a fixture and an exact verification command before being called verified.

@@ -22,8 +22,10 @@ error_file="$tmp_dir/stderr.log"
         '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"apple_toolchain_status","arguments":{}}}' \
         '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"apple_lldb_dap_initialize","arguments":{}}}' \
         '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"apple_macho_inspect","arguments":{"path":"/bin/echo"}}}' \
-        '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"apple_simulator_list","arguments":{}}}'
-    sleep 0.5
+        '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"apple_simulator_list","arguments":{}}}' \
+        '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"apple_crash_inspect","arguments":{"path":"Tests/Fixtures/example.crash"}}}' \
+        '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"apple_log_show","arguments":{"target":"host","last":"1s","predicate":"process == \"apple-debug-mcp\""}}}'
+    sleep 2
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
 grep -q '"id":1' "$output_file"
@@ -33,5 +35,8 @@ grep -q 'ios-device' "$output_file"
 grep -q 'lldb-dap' "$output_file"
 grep -q 'Mach-O' "$output_file"
 grep -q 'iPhone' "$output_file"
+grep -q 'apple_debug_step' "$output_file"
+grep -q 'EXC_BAD_ACCESS' "$output_file"
+grep -q '"id":9.*"isError":false' "$output_file"
 
 printf '%s\n' 'smoke: MCP initialize, tool discovery, capability, and toolchain calls passed'

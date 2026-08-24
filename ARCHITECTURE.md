@@ -2,84 +2,87 @@
 
 ## System context
 
-Apple Debug MCP is a local macOS command-line server that exposes safe, capability-aware Apple debugging operations through MCP. An MCP client launches it over stdio. The server will eventually coordinate LLDB/DAP, Mach-O analysis, Xcode, Simulator, and authorized physical-device workflows.
+Apple Debug MCP is a local macOS command-line server that exposes capability-aware Apple debugging and analysis operations through MCP. An MCP client launches it over stdio. The server delegates debugger transport to LLDB-DAP and delegates Apple platform operations to fixed Xcode command-line tools.
 
-The current implementation is intentionally read-only: it reports the supported platform boundary, discovers allowlisted Xcode command-line tools, and initializes the local LLDB-DAP adapter. No debug target is launched, attached, terminated, or modified.
+The current implementation supports verified macOS and iOS Simulator fixture workflows. Physical-device inventory and development-app lifecycle are present behind CoreDevice authorization checks; physical-device LLDB attach remains restricted until an authorized device fixture is available.
 
 ## Repository map
 
 | Path | Responsibility | Owner or update trigger |
 | --- | --- | --- |
 | Package.swift | SwiftPM products and official MCP SDK dependency | Update when products or upstream SDK version changes |
-| Sources/AppleDebugCore/ | Platform-neutral capability reports and safe toolchain probing | Apple Debug MCP maintainers; update when a platform capability changes |
-| Sources/AppleDebugCore/DAP.swift | DAP value model, Content-Length framing, and LLDB-DAP session lifecycle | Apple Debug MCP maintainers; update with DAP/backend behavior |
-| Sources/AppleDebugCore/MachO.swift | Read-only Mach-O and universal-binary header, architecture, load-command, and segment inspection | Apple Debug MCP maintainers; update with static-analysis behavior |
-| Sources/AppleDebugCore/DebugSessions.swift | Capability-aware LLDB-DAP session manager and launch policy | Apple Debug MCP maintainers; update when session permissions or cleanup changes |
-| Sources/AppleDebugCore/AppleSimulator.swift | Read-only Simulator inventory and policy-gated simctl lifecycle operations | Apple Debug MCP maintainers; update when Simulator/device operations change |
-| Sources/AppleDebugCore/AppleDevice.swift | CoreDevice JSON inventory and authorization-gated physical-device install/launch operations | Apple Debug MCP maintainers; update when pairing/device policy changes |
-| Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated xcodebuild execution | Apple Debug MCP maintainers; update when build/destination policy changes |
-| Tests/Fixtures/iOSDebugApp/ | Minimal SwiftUI app used to prove Xcode/iOS Simulator artifact production | Maintainers; update when Simulator app contract changes |
-| scripts/ios_fixture_smoke.sh | Explicit Simulator lifecycle smoke with screenshot and cleanup | Maintainers; run only with mutation authorization |
-| Sources/AppleDebugMCP/ | MCP server startup and tool dispatch | Apple Debug MCP maintainers; update when MCP surface changes |
-| Tests/AppleDebugCoreTests/ | Core behavior and platform-boundary tests | Update with core behavior changes |
-| scripts/ | Build, smoke, and repository-native harness commands | Update when verification or lifecycle commands change |
-| docs/ | Canonical product, architecture, security, reliability, and agent-workflow knowledge | Update with boundary or workflow changes |
+| Sources/AppleDebugCore/ | Capability policy, toolchain probes, Apple adapters, and testable domain logic | Maintainers; update when a platform capability changes |
+| Sources/AppleDebugCore/DAP.swift | DAP value model, Content-Length framing, and LLDB-DAP process lifecycle | Maintainers; update with DAP/backend behavior |
+| Sources/AppleDebugCore/DebugSessions.swift | Session ownership, debugger operations, bounds, and mutation policy | Maintainers; update when session permissions or cleanup changes |
+| Sources/AppleDebugCore/MachO.swift | Read-only Mach-O/universal-binary headers, segments, symbols, and strings | Maintainers; update with static-analysis behavior |
+| Sources/AppleDebugCore/AppleSymbolication.swift | `atos` address resolution | Maintainers; update with symbolication inputs or output contract |
+| Sources/AppleDebugCore/CrashReports.swift | Bounded `.crash` text and `.ips` JSON analysis | Maintainers; update with Apple crash schema changes |
+| Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
+| Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
+| Sources/AppleDebugCore/AppleDevice.swift | CoreDevice inventory and authorization-gated development-app operations | Maintainers; update with pairing/tunnel policy changes |
+| Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
+| Sources/AppleDebugMCP/ | MCP server startup and typed tool dispatch | Maintainers; update when the MCP surface changes |
+| Tests/Fixtures/ | Signed macOS debugger target, iOS Simulator app, and crash-report fixture | Maintainers; update when fixture contracts change |
+| scripts/ | Build, smoke, lifecycle, and repository-native harness commands | Maintainers; update when verification or cleanup changes |
+| docs/ | Canonical product, architecture, security, reliability, and agent workflow knowledge | Maintainers; update with boundary or workflow changes |
 
 ## Components and boundaries
 
-The executable depends on AppleDebugCore and the official Swift MCP SDK. AppleDebugCore does not depend on MCP, so capability policy and toolchain discovery remain testable without a transport.
+The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `AppleDebugCore` does not depend on MCP, so policy, parsing, and platform adapters remain testable without a transport.
 
-Future backend boundaries are:
+- `LLDBDAPSession`: owns one LLDB-DAP subprocess, DAP framing, request/response matching, event draining, and teardown.
+- `DebugSessionManager`: owns session IDs and routes launch, attach, breakpoints, inspection, stepping, watchpoints, evaluation, and memory writes through policy checks.
+- `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
+- `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
+- `AppleSimulatorService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results.
+- `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
-- LLDBBackend: LLDB/DAP session lifecycle and debugger state.
-- MachOBackend: Mach-O, Objective-C, Swift metadata, symbols, strings, and disassembly.
-- AppleToolingBackend: Xcode, simctl, devicectl, logs, and symbolication.
-- SecurityPolicy: filesystem roots, target authorization, destructive-operation approvals, and audit events.
-
-Backends may be added only behind capability checks. The MCP layer must not expose an operation that the active target cannot safely support.
+No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.
 
 ## Data and control flow
 
-1. The MCP client starts apple-debug-mcp as a stdio child process.
-2. The server completes MCP initialization and advertises read-only tools.
-3. apple_capabilities returns the platform capability matrix and explicit restrictions.
-4. apple_toolchain_status runs only fixed, allowlisted Xcode discovery commands without a shell.
-5. apple_lldb_dap_initialize starts LLDB-DAP, completes the initialize handshake, drains adapter events, and tears down the adapter.
-6. apple_macho_inspect reads a regular, size-bounded Mach-O file without executing it and returns structured architecture/header/segment data.
-7. apple_debug_session_create/list/close manage initialized local LLDB-DAP adapter sessions.
-8. apple_debug_launch validates the explicit launch policy before sending a target launch request and tears down failed sessions.
-9. Breakpoint, continue, threads, stack trace, memory read, and disassembly tools route through an owned session.
-10. apple_simulator_list reads available Simulator inventory; boot, shutdown, install, launch, and terminate require the explicit mutation policy.
-11. apple_device_list reads physical-device pairing and tunnel state; install and launch require a paired, tunnel-ready development target plus explicit mutation policy.
-12. apple_xcode_discover reads schemes/targets from an Xcode project or workspace; apple_xcode_build requires explicit build policy.
-13. Future debugger calls select a backend, enforce policy, and return structured observations.
+1. The MCP client starts `apple-debug-mcp` as a stdio child process.
+2. The server completes MCP initialization and advertises the current tool schemas.
+3. `apple_capabilities` returns platform-specific support and restrictions.
+4. `apple_toolchain_status` probes a fixed allowlist through `xcrun`/`xcode-select`.
+5. `apple_lldb_dap_initialize` starts LLDB-DAP, completes initialization, drains events, and tears down the probe adapter.
+6. `apple_debug_session_create` creates an owned persistent adapter session.
+7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, stack, scopes, variables, memory, disassembly, stepping, watchpoints, evaluation, and continuation.
+8. `apple_macho_inspect`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
+9. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
+10. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
+11. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+12. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 
-The current topology is local macOS only. There is no hosted service, persistent database, production environment, or release deployment in this repository. iOS Simulator and physical-device workflows are future local capabilities and require Xcode/device authorization.
+The topology is local macOS only: one short-lived MCP process, zero listening ports, no hosted service, and no persistent database. Build artifacts remain under `.build`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows. Release packaging, signing/notarization, and remote HTTP transport are outside the current repository boundary.
 
 ## Cross-cutting concerns
 
-- Authentication: stdio inherits the MCP client process boundary; future HTTP transport must bind locally and require explicit authentication.
-- Authorization: capability reports and SecurityPolicy gate target selection and mutating operations.
-- Configuration: no secrets or persistent configuration are required by the current foundation.
-- Telemetry: current tools return structured MCP results; long-lived logging, metrics, and traces are not yet applicable.
-- Reliability: failed discovery returns an absent tool path, DAP probe failures tear down the adapter, failed launch tears down its session, and Mach-O input is regular-file and size-bounded before parsing.
+- Authentication: stdio inherits the MCP client process boundary; a future HTTP transport must bind locally and require explicit authentication.
+- Authorization: capability reports and environment-gated policy checks guard process control, expression evaluation, memory writes, Simulator mutation, device mutation, and Xcode builds.
+- Filesystem safety: analyzers accept regular files only and enforce size limits; debugger launch currently requires a regular target and explicit user authorization.
+- Cleanup: failed launches remove their session; explicit close, server shutdown, and adapter failures close pipes and terminate only the owned LLDB-DAP process.
+- Reliability: external-tool failures become typed MCP errors; no arbitrary-shell fallback is permitted.
 - Licensing: project code is GPL-3.0-or-later under Burak Karahan; upstream dependencies retain their own licenses.
 
 ## Mechanically enforced invariants
 
 | Invariant | Enforcer | Recovery guidance |
 | --- | --- | --- |
-| Toolchain discovery uses a fixed allowlist and no shell | ToolchainProbeTests plus ToolchainProbe implementation | Extend the allowlist and test when adding a tool |
-| Every Apple target has an explicit capability report | CapabilitiesTests | Add the platform to AppleDebugPlatform.allCases and CapabilityMatrix |
-| Physical iOS restrictions are visible in the public report | CapabilitiesTests | Update the restricted set and product/security docs together |
-| Build, tests, MCP smoke protocol, whitespace, and placeholder checks stay green | scripts/check.sh | Run make check, then fix the first reported failure |
-| Harness routes and documents remain complete | scripts/harness_check.sh plus the bundled harness cross-check | Repair the named route or update the active ExecPlan |
+| Toolchain discovery uses a fixed allowlist and no shell | `ToolchainProbeTests` and implementation | Extend the allowlist and test when adding a tool |
+| Every Apple target has an explicit capability report | `CapabilitiesTests` | Add the platform to `AppleDebugPlatform.allCases` and `CapabilityMatrix` |
+| Unsupported physical-device capabilities remain visible | `CapabilitiesTests` and capability JSON | Keep the capability restricted until device evidence exists |
+| Artifact analyzers are regular-file and size bounded | Mach-O/crash tests and implementations | Reject the input; never execute it as a fallback |
+| Mutating debugger operations are explicitly gated | `DebugPolicy` and `DebugSessionTests` | Keep the operation disabled and add a reproducing policy test |
+| Build, tests, MCP smoke, fixture smoke, whitespace, and placeholder checks stay green | `scripts/check.sh` | Run `make check` and fix the first reported failure |
+| Harness routes and documents remain complete | `scripts/harness_check.sh` plus bundled validator | Repair the named route or update the active ExecPlan |
 
 ## Architecture decisions
 
-- The official Swift MCP SDK is used for MCP framing and transport; the project does not reimplement JSON-RPC framing.
-- SwiftPM is the initial build boundary because the server runs on macOS and must coordinate Apple developer tooling.
-- Capability restrictions are represented as data, not hidden in client-specific prompts.
-- The project starts with read-only discovery before adding debugger control or code mutation.
+- Use the official Swift MCP SDK for MCP framing and transport; do not reimplement JSON-RPC framing.
+- Use SwiftPM as the build boundary because the server runs locally on macOS and coordinates Xcode tooling.
+- Keep capability restrictions as data, not hidden in client-specific prompts.
+- Prefer LLDB-DAP over arbitrary LLDB shell commands so the MCP surface is typed, bounded, and reviewable.
+- Make dangerous operations opt-in and fixture-tested before promoting them to a verified capability.

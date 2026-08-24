@@ -101,6 +101,21 @@ public enum SimulatorService {
         try mutate(action: "terminate", udid: udid, arguments: ["simctl", "terminate", udid, bundleID])
     }
 
+    public static func screenshot(udid: String, path: String? = nil) throws -> SimulatorActionResult {
+        guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION"] == "1" else {
+            throw SimulatorError.mutationDisabled
+        }
+        guard try list().contains(where: { $0.udid == udid }) else {
+            throw SimulatorError.unknownDevice(udid)
+        }
+
+        let destination = path ?? FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-(UUID().uuidString).png")
+            .path
+        let result = try run(arguments: ["simctl", "io", udid, "screenshot", destination])
+        return SimulatorActionResult(action: "screenshot", udid: udid, output: result.stdout.isEmpty ? destination : result.stdout)
+    }
+
     private static func mutate(
         action: String,
         udid: String,

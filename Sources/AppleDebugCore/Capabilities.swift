@@ -72,27 +72,31 @@ public enum CapabilityMatrix {
                     .sessionLifecycle, .launch, .attach, .breakpoints,
                     .watchpoints, .stepControl, .registers, .stack,
                     .memoryRead, .memoryWrite, .machOAnalysis, .symbolication,
-                    .crashAnalysis, .simulatorControl, .uiInspection, .logs
+                    .crashAnalysis, .simulatorControl, .logs
                 ],
-                restricted: [],
+                restricted: [.uiInspection],
                 notes: [
                     "Simulator behaviour is not a substitute for physical-device validation.",
-                    "Memory mutation is disabled by default and requires an explicit policy grant."
+                    "Memory mutation is disabled by default and requires an explicit policy grant.",
+                    "Screenshot capture is available; accessibility-tree inspection is not exposed yet."
                 ]
             ),
             CapabilityReport(
                 platform: .iOSDevice,
                 supported: [
-                    .sessionLifecycle, .launch, .breakpoints, .watchpoints,
-                    .stepControl, .registers, .stack, .memoryRead,
-                    .machOAnalysis, .symbolication, .crashAnalysis,
-                    .deviceControl, .logs
+                    .launch, .machOAnalysis, .symbolication, .crashAnalysis,
+                    .deviceControl
                 ],
-                restricted: [.attach, .memoryWrite, .uiInspection],
+                restricted: [
+                    .sessionLifecycle, .attach, .breakpoints, .watchpoints,
+                    .stepControl, .registers, .stack, .memoryRead,
+                    .memoryWrite, .uiInspection, .logs
+                ],
                 notes: [
                     "Physical-device debugging is limited to paired, authorized development targets.",
                     "Stock App Store applications are outside the supported debugging boundary.",
-                    "Device access requires the appropriate signing, Developer Mode, and entitlements."
+                    "Device access requires the appropriate signing, Developer Mode, and entitlements.",
+                    "The current device adapter inventories, installs, and launches development apps; remote LLDB session attach remains gated until a paired-device fixture is available."
                 ]
             )
         ]

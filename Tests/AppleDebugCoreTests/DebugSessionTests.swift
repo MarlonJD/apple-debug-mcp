@@ -14,6 +14,30 @@ final class DebugSessionTests: XCTestCase {
         }
     }
 
+    func testTargetAttachRequiresExplicitPolicy() {
+        XCTAssertThrowsError(
+            try DebugPolicy.validateAttach(processID: 1)
+        ) { error in
+            XCTAssertEqual(error as? DebugPolicyError, .attachDisabled)
+        }
+    }
+
+    func testMemoryWriteRequiresExplicitPolicy() {
+        XCTAssertThrowsError(
+            try DebugPolicy.validateMemoryWrite(data: Data([0x01]))
+        ) { error in
+            XCTAssertEqual(error as? DebugPolicyError, .memoryWriteDisabled)
+        }
+    }
+
+    func testExpressionEvaluationRequiresExplicitPolicy() {
+        XCTAssertThrowsError(
+            try DebugPolicy.validateEvaluate()
+        ) { error in
+            XCTAssertEqual(error as? DebugPolicyError, .evaluateDisabled)
+        }
+    }
+
     func testManagerCreatesAndClosesDAPSession() async throws {
         let manager = DebugSessionManager()
         let summary = try await manager.create()

@@ -20,7 +20,10 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | iOS Simulator fixture leaves state behind | ios-fixture-smoke fails before cleanup | Rerun targeted terminate/shutdown for the known fixture UDID; do not erase the device | make ios-fixture-smoke |
 | iOS Simulator debugger attach regresses | ios-debug-fixture-smoke fails or leaves a session/process | Close the owned LLDB session, terminate the known bundle, and shutdown the known UDID | make ios-debug-fixture-smoke |
 | Tool output becomes non-deterministic | Core tests or sorted JSON output changes unexpectedly | Reproduce with the same fixture and update the contract intentionally | swift test |
-| Future debugger operation leaves a target running | Session lifecycle and process cleanup tests fail | Use the session teardown path; do not kill unrelated processes | Candidate until debugger backend exists |
+| Debugger operation leaves a target or adapter running | Fixture smoke fails or process inspection finds an owned child | Close the session and rerun targeted cleanup; do not kill unrelated processes | macOS and iOS Simulator fixture smoke |
+| Crash report is malformed or unsupported | apple_crash_inspect returns a typed analysis error | Preserve the artifact and inspect it with the supported `.crash`/`.ips` parser | CrashReportTests |
+| Unified log query is too broad or unavailable | apple_log_show returns a bounded-output or command error | Narrow duration/predicate and verify host/Simulator logging availability | AppleLogsTests and tool error path |
+| Simulator screenshot cannot be written | apple_simulator_screenshot returns a typed command error | Use a writable PNG path and keep the Simulator mutation gate explicit | SimulatorService and iOS fixture smoke |
 | Hosted availability, failover, and production rollback | Not applicable to the current local CLI | N/A; define only when a hosted service is introduced | N/A |
 
 ## Failure policy

@@ -4,31 +4,32 @@ Run this sweep manually at each major milestone and before a release or harness 
 
 ## Documentation and navigation
 
-- [ ] Check Markdown links and indexes.
-- [ ] Compare documented commands with Package.swift, Makefile, and scripts.
-- [ ] Check architecture and product scope against the current code.
-- [ ] Check active and completed plan state.
+- [x] Check Markdown links and indexes.
+- [x] Compare documented commands with Package.swift, Makefile, and scripts.
+- [x] Check architecture and product scope against the current code.
+- [x] Check active and completed plan state.
 
 ## Code and architecture
 
-- [ ] Check for duplicated process wrappers or bypassed backend boundaries.
-- [ ] Check capability restrictions against security documentation.
-- [ ] Check growing files, ownerless TODOs, and stale compatibility paths.
-- [ ] Promote repeated review findings into tests or explicit debt.
+- [x] Check for duplicated process wrappers or bypassed backend boundaries.
+- [x] Check capability restrictions against security documentation.
+- [x] Check growing files, ownerless TODOs, and stale compatibility paths.
+- [x] Promote repeated review findings into tests or explicit debt.
 
 ## Verification and runtime
 
-- [ ] Run make check.
-- [ ] Run make harness-check.
-- [ ] Exercise the MCP smoke path and inspect stderr.
-- [ ] Check that no stale debug process or listener remains.
+- [x] Run make check.
+- [x] Run make harness-check.
+- [x] Exercise the MCP smoke path and inspect stderr.
+- [x] Check that no stale debug process or listener remains.
 - [ ] Refresh harness evidence when source or coverage changes.
 
 ## Triage
 
 | Finding | Evidence | Impact | Action | Destination | Owner | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| No sweep finding recorded yet | Foundation checkout created 2026-08-24 | Future drift could remain undocumented | Run the first sweep after the foundation check | Active ExecPlan | Apple Debug MCP maintainers | candidate |
+| Physical-device fixture unavailable | CoreDevice reports unsupported pairing and unavailable tunnel | Remote LLDB evidence cannot be certified locally | Re-run only after an authorized paired device is available | Active ExecPlan | Apple Debug MCP maintainers | blocked-by-environment |
+| Accessibility-tree source not selected | Screenshot is available; UI inspection is restricted | AI cannot query UI hierarchy through MCP | Choose and fixture-test a Simulator-native source | Technical debt tracker | Apple Debug MCP maintainers | open |
 
 ## Cadence and escalation
 
@@ -38,4 +39,4 @@ Run this sweep at each milestone and before a harness attestation. A maintainer 
 
 | Runner and cadence | Scan/repair scope | Read or write mode | Pull-request and merge authority | Rollback and escalation | Evidence and status |
 | --- | --- | --- | --- | --- | --- |
-| Manual maintainer/agent task completion | Repository docs, commands, capability boundaries, and tests | Read-only scan followed by explicitly authorized local repair | No automatic PR or merge | Escalate external writes, release, signing, and product judgment | Candidate until first dated sweep |
+| Manual maintainer/agent task completion | Repository docs, commands, capability boundaries, and tests | Read-only scan followed by explicitly authorized local repair | No automatic PR or merge | Escalate external writes, release, signing, and product judgment | Dated sweep completed 2026-08-24 |

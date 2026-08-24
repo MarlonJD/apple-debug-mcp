@@ -1,49 +1,57 @@
 # Apple Debug MCP
 
-Apple Debug MCP is an MCP server for AI-assisted debugging and reverse engineering of authorized Apple targets.
+Apple Debug MCP is a local, GPL-licensed MCP server for AI-assisted debugging and reverse engineering of authorized Apple targets.
 
-The project is designed to cover:
+The current product surface includes:
 
-- macOS process debugging through LLDB;
-- iOS Simulator debugging and lifecycle control;
-- paired, development-authorized iOS device workflows;
-- Mach-O, Objective-C, and Swift binary analysis;
-- crash analysis and dSYM-based symbolication.
+- macOS LLDB-DAP launch and attach sessions;
+- source breakpoints, threads, stack traces, scopes, variables, stepping, pause/continue, disassembly, and bounded memory reads;
+- watchpoint plumbing through DAP data breakpoints;
+- explicitly authorized expression evaluation and memory writes;
+- Mach-O/universal-binary headers, segments, symbols, and printable strings;
+- `atos` symbolication and `.crash`/`.ips` crash-report inspection;
+- iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
+- Xcode project discovery and explicitly authorized builds;
+- CoreDevice physical-device inventory plus authorization-gated development-app install/launch.
 
-The repository starts with a small, safe foundation. The server exposes read-only capability and toolchain discovery, Mach-O inspection, LLDB-DAP adapter initialization, owned session lifecycle management, specialized debugger inspection commands, iOS Simulator inventory/lifecycle adapters, CoreDevice physical-device inventory, and Xcode project/build adapters. Target launch, attach, memory mutation, and device operations are behind explicit capability and permission boundaries.
+The server is intentionally local and capability-aware. It does not provide arbitrary shell execution, bypass Apple signing or entitlements, or attach to stock App Store applications without an authorized development boundary.
 
-## Design
+## Architecture
 
 ```text
 MCP client
     │ stdio
     ▼
 Apple Debug MCP
-    ├── Debug core and session lifecycle
-    ├── LLDB/DAP backend
-    ├── Mach-O analysis backend
-    ├── Xcode, Simulator, and device adapters
-    └── Permission and audit policy
+    ├── MCP tool catalog and policy gates
+    ├── LLDB-DAP session manager
+    ├── Mach-O, symbolication, and crash-report analyzers
+    └── Xcode, Simulator, CoreDevice, and unified-log adapters
 ```
 
-The public MCP surface will advertise only the capabilities supported by the active target. A physical iOS device is not treated as an unrestricted desktop process: stock App Store applications are outside the supported debugging boundary.
+The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Physical-device remote LLDB attach remains restricted until a paired, development-authorized device fixture is available. Simulator screenshot capture is available; accessibility-tree inspection is not exposed yet.
 
 ## Requirements
 
 - macOS 13 or later;
 - Xcode and its command-line tools;
 - Swift 6 / Xcode 16 or later;
-- an MCP-compatible client for local stdio connections.
+- an MCP-compatible client with local stdio support.
 
-## Build and test
+## Build and verify
 
 ```sh
 swift build
 swift test
 make check
+make harness-check
 make fixture
 make ios-fixture
+make ios-fixture-smoke
+make ios-debug-fixture-smoke
 ```
+
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The two iOS targets are explicit Simulator mutation workflows and boot, install, launch, inspect, and shut down a selected local device.
 
 ## Run
 
@@ -51,15 +59,17 @@ make ios-fixture
 swift run apple-debug-mcp
 ```
 
-Target launch is disabled by default. Enable it only for an authorized local target by setting APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1 in the MCP server environment.
+Safe defaults and opt-in boundaries:
 
-Simulator mutation is disabled by default. Enable it only for an authorized local workflow by setting APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1.
+- `APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1` — launch a known local target;
+- `APPLE_DEBUG_ALLOW_TARGET_ATTACH=1` — attach to an explicitly selected local process ID;
+- `APPLE_DEBUG_ALLOW_EVALUATE=1` — permit LLDB expression evaluation;
+- `APPLE_DEBUG_ALLOW_MEMORY_WRITE=1` — permit at most 4096-byte DAP memory writes;
+- `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` — boot, install, launch, terminate, shut down, or screenshot a Simulator;
+- `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — mutate only a paired, tunnel-ready development device;
+- `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` — run an explicitly selected Xcode project/scheme/configuration/destination build.
 
-Physical-device mutation is disabled by default and additionally requires a paired device with an available developer tunnel. Set APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1 only for an authorized development workflow.
-
-Xcode build execution is disabled by default. Set APPLE_DEBUG_ALLOW_XCODE_BUILD=1 only for an explicitly selected project, scheme, configuration, and destination.
-
-The explicit Simulator smoke is available with make ios-fixture-smoke; it boots a selected available iOS Simulator, installs and launches the fixture, captures a screenshot, then terminates and shuts it down.
+Do not enable a boundary for software or devices you are not authorized to debug.
 
 Example MCP configuration after building:
 
@@ -73,14 +83,9 @@ Example MCP configuration after building:
 }
 ```
 
-## Roadmap
+## Current verification boundary
 
-1. LLDB/DAP target session management for local macOS targets.
-2. Mach-O headers and segments are available now; add symbols, strings, disassembly, and dSYM analysis.
-3. macOS crash/core analysis and controlled memory operations.
-4. iOS Simulator build, install, launch, logs, UI inspection, and debugging.
-5. Paired physical-device workflows for development-signed applications.
-6. Fixtures, integration tests, audit logs, packaging, signing, and release automation.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. Physical-device inventory and fail-closed authorization are verified, but actual device install/launch/debug evidence requires a paired device, Developer Mode, signing, and user authorization. Release packaging, signing/notarization, and accessibility-tree inspection are not included yet.
 
 ## License
 

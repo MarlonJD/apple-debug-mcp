@@ -28,7 +28,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Core capability or policy | make check, diff review, and focused tests | Optional maintainer review | Tests and security docs agree | Yes for changing target authorization or mutation policy | Record finding in the active plan and security docs |
 | MCP tool surface | MCP smoke and schema review | Optional maintainer review | Tool is discoverable and unknown tools fail closed | Yes for destructive tools | Do not expose the tool until policy and fixture evidence exist |
-| LLDB/device backend | Fixture and lifecycle integration tests | Maintainer review required | Cleanup and target restrictions are verified | Yes before physical-device or release use | Keep capability candidate-only and record blocker |
+| LLDB/device backend | Fixture and lifecycle integration tests | Maintainer review required | Cleanup and target restrictions are verified | Yes before physical-device or release use | Keep unsupported physical-device paths restricted and record the blocker |
 | Harness authority | make harness-check and bundled cross-check | Maintainer review of evidence | No placeholders; records and commits are current | Yes for production or external-write claims | Keep harness-ready invalid and escalate |
 
 ## Review and recovery loop

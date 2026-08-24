@@ -20,4 +20,12 @@ final class AppleSimulatorTests: XCTestCase {
             XCTAssertEqual(error as? SimulatorError, .mutationDisabled)
         }
     }
+
+    func testScreenshotIsDisabledByDefault() {
+        XCTAssertThrowsError(
+            try SimulatorService.screenshot(udid: "00000000-0000-0000-0000-000000000000")
+        ) { error in
+            XCTAssertEqual(error as? SimulatorError, .mutationDisabled)
+        }
+    }
 }
