@@ -122,6 +122,40 @@ public struct RegisterSnapshot: Codable, Equatable, Sendable {
     }
 }
 
+public struct DebugStopSnapshot: Codable, Equatable, Sendable {
+    public let sessionID: String
+    public let stopReason: String?
+    public let stoppedThreadID: Int?
+    public let events: [DAPMessage]
+    public let threads: DAPMessage
+    public let stackTrace: DAPMessage?
+    public let scopes: DAPMessage?
+    public let registers: RegisterSnapshot?
+    public let modules: DAPMessage?
+
+    public init(
+        sessionID: String,
+        stopReason: String?,
+        stoppedThreadID: Int?,
+        events: [DAPMessage],
+        threads: DAPMessage,
+        stackTrace: DAPMessage?,
+        scopes: DAPMessage?,
+        registers: RegisterSnapshot?,
+        modules: DAPMessage?
+    ) {
+        self.sessionID = sessionID
+        self.stopReason = stopReason
+        self.stoppedThreadID = stoppedThreadID
+        self.events = events
+        self.threads = threads
+        self.stackTrace = stackTrace
+        self.scopes = scopes
+        self.registers = registers
+        self.modules = modules
+    }
+}
+
 public actor DebugSessionManager {
     private struct SessionRecord {
         let session: LLDBDAPSession
@@ -367,6 +401,7 @@ public actor DebugSessionManager {
     }
 
     public func registers(sessionID: String, frameID: Int) async throws -> RegisterSnapshot {
+        try DebugPolicy.validatePositive(frameID, label: "Frame ID")
         let session = try session(for: sessionID)
         let scopes = try await session.send(
             command: "scopes",
@@ -393,6 +428,52 @@ public actor DebugSessionManager {
             arguments: .object(["variablesReference": .integer(registerReference)])
         )
         return RegisterSnapshot(scopes: scopes, variables: variables)
+    }
+
+    public func stopSnapshot(
+        sessionID: String,
+        threadID requestedThreadID: Int?,
+        levels: Int
+    ) async throws -> DebugStopSnapshot {
+        try DebugPolicy.validatePositive(levels, label: "Snapshot stack levels", maximum: 1_000)
+        let session = try session(for: sessionID)
+        let initialEvents = await session.drainEvents()
+        let threads = try await session.send(command: "threads")
+        let eventMetadata = stopMetadata(from: initialEvents)
+        let threadID = requestedThreadID ?? eventMetadata.threadID ?? firstThreadID(from: threads)
+        var stackTrace: DAPMessage?
+        var scopes: DAPMessage?
+        var registers: RegisterSnapshot?
+        if let threadID {
+            try DebugPolicy.validatePositive(threadID, label: "Thread ID")
+            stackTrace = try await session.send(
+                command: "stackTrace",
+                arguments: .object([
+                    "threadId": .integer(threadID),
+                    "levels": .integer(levels)
+                ])
+            )
+            if let frameID = firstFrameID(from: stackTrace) {
+                scopes = try await session.send(
+                    command: "scopes",
+                    arguments: .object(["frameId": .integer(frameID)])
+                )
+                registers = try await registersForSession(session: session, scopes: scopes!)
+            }
+        }
+        let modules = try await session.send(command: "modules")
+        let finalEvents = await session.drainEvents()
+        return DebugStopSnapshot(
+            sessionID: sessionID,
+            stopReason: eventMetadata.reason,
+            stoppedThreadID: threadID,
+            events: initialEvents + finalEvents,
+            threads: threads,
+            stackTrace: stackTrace,
+            scopes: scopes,
+            registers: registers,
+            modules: modules
+        )
     }
 
     public func evaluate(
@@ -531,6 +612,75 @@ public actor DebugSessionManager {
             throw DAPError.requestFailed("Unknown debug session: \(sessionID)")
         }
         return record
+    }
+
+    private func registersForSession(
+        session: LLDBDAPSession,
+        scopes: DAPMessage
+    ) async throws -> RegisterSnapshot {
+        guard case .object(let body) = scopes.body,
+              case .array(let scopeValues) = body["scopes"] else {
+            return RegisterSnapshot(scopes: scopes, variables: nil)
+        }
+        let registerReference = scopeValues.compactMap { value -> Int? in
+            guard case .object(let scope) = value,
+                  case .string(let name) = scope["name"],
+                  name.lowercased().contains("register"),
+                  case .integer(let reference) = scope["variablesReference"] else {
+                return nil
+            }
+            return reference
+        }.first
+        guard let registerReference else {
+            return RegisterSnapshot(scopes: scopes, variables: nil)
+        }
+        let variables = try await session.send(
+            command: "variables",
+            arguments: .object(["variablesReference": .integer(registerReference)])
+        )
+        return RegisterSnapshot(scopes: scopes, variables: variables)
+    }
+
+    private func firstThreadID(from message: DAPMessage) -> Int? {
+        guard case .object(let body) = message.body,
+              case .array(let threads) = body["threads"],
+              let first = threads.first,
+              case .object(let thread) = first,
+              case .integer(let threadID) = thread["id"] else {
+            return nil
+        }
+        return threadID
+    }
+
+    private func firstFrameID(from message: DAPMessage?) -> Int? {
+        guard case .object(let body) = message?.body,
+              case .array(let frames) = body["stackFrames"],
+              let first = frames.first,
+              case .object(let frame) = first,
+              case .integer(let frameID) = frame["id"] else {
+            return nil
+        }
+        return frameID
+    }
+
+    private func stopMetadata(from events: [DAPMessage]) -> (reason: String?, threadID: Int?) {
+        for event in events.reversed() where event.event == "stopped" {
+            guard case .object(let body) = event.body else { continue }
+            let reason: String?
+            if case .string(let value) = body["reason"] {
+                reason = value
+            } else {
+                reason = nil
+            }
+            let threadID: Int?
+            if case .integer(let value) = body["threadId"] {
+                threadID = value
+            } else {
+                threadID = nil
+            }
+            return (reason, threadID)
+        }
+        return (nil, nil)
     }
 }
 

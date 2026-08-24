@@ -129,6 +129,11 @@ enum ToolCatalog {
             inputSchema: frameObjectSchema
         ),
         Tool(
+            name: "apple_debug_stop_snapshot",
+            description: "Collect a structured stop snapshot with events, threads, stack, scopes, registers, and modules.",
+            inputSchema: stopSnapshotObjectSchema
+        ),
+        Tool(
             name: "apple_debug_modules",
             description: "List loaded modules/images in an active debug session.",
             inputSchema: moduleObjectSchema
@@ -528,6 +533,21 @@ enum ToolCatalog {
             }
             do {
                 return result(for: try await sessions.registers(sessionID: sessionID, frameID: frameID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_debug_stop_snapshot":
+            guard let sessionID = params.arguments?["sessionID"]?.stringValue else {
+                return errorResult("Missing required sessionID argument.")
+            }
+            do {
+                return result(
+                    for: try await sessions.stopSnapshot(
+                        sessionID: sessionID,
+                        threadID: intValue(from: params.arguments?["threadID"]),
+                        levels: intValue(from: params.arguments?["levels"]) ?? 20
+                    )
+                )
             } catch {
                 return errorResult(error)
             }
@@ -1064,6 +1084,19 @@ enum ToolCatalog {
             "sessionID": .object(["type": .string("string")]),
             "startModule": .object(["type": .string("integer")]),
             "moduleCount": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("sessionID")])
+    ])
+
+    private static let stopSnapshotObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "sessionID": .object(["type": .string("string")]),
+            "threadID": .object(["type": .string("integer")]),
+            "levels": .object([
+                "type": .string("integer"),
+                "description": .string("Maximum stack depth; defaults to 20")
+            ])
         ]),
         "required": .array([.string("sessionID")])
     ])

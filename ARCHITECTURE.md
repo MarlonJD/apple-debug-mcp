@@ -49,13 +49,14 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 5. `apple_lldb_dap_initialize` starts LLDB-DAP, completes initialization, drains events, and tears down the probe adapter.
 6. `apple_debug_session_create` creates an owned persistent adapter session.
 7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, stack, scopes, variables, memory, disassembly, stepping, watchpoints, evaluation, and continuation.
-8. `apple_macho_inspect`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
-9. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
-10. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
-11. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
-12. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
-13. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-14. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
+9. `apple_macho_inspect`, `apple_symbolicate`, and `apple_crash_inspect` analyze local artifacts without launching them.
+10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
+11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
+12. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
+13. `apple_simulator_ui_action` runs a bounded tap, text-entry, swipe, or wait command through the same XCUITest runner and returns the post-action tree.
+14. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
+15. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 

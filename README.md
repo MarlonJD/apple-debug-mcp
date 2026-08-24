@@ -8,6 +8,7 @@ The current product surface includes:
 - source/function/exception breakpoints, threads, stack traces, scopes, registers, variables, modules, stepping, pause/continue, disassembly, and bounded memory reads;
 - watchpoint plumbing through DAP data breakpoints;
 - explicitly authorized expression evaluation and memory writes, plus target terminate/disconnect control;
+- structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
 - Mach-O/universal-binary headers, segments, symbols, and printable strings;
 - `atos` symbolication and `.crash`/`.ips` crash-report inspection;
 - iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;

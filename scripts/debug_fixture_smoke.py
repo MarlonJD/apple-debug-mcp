@@ -115,6 +115,14 @@ def main() -> int:
         if not threads:
             raise RuntimeError("debugger returned no threads")
         thread_id = threads[0]["id"]
+        stop_snapshot = json.loads(
+            tool(
+                "apple_debug_stop_snapshot",
+                {"sessionID": session_id, "threadID": thread_id, "levels": 10},
+            )["result"]["content"][0]["text"]
+        )
+        if not stop_snapshot.get("threads") or not stop_snapshot.get("modules"):
+            raise RuntimeError("stop snapshot did not contain threads and modules")
         tool("apple_debug_modules", {"sessionID": session_id, "moduleCount": 100})
 
         stack = json.loads(
@@ -168,7 +176,7 @@ def main() -> int:
         if not closed.get("closed"):
             raise RuntimeError("debug session did not close")
         session_id = None
-        print("fixture-smoke: launch, breakpoints, exceptions, modules, threads, stack, registers, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup passed")
+        print("fixture-smoke: launch, breakpoints, exceptions, stop snapshot, modules, threads, stack, registers, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup passed")
         return 0
     except Exception as error:
         print(f"fixture-smoke: {error}", file=sys.stderr)
