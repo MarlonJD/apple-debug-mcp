@@ -59,7 +59,8 @@ public struct AppleDeviceSummary: Codable, Equatable, Sendable {
         self.bootState = bootState
         self.pairingState = pairingState
         self.tunnelState = tunnelState
-        self.isAuthorizedForDevelopment = pairingState == "paired" && tunnelState != "unavailable"
+        self.isAuthorizedForDevelopment = pairingState == "paired"
+            && ["connected", "available"].contains(tunnelState.lowercased())
     }
 }
 

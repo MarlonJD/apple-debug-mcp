@@ -33,6 +33,16 @@ final class AppleDeviceTests: XCTestCase {
         XCTAssertEqual(devices.count, 2)
         XCTAssertTrue(devices.first { $0.identifier == "paired-device" }?.isAuthorizedForDevelopment == true)
         XCTAssertTrue(devices.first { $0.identifier == "offline-device" }?.isAuthorizedForDevelopment == false)
+
+        let unknownTunnel = AppleDeviceSummary(
+            identifier: "unknown-tunnel",
+            productType: "iPhone17,1",
+            platform: "iOS",
+            bootState: "booted",
+            pairingState: "paired",
+            tunnelState: "unknown"
+        )
+        XCTAssertFalse(unknownTunnel.isAuthorizedForDevelopment)
     }
 
     func testMutationIsDisabledBeforeDeviceAuthorization() {
