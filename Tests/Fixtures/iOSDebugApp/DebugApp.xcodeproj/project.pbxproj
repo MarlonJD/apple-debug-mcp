@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 46;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -28,7 +28,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		100000000000000000000029 /* UI Tests Frameworks */ = {
+		100000000000000000000029 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -39,20 +39,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		100000000000000000000005 = {
+		100000000000000000000005 /*  */ = {
 			isa = PBXGroup;
 			children = (
 				100000000000000000000002 /* DebugApp.swift */,
 				100000000000000000000022 /* DebugAppUITests.swift */,
 			);
-			path = "";
+			name = "";
 			sourceTree = "<group>";
 		};
 		100000000000000000000006 = {
 			isa = PBXGroup;
 			children = (
-				100000000000000000000005,
+				100000000000000000000005 /*  */,
 				100000000000000000000007 /* Products */,
+				6DC754B1303D9FC1003ECDBB /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -63,6 +64,14 @@
 				100000000000000000000024 /* DebugAppUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		6DC754B1303D9FC1003ECDBB /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000025 /* XCTest.framework */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -88,8 +97,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 100000000000000000000027 /* Build configuration list for PBXNativeTarget "DebugAppUITests" */;
 			buildPhases = (
-				100000000000000000000028 /* UI Tests Sources */,
-				100000000000000000000029 /* UI Tests Frameworks */,
+				100000000000000000000028 /* Sources */,
+				100000000000000000000029 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -110,6 +119,7 @@
 				TargetAttributes = {
 					100000000000000000000008 = {
 						CreatedOnToolsVersion = 26.6;
+						DevelopmentTeam = UPK4SC93AN;
 					};
 					100000000000000000000026 = {
 						CreatedOnToolsVersion = 26.6;
@@ -136,16 +146,6 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXResourcesBuildPhase section */
-		10000000000000000000000D /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		10000000000000000000000A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -155,7 +155,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		100000000000000000000028 /* UI Tests Sources */ = {
+		100000000000000000000028 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -169,8 +169,10 @@
 		10000000000000000000000E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UPK4SC93AN;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Apple Debug Fixture";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -185,8 +187,10 @@
 		10000000000000000000000F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UPK4SC93AN;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Apple Debug Fixture";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -198,7 +202,7 @@
 			};
 			name = Release;
 		};
-		100000000000000000000010 /* Project Debug */ = {
+		100000000000000000000010 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -210,7 +214,7 @@
 			};
 			name = Debug;
 		};
-		100000000000000000000011 /* Project Release */ = {
+		100000000000000000000011 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -222,7 +226,7 @@
 			};
 			name = Release;
 		};
-		10000000000000000000002B /* UI Tests Debug */ = {
+		10000000000000000000002B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLE_DEBUG_UI_ACTION_BASE64 = "";
@@ -240,7 +244,7 @@
 			};
 			name = Debug;
 		};
-		10000000000000000000002C /* UI Tests Release */ = {
+		10000000000000000000002C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLE_DEBUG_UI_ACTION_BASE64 = "";
@@ -273,8 +277,8 @@
 		10000000000000000000000C /* Build configuration list for PBXProject "DebugApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				100000000000000000000010 /* Project Debug */,
-				100000000000000000000011 /* Project Release */,
+				100000000000000000000010 /* Debug */,
+				100000000000000000000011 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -282,8 +286,8 @@
 		100000000000000000000027 /* Build configuration list for PBXNativeTarget "DebugAppUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				10000000000000000000002B /* UI Tests Debug */,
-				10000000000000000000002C /* UI Tests Release */,
+				10000000000000000000002B /* Debug */,
+				10000000000000000000002C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
