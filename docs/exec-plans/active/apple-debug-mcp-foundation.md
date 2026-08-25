@@ -182,4 +182,5 @@ The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.ListTools`, `MCP.Ca
 
 - 2026-08-24: Created the repository plan, applied the harness profile, and recorded licensing, scope, and authorization decisions.
 - 2026-08-25: Added and verified the legacy iOS 15 physical-device LLDB-DAP bridge through `ios-deploy`, including owned cleanup and MCP thread/stack/register/memory/disassembly evidence; retained the modern CoreDevice gate explicitly.
+- 2026-08-25: Added and verified deterministic physical breakpoint/control coverage, memory rollback, and legacy stop-state polling through `make ios-legacy-debug-control-smoke`.
 - 2026-08-24: Added symbolication, crash analysis, unified logs, Simulator screenshot capture, richer debugger control, and bounded mutation gates; retained the physical-device blocker explicitly.
