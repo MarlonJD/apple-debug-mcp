@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "737b9e200c6ccce2385c1b73083db365da8de9a5",
+  "repository_commit": "961f874f10398c4260e86c4f429c3ff7defe1f0f",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,14 +9,17 @@
   "environment": "local",
   "command": "make check",
   "exit_code": 0,
-  "observed_at": "2026-08-25T20:43:12Z",
+  "observed_at": "2026-08-25T21:41:25Z",
   "result": "passed",
   "artifacts": [
     "scripts/check.sh",
     "Tests/AppleDebugCoreTests",
-    "make ios-coredevice-debug-control-smoke"
+    "make ios-coredevice-debug-control-smoke",
+    "make ios-coredevice-lifecycle-smoke",
+    "make menubar-build-smoke",
+    "make package"
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "812b6f6b5adc7e525a096cde346428071dc8e9b27e46b047b9828a7d9913e33f"
+  "signature": "d99eac87648c672bfef8884335f119ea9cd6581a09a9bc1ab0423bf4a3eef962"
 }

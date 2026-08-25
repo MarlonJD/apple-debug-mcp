@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "737b9e200c6ccce2385c1b73083db365da8de9a5",
+  "repository_commit": "961f874f10398c4260e86c4f429c3ff7defe1f0f",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,12 +9,12 @@
   "environment": "local",
   "command": "./scripts/harness_check.sh",
   "exit_code": 0,
-  "observed_at": "2026-08-25T20:43:12Z",
+  "observed_at": "2026-08-25T21:41:25Z",
   "result": "passed",
   "artifacts": [
     "docs/agent-harness/entropy-cleanup-checklist.md"
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "9edb37993a48c5b7b59a07e1c1c0faa854f5afbfdb02cad704170be7f3405f3c"
+  "signature": "c61ed8ed3826e4110cb344ce56274be24c33126d90fe8d6e1a50f51b8fbf83c0"
 }
