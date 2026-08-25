@@ -45,6 +45,33 @@ final class AppleDeviceTests: XCTestCase {
         XCTAssertFalse(unknownTunnel.isAuthorizedForDevelopment)
     }
 
+    func testParsesLegacyXcodeInventoryWithoutClaimingCoreDeviceTunnel() throws {
+        let json = """
+        [
+          {
+            "ignored": false,
+            "modelCode": "iPod9,1",
+            "simulator": false,
+            "modelName": "iPod touch (7th generation)",
+            "operatingSystemVersion": "15.8.8",
+            "identifier": "be3091413ece7869d08367bf2985276a1e125390",
+            "platform": "com.apple.platform.iphoneos",
+            "architecture": "arm64",
+            "interface": "usb",
+            "available": true,
+            "name": "FF iPod touch"
+          }
+        ]
+        """
+
+        let devices = try AppleDeviceService.parseLegacyInventory(data: Data(json.utf8))
+
+        XCTAssertEqual(devices.count, 1)
+        XCTAssertEqual(devices.first?.transport, .legacyXcode)
+        XCTAssertTrue(devices.first?.isAuthorizedForDevelopment == true)
+        XCTAssertEqual(devices.first?.tunnelState, "not-required")
+    }
+
     func testMutationIsDisabledBeforeDeviceAuthorization() {
         XCTAssertThrowsError(
             try AppleDeviceService.install(

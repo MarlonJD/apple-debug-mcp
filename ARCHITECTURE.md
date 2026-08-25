@@ -4,7 +4,7 @@
 
 Apple Debug MCP is a local macOS command-line server that exposes capability-aware Apple debugging and analysis operations through MCP. An MCP client launches it over stdio. The server delegates debugger transport to LLDB-DAP and delegates Apple platform operations to fixed Xcode command-line tools.
 
-The current implementation supports verified macOS and iOS Simulator fixture workflows. Physical-device inventory and development-app lifecycle are present behind CoreDevice authorization checks; physical-device LLDB attach remains restricted until an authorized device fixture is available.
+The current implementation supports verified macOS and iOS Simulator fixture workflows plus a signed iOS 15 physical fixture build. Physical-device inventory merges CoreDevice and legacy `xcdevice`; lifecycle uses CoreDevice or optional `ios-deploy`, while physical-device LLDB attach remains restricted to CoreDevice-capable devices.
 
 ## Repository map
 
@@ -42,7 +42,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
 | Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded identifier/coordinate UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
 | Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
-| Sources/AppleDebugCore/AppleDevice.swift | CoreDevice inventory and authorization-gated development-app operations | Maintainers; update with pairing/tunnel policy changes |
+| Sources/AppleDebugCore/AppleDevice.swift | CoreDevice plus legacy `xcdevice` inventory and transport-specific authorization-gated development-app operations | Maintainers; update with pairing/tunnel and legacy tool policy changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
 | Sources/AppleDebugMCP/ | MCP server startup and typed tool dispatch | Maintainers; update when the MCP surface changes |
 | Tests/Fixtures/ | Signed macOS debugger target, iOS Simulator app, and crash-report fixture | Maintainers; update when fixture contracts change |
@@ -84,7 +84,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, paged stack/variables, exception filter options, memory, disassembly, stepping, watchpoints, evaluation, memory search/patch, and continuation.
 8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
 9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_dwarf_inspect`, `apple_binary_diff`, `apple_symbolicate`, `apple_crash_inspect`, and `apple_crash_symbolicate` analyze local artifacts without launching them.
-10. Simulator and CoreDevice tools validate known identifiers and explicit mutation policies before changing target state.
+10. Simulator and physical-device tools validate known identifiers, transport-specific authorization, and explicit mutation policies before changing target state; legacy iOS devices use `xcdevice` and optional `ios-deploy`.
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 12. `apple_swift_ast_inspect` can resolve an Xcode target's bounded Swift Sources phase, module name, SDK, and target triple before public AST emission; direct file/multi-file mode remains available.
 13. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.

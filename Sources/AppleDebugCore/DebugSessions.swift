@@ -304,7 +304,10 @@ public actor DebugSessionManager {
             guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_DEBUG"] == "1" else {
                 throw AppleDeviceError.debugDisabled
             }
-            try AppleDeviceService.validateAuthorizedDevice(identifier: deviceIdentifier)
+            let device = try AppleDeviceService.device(identifier: deviceIdentifier)
+            guard device.transport == .coreDevice else {
+                throw AppleDeviceError.legacyDebugUnavailable(deviceIdentifier)
+            }
             session = try LLDBDAPSession(deviceIdentifier: deviceIdentifier)
             target = "ios-device:\(deviceIdentifier)"
         } else {

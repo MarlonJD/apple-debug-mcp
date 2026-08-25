@@ -465,17 +465,17 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_device_list",
-            description: "List CoreDevice physical-device inventory and explicit pairing/tunnel authorization state.",
+            description: "List CoreDevice and legacy Xcode (xcdevice) physical-device inventory with transport-specific authorization state.",
             inputSchema: emptyObjectSchema
         ),
         Tool(
             name: "apple_device_install",
-            description: "Install an authorized development app on a paired physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            description: "Install an authorized development app on a physical device. Uses CoreDevice when available and optional ios-deploy for legacy Xcode devices. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
             inputSchema: deviceInstallObjectSchema
         ),
         Tool(
             name: "apple_device_launch",
-            description: "Launch an authorized development app on a paired physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            description: "Launch an authorized development app on a physical device. Uses CoreDevice when available and optional ios-deploy for legacy Xcode devices. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
             inputSchema: deviceLaunchObjectSchema
         ),
         Tool(
@@ -1911,7 +1911,8 @@ enum ToolCatalog {
                     for: try AppleDeviceService.launch(
                         identifier: identifier,
                         bundleID: bundleID,
-                        startStopped: boolValue(from: params.arguments?["startStopped"], default: false)
+                        startStopped: boolValue(from: params.arguments?["startStopped"], default: false),
+                        appPath: params.arguments?["appPath"]?.stringValue
                     )
                 )
             } catch {
@@ -2285,7 +2286,7 @@ enum ToolCatalog {
         "properties": .object([
             "deviceIdentifier": .object([
                 "type": .string("string"),
-                "description": .string("Optional paired physical-device UUID; requires APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1")
+                "description": .string("Optional CoreDevice UUID or legacy xcdevice UDID; CoreDevice is required for LLDB-DAP physical attach")
             ])
         ])
     ])
@@ -3209,7 +3210,11 @@ enum ToolCatalog {
         "properties": .object([
             "identifier": .object(["type": .string("string")]),
             "bundleID": .object(["type": .string("string")]),
-            "startStopped": .object(["type": .string("boolean")])
+            "startStopped": .object(["type": .string("boolean")]),
+            "appPath": .object([
+                "type": .string("string"),
+                "description": .string("Required for legacy ios-deploy launch")
+            ])
         ]),
         "required": .array([.string("identifier"), .string("bundleID")])
     ])

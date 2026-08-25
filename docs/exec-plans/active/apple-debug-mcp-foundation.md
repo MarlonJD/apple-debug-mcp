@@ -29,6 +29,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 04:00Z) Add host/Simulator bounded unified-log adapter.
 - [x] (2026-08-24 04:05Z) Add CoreDevice inventory, fail-closed development-app install/launch operations, and an authorization-gated LLDB `device select` session path.
 - [ ] Add a paired physical-device fixture for remote LLDB attach and lifecycle evidence.
+- [x] (2026-08-25 13:35Z) Add legacy `xcdevice` inventory fallback, transport-aware authorization, optional `ios-deploy` install/launch, and fail-closed legacy LLDB-DAP behavior for CoreDevice-incompatible iOS 15 devices.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
@@ -85,7 +86,8 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - LLDB-DAP target launch against a system binary is denied when Developer Mode is disabled. An ad-hoc signed `get-task-allow` fixture works without changing the global setting.
 - LLDB-DAP accepts `pid` for process attach; using another key causes a misleading adapter failure.
 - The iOS Simulator fixture can be built, installed, launched, screenshot, attached with LLDB-DAP, inspected, and cleaned up on the local Xcode installation.
-- The current CoreDevice inventory reports `pairingState=unsupported` and `tunnelState=unavailable`; no physical-device mutation or debug attach was attempted.
+- The current CoreDevice inventory reports `pairingState=unsupported` and `tunnelState=unavailable`; legacy `xcdevice`/`xctrace` inventory and profiling are available, while MCP legacy install/launch requires optional `ios-deploy` and legacy LLDB attach remains fail-closed.
+- The connected iPod touch 7 (iOS 15.8.8) is online in legacy `xcdevice`/`xctrace`, while CoreDevice reports unsupported pairing, unavailable tunnel, unavailable DDI services, and no usage assertion; the signed iOS 15 fixture builds successfully, but the current MCP LLDB-DAP adapter has no legacy bridge.
 - Unified-log output is large even for a one-second host window, so the public adapter caps responses and the deterministic MCP smoke covers the tool schema rather than making log volume a required gate.
 - `dwarfdump --name` with `--show-children` returns a nested DIE stream rather than a flat symbol list; the DWARF adapter preserves offsets, depth, parent links, attributes, source paths, and bounded line rows so type/source evidence is not reduced to `atos` names.
 - `xctrace export --xpath` returns a bounded XML query result with deduplicated reference nodes; the parser preserves the first materialized frame/sample records and rejects arbitrary XPath/schema input so trace analysis stays deterministic and bounded.
@@ -119,7 +121,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 
 ## Outcomes & Retrospective
 
-The macOS and iOS Simulator product paths are locally verified with repository fixtures. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP adapters, and fails closed for unauthorized mutation. Physical-device support is intentionally partial: inventory and development-app lifecycle code exist, but the current machine has no paired/tunnel-ready device, so remote LLDB evidence remains a documented environmental blocker.
+The macOS and iOS Simulator product paths are locally verified with repository fixtures. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP adapters, and fails closed for unauthorized mutation. The physical iOS 15 fixture now builds/signs and legacy inventory is verified; lifecycle mutation requires optional `ios-deploy`, and remote LLDB remains blocked for the legacy transport until a supported bridge exists.
 
 ## Context and Orientation
 

@@ -134,8 +134,8 @@ public enum CapabilityMatrix {
                 notes: [
                     "Physical-device debugging is limited to paired, authorized development targets.",
                     "Stock App Store applications are outside the supported debugging boundary.",
-                    "Device access requires the appropriate signing, Developer Mode, and entitlements.",
-                    "The current device adapter inventories, installs, and launches development apps; remote LLDB session attach remains gated until a paired-device fixture is available."
+                    "Device access requires the appropriate signing, Developer Mode, and entitlements; legacy iOS 15 devices may use xcdevice/ios-deploy instead of CoreDevice.",
+                    "CoreDevice is required for the current LLDB-DAP physical session path; legacy Xcode lifecycle fallback is available when ios-deploy is installed."
                 ]
             )
         ]
@@ -165,7 +165,7 @@ public struct ToolchainStatus: Codable, Equatable, Sendable {
 public enum ToolchainProbe {
     public static func collect() -> ToolchainStatus {
         let toolNames = [
-            "lldb", "lldb-dap", "simctl", "devicectl", "xcodebuild",
+            "lldb", "lldb-dap", "simctl", "devicectl", "xcdevice", "ios-deploy", "xcodebuild",
             "codesign", "otool", "nm", "dyld_info", "swiftc", "swift-demangle", "dwarfdump", "vmmap", "xctrace",
             "heap", "leaks", "malloc_history", "sample", "clang", "llvm-objdump"
         ]
