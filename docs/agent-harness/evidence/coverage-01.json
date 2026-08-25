@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "961f874f10398c4260e86c4f429c3ff7defe1f0f",
+  "repository_commit": "6b537699d36a75cb0e139d6cb3dccd6585f408c1",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,7 +9,7 @@
   "environment": "local",
   "command": "make check",
   "exit_code": 0,
-  "observed_at": "2026-08-25T21:41:25Z",
+  "observed_at": "2026-08-25T22:22:44Z",
   "result": "passed",
   "artifacts": [
     "scripts/check.sh",
@@ -17,5 +17,5 @@
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "b630e8612f226233a4bca6a880a5d0bc036a28857e61e0abfb423958b85975ea"
+  "signature": "1708acbd97bd239368cbff8363f5843a326cf71f9da63d2e05c77a2a8e6bb1d0"
 }
