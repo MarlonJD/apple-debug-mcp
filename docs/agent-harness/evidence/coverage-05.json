@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "repository_commit": "491c5e787610d90883776481819ccebdb8dfc9af",
+  "repository_commit": "8547e5906445eb9ada4faaa3a3e927eb82e8cdab",
   "repository_identity": "github.com/MarlonJD/apple-debug-mcp",
   "deployment_target_id": "apple-debug-mcp-local",
   "capabilities": [
@@ -9,7 +9,7 @@
   "environment": "local",
   "command": "make performance-analysis-smoke",
   "exit_code": 0,
-  "observed_at": "2026-08-24T23:31:15Z",
+  "observed_at": "2026-08-25T10:46:12Z",
   "result": "passed",
   "artifacts": [
     "scripts/performance_analysis_smoke.py",
@@ -17,5 +17,5 @@
   ],
   "issuer": "Apple Debug MCP maintainers",
   "key_id": "c2bdfa7af6c96075c71a4673b50f83d9322d4d50609a7881ebc21d8f4b4ef5fe",
-  "signature": "b0650176250b270cc86ad53ea926cc4e224bfd21d8963907a76060622be85fa7"
+  "signature": "3cdd1ef7f993cf9b14c2fc965ad224edee73257854e87ee7c3d5b742d171904a"
 }
