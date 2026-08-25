@@ -244,6 +244,7 @@ public actor LLDBDAPSession {
     private let executablePath: String
     private let preInitCommands: [String]
     private let replMode: String?
+    private let pollThreadsForStop: Bool
     private var process: Process?
     private var input: FileHandle?
     private var output: FileHandle?
@@ -254,7 +255,8 @@ public actor LLDBDAPSession {
     public init(
         executablePath: String? = nil,
         preInitCommands: [String] = [],
-        replMode: String? = nil
+        replMode: String? = nil,
+        pollThreadsForStop: Bool = false
     ) throws {
         guard let executablePath = executablePath ?? ToolchainProbe.path(for: "lldb-dap") else {
             throw DAPError.toolUnavailable
@@ -262,6 +264,7 @@ public actor LLDBDAPSession {
         self.executablePath = executablePath
         self.preInitCommands = preInitCommands
         self.replMode = replMode
+        self.pollThreadsForStop = pollThreadsForStop
     }
 
     public init(deviceIdentifier: String) throws {
@@ -291,7 +294,11 @@ public actor LLDBDAPSession {
         return try send(command: "initialize", arguments: arguments)
     }
 
-    public func send(command: String, arguments: DAPValue? = nil) throws -> DAPMessage {
+    public func send(
+        command: String,
+        arguments: DAPValue? = nil,
+        readTimeoutMilliseconds: Int = 60_000
+    ) throws -> DAPMessage {
         try startProcessIfNeeded()
 
         guard let input, let output else {
@@ -310,7 +317,10 @@ public actor LLDBDAPSession {
         try input.write(contentsOf: DAPFraming.frame(request))
 
         while true {
-            let data = try readChunk(from: output)
+            let data = try readChunk(
+                from: output,
+                timeoutMilliseconds: readTimeoutMilliseconds
+            )
             if data.isEmpty {
                 let status = processStatus()
                 throw DAPError.processExited(status)
@@ -378,7 +388,9 @@ public actor LLDBDAPSession {
             throw DAPError.processUnavailable
         }
         let deadline = Date().addingTimeInterval(Double(timeoutMilliseconds) / 1_000.0)
+        var nextThreadStateProbe = Date().addingTimeInterval(2)
         while true {
+            try appendBufferedEvents()
             if hasStopEvent(events) {
                 return DAPEventWaitResult(events: drainEvents(), timedOut: false)
             }
@@ -386,23 +398,45 @@ public actor LLDBDAPSession {
             if remaining <= 0 {
                 return DAPEventWaitResult(events: drainEvents(), timedOut: true)
             }
+            if pollThreadsForStop, Date() >= nextThreadStateProbe {
+                nextThreadStateProbe = Date().addingTimeInterval(1)
+                do {
+                    let response = try send(
+                        command: "threads",
+                        readTimeoutMilliseconds: min(5_000, remaining)
+                    )
+                    if hasThreads(response) {
+                        var observedEvents = drainEvents()
+                        observedEvents.append(
+                            DAPMessage(
+                                type: "event",
+                                event: "stopped",
+                                body: .object(["reason": .string("adapter-state-poll")])
+                            )
+                        )
+                        return DAPEventWaitResult(events: observedEvents, timedOut: false)
+                    }
+                } catch DAPError.timeout {
+                    // The legacy adapter may not answer while it is transitioning state.
+                } catch DAPError.requestFailed {
+                    // LLDB-DAP reports a running or transitioning process as a request failure.
+                }
+            }
             do {
                 let data = try readChunk(
                     from: output,
-                    timeoutMilliseconds: min(remaining, 10_000)
+                    timeoutMilliseconds: min(remaining, pollThreadsForStop ? 250 : 10_000)
                 )
                 if data.isEmpty {
                     let status = processStatus()
                     throw DAPError.processExited(status)
                 }
                 buffer.append(data)
-                while let message = try DAPFraming.nextMessage(from: &buffer) {
-                    if message.type == "event" {
-                        events.append(message)
-                    }
-                }
+                try appendBufferedEvents()
             } catch DAPError.timeout {
-                return DAPEventWaitResult(events: drainEvents(), timedOut: true)
+                if !pollThreadsForStop {
+                    return DAPEventWaitResult(events: drainEvents(), timedOut: true)
+                }
             }
         }
     }
@@ -473,6 +507,22 @@ public actor LLDBDAPSession {
         messages.contains { message in
             guard let event = message.event else { return false }
             return event == "stopped" || event == "terminated" || event == "exited"
+        }
+    }
+
+    private func hasThreads(_ message: DAPMessage) -> Bool {
+        guard case .object(let body) = message.body,
+              case .array(let threads) = body["threads"] else {
+            return false
+        }
+        return !threads.isEmpty
+    }
+
+    private func appendBufferedEvents() throws {
+        while let message = try DAPFraming.nextMessage(from: &buffer) {
+            if message.type == "event" {
+                events.append(message)
+            }
         }
     }
 

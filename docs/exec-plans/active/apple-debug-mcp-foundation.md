@@ -29,6 +29,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 04:00Z) Add host/Simulator bounded unified-log adapter.
 - [x] (2026-08-24 04:05Z) Add CoreDevice inventory, fail-closed development-app install/launch operations, and an authorization-gated LLDB `device select` session path.
 - [x] (2026-08-25 15:45Z) Add an authorization-gated legacy `ios-deploy` debugserver transport, generated LLDB-Python `SBTarget.ConnectRemote`/`SBTarget.Launch` bridge, DAP attach wiring, owned-process cleanup, and physical iOS 15 debugger smoke evidence.
+- [x] (2026-08-25 16:55Z) Add a deterministic background control probe, physical breakpoint-hit/control smoke, legacy stop-state polling for missing DAP stop events, and verified memory patch/rollback recovery.
 - [ ] Add a paired modern CoreDevice physical-device fixture for UUID/tunnel-based remote LLDB attach and lifecycle evidence.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
@@ -86,7 +87,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - LLDB-DAP target launch against a system binary is denied when Developer Mode is disabled. An ad-hoc signed `get-task-allow` fixture works without changing the global setting.
 - LLDB-DAP accepts `pid` for process attach; using another key causes a misleading adapter failure.
 - The iOS Simulator fixture can be built, installed, launched, screenshot, attached with LLDB-DAP, inspected, and cleaned up on the local Xcode installation.
-- The current CoreDevice inventory reports `pairingState=unsupported` and `tunnelState=unavailable`; the connected iPod touch 7 (iOS 15.8.8) is online through legacy `xcdevice`/`xctrace` and now has an MCP LLDB-DAP bridge through `ios-deploy`.
+- The current CoreDevice inventory reports `pairingState=unsupported` and `tunnelState=unavailable`; the connected iPod touch 7 (iOS 15.8.8) is online through legacy `xcdevice`/`xctrace` and now has an MCP LLDB-DAP bridge through `ios-deploy`; the legacy debugserver can omit DAP stopped events, so the adapter uses a bounded state-poll fallback.
 - Legacy physical session creation requires `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1`, `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1`, a signed `.app` path, and `ios-deploy`; the session owns the debugserver and generated bridge and exposes typed DAP inspection after attach.
 - Unified-log output is large even for a one-second host window, so the public adapter caps responses and the deterministic MCP smoke covers the tool schema rather than making log volume a required gate.
 - `dwarfdump --name` with `--show-children` returns a nested DIE stream rather than a flat symbol list; the DWARF adapter preserves offsets, depth, parent links, attributes, source paths, and bounded line rows so type/source evidence is not reduced to `atos` names.
@@ -121,7 +122,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 
 ## Outcomes & Retrospective
 
-The macOS and iOS Simulator product paths are locally verified with repository fixtures. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP and legacy `ios-deploy` adapters, and fails closed for unauthorized mutation. The physical iOS 15 fixture builds/signs and the authorized legacy path is verified through install, debugserver attach, threads, stack, registers, memory, disassembly, and cleanup; modern CoreDevice remote LLDB remains a separate environment-gated boundary.
+The macOS and iOS Simulator product paths are locally verified with repository fixtures. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP and legacy `ios-deploy` adapters, and fails closed for unauthorized mutation. The physical iOS 15 fixture builds/signs and the authorized legacy path is verified through install, debugserver attach, threads, stack, registers, memory, disassembly, breakpoint hit, evaluation, instruction step, pause/continue, memory rollback, and cleanup; modern CoreDevice remote LLDB remains a separate environment-gated boundary.
 
 ## Context and Orientation
 
@@ -155,6 +156,7 @@ The current verified checkpoint requires:
 - iOS Simulator smoke covers build/install/launch/screenshot/terminate/shutdown and LLDB-DAP attach/threads/stack/memory/disassembly/cleanup;
 - physical-device capability restrictions and current CoreDevice state are explicit;
 - authorized legacy physical-device evidence covers `ios-deploy` debugserver ownership and MCP LLDB-DAP inspection;
+- authorized legacy physical-device control evidence covers breakpoint hit, stepping, pause/continue, evaluation, and memory patch/rollback;
 - no unresolved harness placeholders remain;
 - source and attestation commit boundaries are direct-child and clean before certification.
 

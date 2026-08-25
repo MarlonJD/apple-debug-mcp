@@ -9,6 +9,16 @@ struct DebugApp: App {
     @State private var input = ""
     @State private var status = "Ready"
 
+    init() {
+        DispatchQueue.global(qos: .utility).async {
+            var value = 0
+            while true {
+                value = DebugControlProbe.tick(value)
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             VStack(spacing: 12) {
@@ -40,5 +50,14 @@ struct DebugApp: App {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("debug.fixture.root")
         }
+    }
+}
+
+private enum DebugControlProbe {
+    @inline(never)
+    static func tick(_ value: Int) -> Int {
+        let next = value &+ 1
+        UserDefaults.standard.set(next, forKey: "apple-debug-mcp-control-probe")
+        return next
     }
 }

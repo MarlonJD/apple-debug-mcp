@@ -1,4 +1,4 @@
-.PHONY: build test fixture ios-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -27,8 +27,14 @@ ios-ui-tree-smoke:
 ios-arbitrary-ui-smoke: build ios-fixture
 	APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1 python3 ./scripts/ios_arbitrary_ui_smoke.py
 
-ios-legacy-debug-smoke: build
+ios-physical-fixture:
+	./scripts/build_ios_physical_fixture.sh
+
+ios-legacy-debug-smoke: build ios-physical-fixture
 	APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1 python3 ./scripts/ios_legacy_debug_smoke.py
+
+ios-legacy-debug-control-smoke: build ios-physical-fixture
+	APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1 APPLE_DEBUG_ALLOW_EVALUATE=1 APPLE_DEBUG_ALLOW_MEMORY_WRITE=1 python3 ./scripts/ios_legacy_debug_control_smoke.py
 
 xcode-artifact-smoke: build
 	APPLE_DEBUG_ALLOW_XCODE_BUILD=1 python3 ./scripts/xcode_artifact_smoke.py

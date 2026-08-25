@@ -1194,7 +1194,8 @@ public actor DebugSessionManager {
         do {
             let configuration = try await transport.start()
             let session = try LLDBDAPSession(
-                preInitCommands: configuration.preInitCommands
+                preInitCommands: configuration.preInitCommands,
+                pollThreadsForStop: true
             )
             _ = try await session.start()
             _ = try await session.attach(

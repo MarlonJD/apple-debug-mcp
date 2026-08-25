@@ -81,6 +81,8 @@ make ios-debug-fixture-smoke
 make ios-mcp-tool-smoke
 make ios-ui-tree-smoke
 make ios-arbitrary-ui-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-control-smoke
 make dwarf-smoke
 make swift-ast-smoke
 make performance-analysis-smoke
@@ -141,7 +143,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. The iOS 15 physical fixture builds and signs for the connected iPod touch; legacy `xcdevice`/`xctrace` inventory, `ios-deploy` install/debugserver launch, and MCP LLDB-DAP thread/stack/register/memory/disassembly inspection are verified with the signed fixture. Modern physical sessions still require CoreDevice pairing/tunnel support. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. The iOS 15 physical fixture builds and signs for the connected iPod touch; legacy `xcdevice`/`xctrace` inventory, `ios-deploy` install/debugserver launch, and MCP LLDB-DAP thread/stack/register/memory/disassembly/control inspection are verified with the signed fixture. `make ios-legacy-debug-control-smoke` covers a real breakpoint hit, expression evaluation, instruction stepping, pause/continue, and memory patch/rollback. Modern physical sessions still require CoreDevice pairing/tunnel support. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
 
 ## License
 
