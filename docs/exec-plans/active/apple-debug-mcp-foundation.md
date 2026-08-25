@@ -9,7 +9,7 @@ owner: Apple Debug MCP maintainers
 
 # Establish the Apple Debug MCP foundation
 
-Maintain this plan according to the [configured planning policy](../../PLANS.md). The plan remains active while modern CoreDevice physical coverage and release gates remain outside the verified local boundary.
+Maintain this plan according to the [configured planning policy](../../PLANS.md). The plan remains active while release gates remain outside the verified local boundary.
 
 ## Purpose / Big Picture
 
@@ -30,7 +30,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-24 04:05Z) Add CoreDevice inventory, fail-closed development-app install/launch operations, and an authorization-gated LLDB `device select` session path.
 - [x] (2026-08-25 15:45Z) Add an authorization-gated legacy `ios-deploy` debugserver transport, generated LLDB-Python `SBTarget.ConnectRemote`/`SBTarget.Launch` bridge, DAP attach wiring, owned-process cleanup, and physical iOS 15 debugger smoke evidence.
 - [x] (2026-08-25 16:55Z) Add a deterministic background control probe, physical breakpoint-hit/control smoke, legacy stop-state polling for missing DAP stop events, and verified memory patch/rollback recovery.
-- [ ] Add a paired modern CoreDevice physical-device fixture for UUID/tunnel-based remote LLDB attach and lifecycle evidence.
+- [x] (2026-08-25 20:35Z) Add paired modern CoreDevice physical-device lifecycle, PID discovery, remote LLDB-DAP attach, control, and cleanup evidence on iPhone 17.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
@@ -87,7 +87,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - LLDB-DAP target launch against a system binary is denied when Developer Mode is disabled. An ad-hoc signed `get-task-allow` fixture works without changing the global setting.
 - LLDB-DAP accepts `pid` for process attach; using another key causes a misleading adapter failure.
 - The iOS Simulator fixture can be built, installed, launched, screenshot, attached with LLDB-DAP, inspected, and cleaned up on the local Xcode installation.
-- The current CoreDevice inventory reports `pairingState=unsupported` and `tunnelState=unavailable`; the connected iPod touch 7 (iOS 15.8.8) is online through legacy `xcdevice`/`xctrace` and now has an MCP LLDB-DAP bridge through `ios-deploy`; the legacy debugserver can omit DAP stopped events, so the adapter uses a bounded state-poll fallback.
+- CoreDevice inventory can report a paired device with a disconnected tunnel until a read-only `devicectl device info lockState` probe acquires the tunnel; the adapter refreshes that state before authorization decisions and remains fail-closed when the probe fails.
+- The connected iPhone 17 (CoreDevice UUID `02329A9F-84C9-5499-9EBF-074EFCB45F7C`, iOS 27 beta) is verified through CoreDevice install, deterministic terminate-existing launch, PID discovery, custom LLDB-DAP `device process attach --pid` attach, source breakpoint/control, memory rollback, and cleanup. The connected iPod touch 7 (iOS 15.8.8) remains covered by the separate legacy `ios-deploy` transport.
+- CoreDevice LLDB-DAP can return from its attach command before the process is stopped and can emit the initial SIGSTOP after the attach response; the adapter pauses, waits for the initial stop, drains stale events, and bounds adapter shutdown so subsequent breakpoint waits observe only new stops.
 - Legacy physical session creation requires `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1`, `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1`, a signed `.app` path, and `ios-deploy`; the session owns the debugserver and generated bridge and exposes typed DAP inspection after attach.
 - Unified-log output is large even for a one-second host window, so the public adapter caps responses and the deterministic MCP smoke covers the tool schema rather than making log volume a required gate.
 - `dwarfdump --name` with `--show-children` returns a nested DIE stream rather than a flat symbol list; the DWARF adapter preserves offsets, depth, parent links, attributes, source paths, and bounded line rows so type/source evidence is not reduced to `atos` names.
@@ -122,7 +124,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 
 ## Outcomes & Retrospective
 
-The macOS and iOS Simulator product paths are locally verified with repository fixtures. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP and legacy `ios-deploy` adapters, and fails closed for unauthorized mutation. The physical iOS 15 fixture builds/signs and the authorized legacy path is verified through install, debugserver attach, threads, stack, registers, memory, disassembly, breakpoint hit, evaluation, instruction step, pause/continue, memory rollback, and cleanup; modern CoreDevice remote LLDB remains a separate environment-gated boundary.
+The macOS, iOS Simulator, and authorized physical-device product paths are locally verified with repository fixtures. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP, CoreDevice, and legacy `ios-deploy` adapters, and fails closed for unauthorized mutation. The iPhone 17 CoreDevice fixture is verified through install, PID-returning launch, remote LLDB-DAP attach, threads, stack, registers, memory, disassembly, breakpoint hit, evaluation, instruction step, pause/continue, memory rollback, and cleanup. The physical iOS 15 fixture remains verified through its separate legacy debugserver path; release signing/notarization remains authority-gated.
 
 ## Context and Orientation
 
@@ -131,7 +133,7 @@ The repository contains `AppleDebugCore` and `AppleDebugMCP`. The core owns capa
 ## Plan of Work
 
 1. Keep the current local debugger and Simulator workflows green with fixture-based regression checks.
-2. Keep legacy physical evidence authorization-gated by signed app, Developer Mode, signing, and explicit user direction; add modern CoreDevice evidence only after a paired/tunnel-ready device is present.
+2. Keep both modern CoreDevice and legacy physical evidence authorization-gated by signed app, Developer Mode, signing, explicit device grants, and explicit user direction.
 3. Add metadata/UI/release/reverse-engineering increments as separate fixture-backed checkpoints rather than advertising unsupported capabilities.
 4. Refresh harness evidence and create a direct-child attestation after each source/documentation checkpoint.
 
@@ -142,9 +144,10 @@ Work from `/Users/marlonjd/Developer/monorepos/apple-debug-mcp`.
 1. Run `swift package resolve` and `swift build`.
 2. Run `swift test` and `make check`.
 3. Run `make ios-fixture-smoke` and `make ios-debug-fixture-smoke` only for the explicit local Simulator workflow.
-4. Run `make harness-check` and the bundled harness validator when the source commit is final.
-5. Review `git diff --check`, `git status --short --branch`, and the staged diff before each authorized Conventional Commit.
-6. Push verified source commits and the direct-child harness attestation commit to `main`.
+4. Run `make ios-coredevice-debug-control-smoke` with `APPLE_DEBUG_COREDEVICE_ID` and the explicit physical-device grants when a paired modern device is available; run the legacy target separately for iOS 15 hardware.
+5. Run `make harness-check` and the bundled harness validator when the source commit is final.
+6. Review `git diff --check`, `git status --short --branch`, and the staged diff before each authorized Conventional Commit.
+7. Push verified source commits and the direct-child harness attestation commit to `main`.
 
 ## Validation and Acceptance
 
@@ -154,13 +157,13 @@ The current verified checkpoint requires:
 - MCP initialize, tools/list, capability, toolchain, LLDB-DAP probe, Mach-O, and crash calls return valid JSON-RPC responses;
 - macOS fixture smoke covers launch, breakpoint, threads, stack, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup;
 - iOS Simulator smoke covers build/install/launch/screenshot/terminate/shutdown and LLDB-DAP attach/threads/stack/memory/disassembly/cleanup;
-- physical-device capability restrictions and current CoreDevice state are explicit;
+- modern CoreDevice evidence covers paired/tunnel refresh, install, deterministic launch/PID discovery, LLDB-DAP attach, inspection/control, rollback, and cleanup;
 - authorized legacy physical-device evidence covers `ios-deploy` debugserver ownership and MCP LLDB-DAP inspection;
 - authorized legacy physical-device control evidence covers breakpoint hit, stepping, pause/continue, evaluation, and memory patch/rollback;
 - no unresolved harness placeholders remain;
 - source and attestation commit boundaries are direct-child and clean before certification.
 
-Modern CoreDevice physical debugging must remain `blocked-by-environment` until a paired/tunnel-ready device is available; the authorized legacy iOS 15 path is locally evidenced and must not be conflated with CoreDevice coverage.
+Modern CoreDevice debugging is verified on the paired iPhone 17 fixture. A future unavailable or incompatible device must remain an explicit transport blocker and must not be conflated with legacy iOS 15 coverage.
 
 ## Idempotence and Recovery
 
@@ -181,6 +184,7 @@ The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.ListTools`, `MCP.Ca
 ## Revision History
 
 - 2026-08-24: Created the repository plan, applied the harness profile, and recorded licensing, scope, and authorization decisions.
-- 2026-08-25: Added and verified the legacy iOS 15 physical-device LLDB-DAP bridge through `ios-deploy`, including owned cleanup and MCP thread/stack/register/memory/disassembly evidence; retained the modern CoreDevice gate explicitly.
+- 2026-08-25: Added and verified the legacy iOS 15 physical-device LLDB-DAP bridge through `ios-deploy`, including owned cleanup and MCP thread/stack/register/memory/disassembly evidence; retained the modern CoreDevice transport as a separate path.
 - 2026-08-25: Added and verified deterministic physical breakpoint/control coverage, memory rollback, and legacy stop-state polling through `make ios-legacy-debug-control-smoke`.
-- 2026-08-24: Added symbolication, crash analysis, unified logs, Simulator screenshot capture, richer debugger control, and bounded mutation gates; retained the physical-device blocker explicitly.
+- 2026-08-25: Added CoreDevice tunnel activation, PID-returning deterministic launch, custom remote LLDB-DAP attach synchronization, bounded adapter cleanup, and full iPhone 17 control evidence through `make ios-coredevice-debug-control-smoke`.
+- 2026-08-24: Added symbolication, crash analysis, unified logs, Simulator screenshot capture, richer debugger control, and bounded mutation gates.

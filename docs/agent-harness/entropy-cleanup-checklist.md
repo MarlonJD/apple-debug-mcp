@@ -28,7 +28,7 @@ Run this sweep manually at each major milestone and before a release or harness 
 
 | Finding | Evidence | Impact | Action | Destination | Owner | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| Modern CoreDevice fixture unavailable | CoreDevice reports unsupported pairing and unavailable tunnel on the connected iOS 15 device | CoreDevice-specific remote LLDB evidence cannot be certified locally; legacy iOS 15 control evidence is verified separately | Re-run only after an authorized modern paired device is available | Active ExecPlan | Apple Debug MCP maintainers | blocked-by-environment |
+| Modern CoreDevice fixture unavailable | iPhone 17 CoreDevice tunnel refresh, lifecycle, remote LLDB-DAP control, rollback, and cleanup pass through the modern smoke | Future devices may still be unavailable because pairing, Developer Mode, signing, or Xcode support are external authorities | Re-run the modern smoke when device/toolchain support changes; retain the legacy iOS 15 path | Active ExecPlan | Apple Debug MCP maintainers | resolved-for-current-scope |
 | Accessibility-tree source not selected | XCUITest attachment bridge and bounded gesture actions are fixture-tested | Arbitrary installed-app UI trees still require a UI-test-enabled project/scheme | Keep the fixture bridge explicit and extend project adapters only with a stable authorization contract | Technical debt tracker | Apple Debug MCP maintainers | resolved-for-fixture |
 
 ## Cadence and escalation

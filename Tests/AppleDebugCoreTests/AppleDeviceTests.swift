@@ -95,4 +95,20 @@ final class AppleDeviceTests: XCTestCase {
         let devices = try AppleDeviceService.list()
         XCTAssertTrue(devices.allSatisfy { !$0.identifier.isEmpty })
     }
+
+    func testDeviceActionResultRoundTripsProcessIdentifier() throws {
+        let result = AppleDeviceActionResult(
+            action: "launch",
+            identifier: "02329A9F-84C9-5499-9EBF-074EFCB45F7C",
+            output: "launched",
+            processID: 1234
+        )
+
+        let decoded = try JSONDecoder().decode(
+            AppleDeviceActionResult.self,
+            from: JSONEncoder().encode(result)
+        )
+
+        XCTAssertEqual(decoded, result)
+    }
 }

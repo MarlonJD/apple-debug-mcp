@@ -475,7 +475,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_device_launch",
-            description: "Launch an authorized development app on a physical device. Uses CoreDevice when available and optional ios-deploy for legacy Xcode devices. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            description: "Launch an authorized development app on a physical device. CoreDevice launch terminates an existing instance, returns its PID when appPath identifies the executable, and supports start-stopped debugger attach; legacy devices use optional ios-deploy. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
             inputSchema: deviceLaunchObjectSchema
         ),
         Tool(
@@ -2291,7 +2291,7 @@ enum ToolCatalog {
             ]),
             "appPath": .object([
                 "type": .string("string"),
-                "description": .string("Signed .app path; required for legacy physical-device LLDB-DAP sessions")
+                "description": .string("Signed .app path; required for legacy LLDB-DAP and recommended for CoreDevice symbols/PID discovery")
             ])
         ])
     ])
@@ -3218,7 +3218,7 @@ enum ToolCatalog {
             "startStopped": .object(["type": .string("boolean")]),
             "appPath": .object([
                 "type": .string("string"),
-                "description": .string("Required for legacy ios-deploy launch")
+                "description": .string("Required for legacy ios-deploy launch; recommended for CoreDevice PID discovery")
             ])
         ]),
         "required": .array([.string("identifier"), .string("bundleID")])

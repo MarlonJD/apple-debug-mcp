@@ -90,11 +90,13 @@ public struct AppleDeviceActionResult: Codable, Equatable, Sendable {
     public let action: String
     public let identifier: String
     public let output: String
+    public let processID: Int?
 
-    public init(action: String, identifier: String, output: String) {
+    public init(action: String, identifier: String, output: String, processID: Int? = nil) {
         self.action = action
         self.identifier = identifier
         self.output = output
+        self.processID = processID
     }
 }
 
@@ -103,7 +105,7 @@ public enum AppleDeviceService {
         var devices: [AppleDeviceSummary] = []
         var coreDeviceError: Error?
         do {
-            devices.append(contentsOf: try listCoreDevices())
+            devices.append(contentsOf: refreshCoreDeviceTunnels(try listCoreDevices()))
         } catch {
             coreDeviceError = error
         }
@@ -149,6 +151,35 @@ public enum AppleDeviceService {
         ])
         let data = try Data(contentsOf: outputURL)
         return try parseInventory(data: data)
+    }
+
+    private static func refreshCoreDeviceTunnels(_ devices: [AppleDeviceSummary]) -> [AppleDeviceSummary] {
+        devices.map { device in
+            guard device.transport == .coreDevice,
+                  device.pairingState.caseInsensitiveCompare("paired") == .orderedSame,
+                  !["connected", "available"].contains(device.tunnelState.lowercased()) else {
+                return device
+            }
+
+            do {
+                _ = try run(arguments: [
+                    "devicectl", "device", "info", "lockState",
+                    "--device", device.identifier,
+                    "--quiet"
+                ])
+                return AppleDeviceSummary(
+                    identifier: device.identifier,
+                    productType: device.productType,
+                    platform: device.platform,
+                    bootState: device.bootState,
+                    pairingState: device.pairingState,
+                    tunnelState: "connected",
+                    transport: device.transport
+                )
+            } catch {
+                return device
+            }
+        }
     }
 
     public static func parseInventory(data: Data) throws -> [AppleDeviceSummary] {
@@ -242,9 +273,19 @@ public enum AppleDeviceService {
         if startStopped {
             arguments.append("--start-stopped")
         }
+        arguments.append("--terminate-existing")
         arguments.append(bundleID)
         let output = try run(arguments: arguments)
-        return AppleDeviceActionResult(action: "launch", identifier: identifier, output: output.stdout)
+        return AppleDeviceActionResult(
+            action: "launch",
+            identifier: identifier,
+            output: output.stdout,
+            processID: findProcessID(
+                identifier: identifier,
+                bundleID: bundleID,
+                appPath: appPath
+            )
+        )
     }
 
     public static func validateAuthorizedDevice(identifier: String) throws {
@@ -278,6 +319,57 @@ public enum AppleDeviceService {
             arguments: ["--id", identifier, "--bundle", appPath, "--justlaunch"]
         )
         return AppleDeviceActionResult(action: "launch", identifier: identifier, output: output.stdout)
+    }
+
+    private static func findProcessID(identifier: String, bundleID: String, appPath: String?) -> Int? {
+        let executableName = appPath.flatMap { bundleExecutableName(for: $0) }
+            ?? bundleID.split(separator: ".").last.map(String.init)
+        guard let executableName, !executableName.isEmpty else {
+            return nil
+        }
+
+        for _ in 0..<20 {
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("apple-debug-mcp-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: outputURL) }
+            do {
+                _ = try run(arguments: [
+                    "devicectl", "device", "info", "processes",
+                    "--device", identifier,
+                    "--json-output", outputURL.path,
+                    "--quiet"
+                ])
+                let data = try Data(contentsOf: outputURL)
+                guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let result = root["result"] as? [String: Any],
+                      let processes = result["runningProcesses"] as? [[String: Any]] else {
+                    return nil
+                }
+                if let process = processes.first(where: { process in
+                    guard let executable = process["executable"] as? String,
+                          let processID = process["processIdentifier"] as? Int else {
+                        return false
+                    }
+                    let path = URL(string: executable)?.path ?? executable
+                    return path.hasSuffix("/\(executableName)") && processID > 0
+                }), let processID = process["processIdentifier"] as? Int {
+                    return processID
+                }
+            } catch {
+                return nil
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return nil
+    }
+
+    private static func bundleExecutableName(for appPath: String) -> String? {
+        guard let bundle = Bundle(path: appPath),
+              let name = bundle.object(forInfoDictionaryKey: "CFBundleExecutable") as? String,
+              !name.isEmpty else {
+            return nil
+        }
+        return name
     }
 
     static func legacyToolPath() -> String? {

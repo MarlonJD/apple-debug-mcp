@@ -16,7 +16,7 @@ The target is an application installed in a local Simulator. The implemented sur
 
 ### Physical iOS device
 
-The target is a development application installed on a physical device that the user is authorized to develop and debug. Modern devices use CoreDevice pairing/tunnel state; CoreDevice-incompatible legacy iOS devices use `xcdevice` plus `ios-deploy` and require the signed `.app` path when creating an LLDB-DAP session. All physical workflows require Apple signing, Developer Mode, and the relevant entitlements. Stock App Store applications are not a supported target class.
+The target is a development application installed on a physical device that the user is authorized to develop and debug. Modern devices use CoreDevice pairing/tunnel state, deterministic install/launch with a returned process ID, and the documented LLDB `device process attach --pid` path; CoreDevice sessions can consume a signed `.app` path for local symbols and source breakpoints. CoreDevice-incompatible legacy iOS devices use `xcdevice` plus `ios-deploy` and require the signed `.app` path when creating an LLDB-DAP session. All physical workflows require Apple signing, Developer Mode, the relevant entitlements, explicit debug/mutation grants, and targeted cleanup. Stock App Store applications are not a supported target class.
 
 ## Non-goals
 
@@ -33,6 +33,6 @@ The product is successful in stages:
 2. macOS LLDB inspection and controlled process operations work against a signed fixture binary.
 3. macOS controlled process operations remain policy-gated and cleanup-tested.
 4. Simulator build/run/debug and UI/log evidence work against a fixture app.
-5. Physical-device inventory and development-app lifecycle work only for paired, development-authorized fixtures; remote LLDB attach remains gated until a paired-device fixture is available.
+5. Physical-device inventory, development-app lifecycle, and remote LLDB inspection/control work for paired, development-authorized fixtures through separate modern CoreDevice and legacy transports.
 
 Each stage must have a fixture and an exact verification command before being called verified.

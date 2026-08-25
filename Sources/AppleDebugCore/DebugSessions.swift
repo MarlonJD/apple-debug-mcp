@@ -290,6 +290,7 @@ public actor DebugSessionManager {
         let session: LLDBDAPSession
         let target: String
         let deviceIdentifier: String?
+        let programPath: String?
         let legacyTransport: LegacyDeviceDebugTransport?
     }
 
@@ -309,6 +310,7 @@ public actor DebugSessionManager {
         let sessionID = UUID().uuidString.lowercased()
         let session: LLDBDAPSession
         let target: String
+        let programPath: String?
         let legacyTransport: LegacyDeviceDebugTransport?
         var sessionStarted = false
         if let deviceIdentifier {
@@ -320,6 +322,7 @@ public actor DebugSessionManager {
             case .coreDevice:
                 session = try LLDBDAPSession(deviceIdentifier: deviceIdentifier)
                 target = "ios-device:\(deviceIdentifier)"
+                programPath = appPath
                 legacyTransport = nil
             case .legacyXcode:
                 guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_MUTATION"] == "1" else {
@@ -334,6 +337,7 @@ public actor DebugSessionManager {
                 )
                 session = setup.session
                 target = "ios-device-legacy:\(deviceIdentifier)"
+                programPath = appPath
                 legacyTransport = setup.transport
                 sessionStarted = true
             }
@@ -343,6 +347,7 @@ public actor DebugSessionManager {
             }
             session = try LLDBDAPSession()
             target = "macos"
+            programPath = nil
             legacyTransport = nil
         }
         do {
@@ -353,6 +358,7 @@ public actor DebugSessionManager {
                 session: session,
                 target: target,
                 deviceIdentifier: deviceIdentifier,
+                programPath: programPath,
                 legacyTransport: legacyTransport
             )
             return DebugSessionSummary(sessionID: sessionID, target: target)
@@ -415,6 +421,10 @@ public actor DebugSessionManager {
                     "Legacy physical-device sessions are already attached during session creation."
                 )
             }
+            return try await record.session.attach(
+                deviceProcessID: processID,
+                program: record.programPath
+            )
         } else {
             try DebugPolicy.validateAttach(processID: processID)
         }

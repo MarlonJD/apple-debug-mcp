@@ -362,6 +362,28 @@ public actor LLDBDAPSession {
     }
 
     public func attach(
+        deviceProcessID: Int,
+        program: String? = nil
+    ) throws -> DAPMessage {
+        var arguments: [String: DAPValue] = [
+            "attachCommands": .array([
+                .string("device process attach --pid \(deviceProcessID)")
+            ])
+        ]
+        if let program {
+            arguments["program"] = .string(program)
+        }
+        let response = try send(command: "attach", arguments: .object(arguments))
+        // CoreDevice's attach command can return while the app is already
+        // running, especially when a local program is supplied for symbols.
+        // Normalize the session to a stopped debugger state for DAP clients.
+        _ = try? send(command: "pause")
+        _ = try? waitForStop(timeoutMilliseconds: 5_000)
+        _ = drainEvents()
+        return response
+    }
+
+    public func attach(
         program: String,
         attachCommands: [String]
     ) throws -> DAPMessage {
@@ -445,12 +467,17 @@ public actor LLDBDAPSession {
         if let process {
             try? input?.close()
             try? output?.close()
+            let terminated = DispatchSemaphore(value: 0)
+            process.terminationHandler = { _ in
+                terminated.signal()
+            }
             if process.isRunning {
                 process.terminate()
-                if process.isRunning {
+                if terminated.wait(timeout: .now() + 1) == .timedOut,
+                   process.isRunning {
                     _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                    _ = terminated.wait(timeout: .now() + 2)
                 }
-                process.waitUntilExit()
             }
         }
         process = nil
