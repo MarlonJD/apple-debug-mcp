@@ -15,13 +15,16 @@ final class CapabilitiesTests: XCTestCase {
         )
     }
 
-    func testPhysicalDeviceRestrictionsAreExplicit() {
+    func testPhysicalDeviceSupportAndRestrictionsAreExplicit() {
         let report = try? XCTUnwrap(
             CapabilityMatrix.reports().first { $0.platform == .iOSDevice }
         )
 
-        XCTAssertTrue(report?.restricted.contains(.attach) == true)
-        XCTAssertTrue(report?.restricted.contains(.memoryWrite) == true)
+        XCTAssertTrue(report?.supported.contains(.attach) == true)
+        XCTAssertTrue(report?.supported.contains(.memoryWrite) == true)
+        XCTAssertTrue(report?.supported.contains(.performanceAnalysis) == true)
+        XCTAssertTrue(report?.restricted.contains(.uiInspection) == true)
+        XCTAssertTrue(report?.restricted.contains(.logs) == true)
         XCTAssertTrue(report?.notes.contains {
             $0.localizedCaseInsensitiveContains("App Store")
         } == true)

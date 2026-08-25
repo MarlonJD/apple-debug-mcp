@@ -111,4 +111,23 @@ final class AppleDeviceTests: XCTestCase {
 
         XCTAssertEqual(decoded, result)
     }
+
+    func testParsesCoreDeviceProcessInventory() throws {
+        let json = """
+        {
+          "result": {
+            "runningProcesses": [
+              {"executable": "file:///private/var/containers/Bundle/Application/fixture/DebugApp.app/DebugApp", "processIdentifier": 1234},
+              {"executable": "file:///usr/libexec/launchd", "processIdentifier": 1},
+              {"executable": "", "processIdentifier": 0}
+            ]
+          }
+        }
+        """
+
+        let processes = try AppleDeviceService.parseProcessInventory(data: Data(json.utf8))
+
+        XCTAssertEqual(processes.map(\.processID), [1234, 1])
+        XCTAssertEqual(processes.first?.name, "DebugApp")
+    }
 }

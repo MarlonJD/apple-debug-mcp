@@ -44,6 +44,14 @@ plutil -replace CFBundleShortVersionString -string "$version" "$contents_path/In
 plutil -replace CFBundleVersion -string "$version" "$contents_path/Info.plist"
 cp LICENSE README.md ARCHITECTURE.md "$contents_path/Resources/"
 
+menu_bar_app_path="$staging_directory/AppleDebugMenuBar.app"
+mkdir -p "$menu_bar_app_path/Contents/MacOS" "$menu_bar_app_path/Contents/Resources"
+cp .build/release/apple-debug-menubar "$menu_bar_app_path/Contents/MacOS/AppleDebugMenuBar"
+cp .build/release/apple-debug-mcp "$menu_bar_app_path/Contents/Resources/apple-debug-mcp"
+cp Resources/AppleDebugMenuBar-Info.plist "$menu_bar_app_path/Contents/Info.plist"
+cp LICENSE README.md "$menu_bar_app_path/Contents/Resources/"
+chmod +x "$menu_bar_app_path/Contents/MacOS/AppleDebugMenuBar" "$menu_bar_app_path/Contents/Resources/apple-debug-mcp"
+
 if [ -n "$plugin_xpc_bundle" ]; then
     case "$plugin_xpc_bundle" in
         *.xpc) ;;
@@ -59,10 +67,16 @@ if [ -n "$plugin_xpc_bundle" ]; then
 fi
 
 codesign --force --options runtime --timestamp --sign "$identity" "$app_path"
+codesign --force --options runtime --timestamp --sign "$identity" "$menu_bar_app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"
+codesign --verify --deep --strict --verbose=2 "$menu_bar_app_path"
 
+notary_payload="$staging_directory/apple-debug-mcp-notary-payload"
+mkdir -p "$notary_payload"
+ditto "$app_path" "$notary_payload/AppleDebugMCP.app"
+ditto "$menu_bar_app_path" "$notary_payload/AppleDebugMenuBar.app"
 unsigned_submission="$staging_directory/apple-debug-mcp-notary-input.zip"
-ditto -c -k --keepParent "$app_path" "$unsigned_submission"
+ditto -c -k --sequesterRsrc --keepParent "$notary_payload" "$unsigned_submission"
 xcrun notarytool submit "$unsigned_submission" \
     --keychain-profile "$notary_profile" \
     --wait \
@@ -70,8 +84,15 @@ xcrun notarytool submit "$unsigned_submission" \
 
 xcrun stapler staple "$app_path"
 xcrun stapler validate "$app_path"
+xcrun stapler staple "$menu_bar_app_path"
+xcrun stapler validate "$menu_bar_app_path"
 spctl --assess --type execute --verbose=4 "$app_path"
+spctl --assess --type execute --verbose=4 "$menu_bar_app_path"
 
 mkdir -p "$(dirname -- "$output_path")"
-ditto -c -k --keepParent "$app_path" "$output_path"
+distribution_directory="$staging_directory/apple-debug-mcp-release"
+mkdir -p "$distribution_directory"
+ditto "$app_path" "$distribution_directory/AppleDebugMCP.app"
+ditto "$menu_bar_app_path" "$distribution_directory/AppleDebugMenuBar.app"
+ditto -c -k --sequesterRsrc --keepParent "$distribution_directory" "$output_path"
 printf 'release: created signed and notarized macOS app archive at %s\n' "$output_path"

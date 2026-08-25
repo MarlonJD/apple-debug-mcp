@@ -25,6 +25,10 @@ let package = Package(
             targets: ["AppleDebugWorkbench"]
         ),
         .executable(
+            name: "apple-debug-menubar",
+            targets: ["AppleDebugMenuBar"]
+        ),
+        .executable(
             name: "apple-debug-plugin-host",
             targets: ["AppleDebugPluginHost"]
         ),
@@ -53,6 +57,10 @@ let package = Package(
         .executableTarget(
             name: "AppleDebugWorkbench",
             dependencies: ["AppleDebugCore"]
+        ),
+        .executableTarget(
+            name: "AppleDebugMenuBar",
+            dependencies: []
         ),
         .executableTarget(
             name: "AppleDebugPluginHost",

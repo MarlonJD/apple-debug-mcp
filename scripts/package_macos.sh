@@ -25,5 +25,14 @@ cp .build/release/apple-debug-mcp "$package_directory/apple-debug-mcp"
 cp .build/release/apple-debug-plugin-host "$package_directory/apple-debug-plugin-host"
 cp LICENSE README.md ARCHITECTURE.md "$package_directory/"
 
+menu_bar_app="$package_directory/AppleDebugMenuBar.app"
+mkdir -p "$menu_bar_app/Contents/MacOS" "$menu_bar_app/Contents/Resources"
+cp .build/release/apple-debug-menubar "$menu_bar_app/Contents/MacOS/AppleDebugMenuBar"
+cp .build/release/apple-debug-mcp "$menu_bar_app/Contents/Resources/apple-debug-mcp"
+cp Resources/AppleDebugMenuBar-Info.plist "$menu_bar_app/Contents/Info.plist"
+cp LICENSE README.md "$menu_bar_app/Contents/Resources/"
+chmod +x "$menu_bar_app/Contents/MacOS/AppleDebugMenuBar" "$menu_bar_app/Contents/Resources/apple-debug-mcp"
+codesign --force --deep --sign - "$menu_bar_app" >/dev/null
+
 tar -czf "$output_path" -C "$staging_directory" apple-debug-mcp
 printf 'package: created unsigned macOS archive at %s\n' "$output_path"

@@ -225,7 +225,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_performance_record",
-            description: "Capture a bounded xctrace Time Profiler, Allocations, or System Trace artifact for an authorized macOS PID or Simulator.",
+            description: "Capture a bounded xctrace artifact for an authorized macOS PID, Simulator UDID, or paired CoreDevice UUID.",
             inputSchema: performanceRecordObjectSchema
         ),
         Tool(
@@ -477,6 +477,36 @@ enum ToolCatalog {
             name: "apple_device_launch",
             description: "Launch an authorized development app on a physical device. CoreDevice launch terminates an existing instance, returns its PID when appPath identifies the executable, and supports start-stopped debugger attach; legacy devices use optional ios-deploy. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
             inputSchema: deviceLaunchObjectSchema
+        ),
+        Tool(
+            name: "apple_device_processes",
+            description: "List running processes on an authorized CoreDevice physical device. This is read-only and requires a paired, tunnel-ready CoreDevice UUID.",
+            inputSchema: deviceIdentifierObjectSchema
+        ),
+        Tool(
+            name: "apple_device_terminate",
+            description: "Terminate a process on an authorized CoreDevice physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1; force termination is explicit.",
+            inputSchema: deviceTerminateObjectSchema
+        ),
+        Tool(
+            name: "apple_device_suspend",
+            description: "Suspend a process on an authorized CoreDevice physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            inputSchema: deviceProcessObjectSchema
+        ),
+        Tool(
+            name: "apple_device_resume",
+            description: "Resume a process on an authorized CoreDevice physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            inputSchema: deviceProcessObjectSchema
+        ),
+        Tool(
+            name: "apple_device_signal",
+            description: "Send an allowlisted signal to a process on an authorized CoreDevice physical device. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            inputSchema: deviceSignalObjectSchema
+        ),
+        Tool(
+            name: "apple_device_sysdiagnose",
+            description: "Collect a bounded CoreDevice sysdiagnose into an explicit destination directory. Disabled unless APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1.",
+            inputSchema: deviceSysdiagnoseObjectSchema
         ),
         Tool(
             name: "apple_xcode_discover",
@@ -1125,6 +1155,7 @@ enum ToolCatalog {
                     for: try ApplePerformanceService.record(
                         processID: intValue(from: params.arguments?["processID"]),
                         simulatorUDID: params.arguments?["simulatorUDID"]?.stringValue,
+                        coreDeviceIdentifier: params.arguments?["coreDeviceIdentifier"]?.stringValue,
                         template: params.arguments?["template"]?.stringValue ?? "Time Profiler",
                         durationSeconds: intValue(from: params.arguments?["durationSeconds"]) ?? 5,
                         outputPath: params.arguments?["outputPath"]?.stringValue ?? ""
@@ -1919,6 +1950,78 @@ enum ToolCatalog {
             } catch {
                 return errorResult(error)
             }
+        case "apple_device_processes":
+            guard let identifier = params.arguments?["identifier"]?.stringValue else {
+                return errorResult("Missing required identifier argument.")
+            }
+            do {
+                return result(for: try AppleDeviceService.processes(identifier: identifier))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_terminate":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let processID = intValue(from: params.arguments?["processID"]) else {
+                return errorResult("Missing required identifier or processID argument.")
+            }
+            do {
+                return result(
+                    for: try AppleDeviceService.terminate(
+                        identifier: identifier,
+                        processID: processID,
+                        force: boolValue(from: params.arguments?["force"], default: false)
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_suspend":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let processID = intValue(from: params.arguments?["processID"]) else {
+                return errorResult("Missing required identifier or processID argument.")
+            }
+            do {
+                return result(for: try AppleDeviceService.suspend(identifier: identifier, processID: processID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_resume":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let processID = intValue(from: params.arguments?["processID"]) else {
+                return errorResult("Missing required identifier or processID argument.")
+            }
+            do {
+                return result(for: try AppleDeviceService.resume(identifier: identifier, processID: processID))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_signal":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let processID = intValue(from: params.arguments?["processID"]),
+                  let signal = params.arguments?["signal"]?.stringValue else {
+                return errorResult("Missing required identifier, processID, or signal argument.")
+            }
+            do {
+                return result(for: try AppleDeviceService.signal(identifier: identifier, processID: processID, signal: signal))
+            } catch {
+                return errorResult(error)
+            }
+        case "apple_device_sysdiagnose":
+            guard let identifier = params.arguments?["identifier"]?.stringValue,
+                  let destination = params.arguments?["destination"]?.stringValue else {
+                return errorResult("Missing required identifier or destination argument.")
+            }
+            do {
+                return result(
+                    for: try AppleDeviceService.sysdiagnose(
+                        identifier: identifier,
+                        destination: destination,
+                        fullLogs: boolValue(from: params.arguments?["fullLogs"], default: false)
+                    )
+                )
+            } catch {
+                return errorResult(error)
+            }
         case "apple_xcode_discover":
             guard let path = params.arguments?["path"]?.stringValue else {
                 return errorResult("Missing required path argument.")
@@ -2449,6 +2552,10 @@ enum ToolCatalog {
         "properties": .object([
             "processID": .object(["type": .string("integer")]),
             "simulatorUDID": .object(["type": .string("string")]),
+            "coreDeviceIdentifier": .object([
+                "type": .string("string"),
+                "description": .string("Paired CoreDevice UUID for physical-device capture")
+            ]),
             "template": .object([
                 "type": .string("string"),
                 "enum": .array([
@@ -2463,6 +2570,7 @@ enum ToolCatalog {
                     .string("Leaks"),
                     .string("Network"),
                     .string("File Activity"),
+                    .string("Logging"),
                     .string("Game Performance")
                 ])
             ]),
@@ -3222,6 +3330,70 @@ enum ToolCatalog {
             ])
         ]),
         "required": .array([.string("identifier"), .string("bundleID")])
+    ])
+
+    private static let deviceIdentifierObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object([
+                "type": .string("string"),
+                "description": .string("CoreDevice UUID")
+            ])
+        ]),
+        "required": .array([.string("identifier")])
+    ])
+
+    private static let deviceProcessObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object(["type": .string("string")]),
+            "processID": .object(["type": .string("integer")])
+        ]),
+        "required": .array([.string("identifier"), .string("processID")])
+    ])
+
+    private static let deviceTerminateObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object(["type": .string("string")]),
+            "processID": .object(["type": .string("integer")]),
+            "force": .object([
+                "type": .string("boolean"),
+                "description": .string("Use SIGKILL instead of the graceful termination signal")
+            ])
+        ]),
+        "required": .array([.string("identifier"), .string("processID")])
+    ])
+
+    private static let deviceSignalObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object(["type": .string("string")]),
+            "processID": .object(["type": .string("integer")]),
+            "signal": .object([
+                "type": .string("string"),
+                "enum": .array([
+                    .string("SIGHUP"), .string("SIGINT"), .string("SIGQUIT"), .string("SIGILL"),
+                    .string("SIGABRT"), .string("SIGFPE"), .string("SIGKILL"), .string("SIGSEGV"),
+                    .string("SIGPIPE"), .string("SIGALRM"), .string("SIGTERM"), .string("SIGSTOP"),
+                    .string("SIGCONT"), .string("SIGUSR1"), .string("SIGUSR2")
+                ])
+            ])
+        ]),
+        "required": .array([.string("identifier"), .string("processID"), .string("signal")])
+    ])
+
+    private static let deviceSysdiagnoseObjectSchema: Value = .object([
+        "type": .string("object"),
+        "properties": .object([
+            "identifier": .object(["type": .string("string")]),
+            "destination": .object([
+                "type": .string("string"),
+                "description": .string("Absolute existing directory or path with an existing parent")
+            ]),
+            "fullLogs": .object(["type": .string("boolean")])
+        ]),
+        "required": .array([.string("identifier"), .string("destination")])
     ])
 
     private static let xcodeDiscoverObjectSchema: Value = .object([

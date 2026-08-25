@@ -39,7 +39,9 @@ The current product surface includes:
 - generated XCUITest runners that inspect and act on arbitrary applications already installed in a Simulator, without requiring the target app’s Xcode project;
 - Simulator URL opening, deterministic location injection/clear, and bounded video recording for automated reproduction;
 - Xcode project discovery, explicitly authorized builds with derived-data/`.app`/`.dSYM` manifests, and test execution with `.xcresult` summaries;
-- CoreDevice and legacy `xcdevice` physical-device inventory, plus optional `ios-deploy` authorization-gated development-app install/launch.
+- CoreDevice and legacy `xcdevice` physical-device inventory, plus optional `ios-deploy` authorization-gated development-app install/launch;
+- CoreDevice process inventory, terminate/suspend/resume/signal controls, bounded sysdiagnose collection, and physical-device xctrace capture;
+- a signed-bundle-ready macOS menu bar app that owns the MCP server process, exposes launch-at-login and server-at-login toggles, opens the server log, and provides a Quit action.
 
 The server is intentionally local and capability-aware. It does not provide arbitrary shell execution, bypass Apple signing or entitlements, or attach to stock App Store applications without an authorized development boundary.
 
@@ -53,7 +55,8 @@ Apple Debug MCP
     ├── MCP tool catalog and policy gates
     ├── LLDB-DAP session manager
     ├── Mach-O, symbolication, and crash-report analyzers
-    └── Xcode, Simulator, CoreDevice, and unified-log adapters
+    ├── Xcode, Simulator, CoreDevice, and unified-log adapters
+    └── Menu bar supervisor for the bundled stdio MCP process
 ```
 
 The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Legacy iOS 15 inventory, profiling, and authorized development-app LLDB-DAP sessions are available when `ios-deploy` and a signed `.app` path are supplied; modern physical sessions use CoreDevice. Simulator screenshot capture, the policy-gated standalone MCP accessibility-tree bridge, and fixture UI actions are available.
@@ -83,6 +86,8 @@ make ios-ui-tree-smoke
 make ios-arbitrary-ui-smoke
 APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-smoke
 APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-control-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<iphone-udid> APPLE_DEBUG_COREDEVICE_ID=<coredevice-uuid> make ios-coredevice-lifecycle-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<iphone-udid> APPLE_DEBUG_COREDEVICE_ID=<coredevice-uuid> make ios-coredevice-debug-control-smoke
 make dwarf-smoke
 make swift-ast-smoke
 make performance-analysis-smoke
@@ -100,9 +105,10 @@ make plugin-smoke
 make plugin-xpc-smoke
 make plugin-host-build-smoke
 make workbench-build-smoke
+./script/build_and_run.sh --verify
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `swift-concurrency-graph-smoke` compiles an async fixture, records the public Swift Concurrency template, and verifies task/actor graph evidence, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation.
+`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `swift-concurrency-graph-smoke` compiles an async fixture, records the public Swift Concurrency template, and verifies task/actor graph evidence, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation. The explicit physical targets exercise CoreDevice process lifecycle and remote LLDB control on an authorized modern device.
 
 Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
 
@@ -112,7 +118,10 @@ For a signed and notarized archive on a configured release Mac, see [docs/RELEAS
 
 ```sh
 swift run apple-debug-mcp
+./script/build_and_run.sh --verify
 ```
+
+`script/build_and_run.sh` stages a real `AppleDebugMenuBar.app`, bundles the MCP executable inside it, signs the local bundle with `CODESIGN_IDENTITY` when supplied, and launches it. The menu bar app defaults to starting the MCP child at app launch. `Launch at Login` is registered through `SMAppService.mainApp`; use the signed packaged app from `/Applications` for persistent login registration. `Start MCP at Login` is a separate preference and is enabled by default.
 
 Safe defaults and opt-in boundaries:
 
@@ -143,7 +152,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. The iOS 15 physical fixture builds and signs for the connected iPod touch; legacy `xcdevice`/`xctrace` inventory, `ios-deploy` install/debugserver launch, and MCP LLDB-DAP thread/stack/register/memory/disassembly/control inspection are verified with the signed fixture. `make ios-legacy-debug-control-smoke` covers a real breakpoint hit, expression evaluation, instruction stepping, pause/continue, and memory patch/rollback. Modern physical sessions still require CoreDevice pairing/tunnel support. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
+The local macOS debugger, menu bar app, iOS Simulator, iOS 15 legacy device, and iPhone 17 CoreDevice workflows are verified against repository fixtures or the explicitly authorized devices. `make ios-coredevice-lifecycle-smoke` covers process inventory, launch PID, resume, suspend, resume, and terminate; `make ios-coredevice-debug-control-smoke` covers remote LLDB-DAP inspection/control and memory rollback. Public CoreDevice tooling does not expose a supported file-backed physical screenshot interface here, so physical UI capture remains restricted. `make package` produces an unsigned relocatable macOS archive containing the menu bar app, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
 
 ## License
 

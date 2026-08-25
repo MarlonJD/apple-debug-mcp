@@ -18,7 +18,7 @@ public enum ApplePerformanceError: Error, Equatable, LocalizedError, Sendable {
         case .invalidRequest:
             return "Performance trace request is invalid or exceeds the bounded limits."
         case .permissionDisabled:
-            return "Performance capture requires an explicit authorized target or Simulator policy grant."
+            return "Performance capture requires an explicit authorized target, Simulator policy grant, or physical-device mutation grant."
         case .simulatorNotFound(let udid):
             return "Simulator is not in the available inventory: \(udid)"
         case .traceNotFound:
@@ -36,6 +36,7 @@ public enum ApplePerformanceError: Error, Equatable, LocalizedError, Sendable {
 public struct ApplePerformanceTraceResult: Codable, Equatable, Sendable {
     public let processID: Int?
     public let simulatorUDID: String?
+    public let coreDeviceIdentifier: String?
     public let template: String
     public let durationSeconds: Int
     public let tracePath: String
@@ -47,10 +48,12 @@ public struct ApplePerformanceTraceResult: Codable, Equatable, Sendable {
         template: String,
         durationSeconds: Int,
         tracePath: String,
-        output: String
+        output: String,
+        coreDeviceIdentifier: String? = nil
     ) {
         self.processID = processID
         self.simulatorUDID = simulatorUDID
+        self.coreDeviceIdentifier = coreDeviceIdentifier
         self.template = template
         self.durationSeconds = durationSeconds
         self.tracePath = tracePath
@@ -403,7 +406,7 @@ public enum ApplePerformanceService {
     private static let templates = [
         "Time Profiler", "Allocations", "System Trace", "Power Profiler", "Animation Hitches",
         "Swift Concurrency", "Processor Trace", "CPU Profiler", "Leaks", "Network",
-        "File Activity", "Game Performance"
+        "File Activity", "Game Performance", "Logging"
     ]
     private static let analysisSchemas = [
         "time-profile", "time-sample", "allocations", "allocation", "os-signpost", "os-log",
@@ -415,11 +418,15 @@ public enum ApplePerformanceService {
     public static func record(
         processID: Int?,
         simulatorUDID: String?,
+        coreDeviceIdentifier: String? = nil,
         template: String,
         durationSeconds: Int,
         outputPath: String
     ) throws -> ApplePerformanceTraceResult {
-        guard (processID == nil) != (simulatorUDID == nil),
+        let targetCount = [processID != nil, simulatorUDID != nil, coreDeviceIdentifier != nil]
+            .filter { $0 }
+            .count
+        guard targetCount == 1,
               templates.contains(template),
               (1...60).contains(durationSeconds),
               !outputPath.isEmpty, outputPath.utf8.count <= 4_096,
@@ -448,6 +455,15 @@ public enum ApplePerformanceService {
                 throw ApplePerformanceError.simulatorNotFound(simulatorUDID)
             }
             arguments += ["--device", simulatorUDID, "--all-processes"]
+        } else if let coreDeviceIdentifier {
+            guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_MUTATION"] == "1" else {
+                throw ApplePerformanceError.permissionDisabled
+            }
+            let device = try AppleDeviceService.device(identifier: coreDeviceIdentifier)
+            guard device.transport == .coreDevice else {
+                throw ApplePerformanceError.commandFailed("Physical performance capture requires a CoreDevice UUID.")
+            }
+            arguments += ["--device", device.deviceUDID ?? coreDeviceIdentifier, "--all-processes"]
         }
         guard let xctracePath = ToolchainProbe.path(for: "xctrace") else {
             throw ApplePerformanceError.toolUnavailable
@@ -480,7 +496,8 @@ public enum ApplePerformanceService {
             template: template,
             durationSeconds: durationSeconds,
             tracePath: outputPath,
-            output: String(decoding: result.stdout, as: UTF8.self)
+            output: String(decoding: result.stdout, as: UTF8.self),
+            coreDeviceIdentifier: coreDeviceIdentifier
         )
     }
 

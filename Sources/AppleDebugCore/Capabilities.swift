@@ -122,12 +122,12 @@ public enum CapabilityMatrix {
                     .launch, .machOAnalysis, .symbolication, .crashAnalysis,
                     .controlFlowAnalysis, .dyldSharedCache, .binaryIntelligence,
                     .runtimeMetadata, .dwarfAnalysis, .swiftASTAnalysis, .assembler, .binaryDiff,
-                    .signingAudit, .patchWorkflow, .deviceControl
+                    .signingAudit, .patchWorkflow, .deviceControl,
+                    .sessionLifecycle, .attach, .breakpoints, .stepControl,
+                    .registers, .stack, .memoryRead, .memoryWrite, .performanceAnalysis
                 ],
                 restricted: [
-                    .sessionLifecycle, .attach, .breakpoints, .watchpoints,
-                    .stepControl, .registers, .stack, .memoryRead,
-                    .memoryWrite, .uiInspection, .logs, .performanceAnalysis,
+                    .watchpoints, .uiInspection, .logs,
                     .runtimeDiagnostics, .forwardExecutionTrace,
                     .reverseExecution, .kernelInspection
                 ],
@@ -135,7 +135,8 @@ public enum CapabilityMatrix {
                     "Physical-device debugging is limited to paired, authorized development targets.",
                     "Stock App Store applications are outside the supported debugging boundary.",
                     "Device access requires the appropriate signing, Developer Mode, and entitlements; legacy iOS 15 devices may use xcdevice/ios-deploy instead of CoreDevice.",
-                    "CoreDevice sessions use paired UUIDs; CoreDevice-incompatible legacy devices use an authorized signed .app path, ios-deploy debugserver, and a generated LLDB-DAP attach bridge."
+                    "CoreDevice sessions use paired UUIDs, named process lifecycle controls, sysdiagnose, and xctrace performance capture; CoreDevice-incompatible legacy devices use an authorized signed .app path, ios-deploy debugserver, and a generated LLDB-DAP attach bridge.",
+                    "Physical UI inspection and direct device screenshot capture remain restricted where the public Apple tooling does not expose a supported file-backed interface."
                 ]
             )
         ]

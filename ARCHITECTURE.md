@@ -2,7 +2,7 @@
 
 ## System context
 
-Apple Debug MCP is a local macOS command-line server that exposes capability-aware Apple debugging and analysis operations through MCP. An MCP client launches it over stdio. The server delegates debugger transport to LLDB-DAP and delegates Apple platform operations to fixed Xcode command-line tools.
+Apple Debug MCP is a local macOS command-line server that exposes capability-aware Apple debugging and analysis operations through MCP. An MCP client launches it over stdio. The optional SwiftUI menu bar app supervises a bundled stdio server process but does not open a network listener. The server delegates debugger transport to LLDB-DAP and delegates Apple platform operations to fixed Xcode command-line tools.
 
 The current implementation supports verified macOS and iOS Simulator fixture workflows plus a signed iOS 15 physical fixture build. Physical-device inventory merges CoreDevice and legacy `xcdevice`; lifecycle uses CoreDevice or optional `ios-deploy`, while physical-device LLDB uses CoreDevice for modern devices and an authorization-gated `ios-deploy` debugserver/LLDB-Python bridge for legacy devices.
 
@@ -23,7 +23,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleAssembler.swift | Self-contained arm64/x86_64 assembly, Mach-O text extraction, disassembly, and patch payload generation | Maintainers; update with clang/LLVM output changes |
 | Sources/AppleDebugCore/AppleControlFlow.swift | Bounded instruction parsing, basic blocks, direct/indirect branch evidence, address-based xrefs, relocations, call graph, external calls, indirect symbols, data-in-code reports, and annotated decompiler-style pseudo-code | Maintainers; update with LLVM disassembly output changes |
 | Sources/AppleDebugCore/AppleSwiftConcurrencyGraph.swift | Public xctrace Swift Concurrency task, actor, continuation, and relationship graph reconstruction | Maintainers; update with Instruments schema changes |
-| Sources/AppleDebugCore/ApplePerformance.swift | Bounded xctrace rows, hotspots, folded stacks, semantic reports, timeline points, and trace diffs | Maintainers; update with Instruments schema changes |
+| Sources/AppleDebugCore/ApplePerformance.swift | Bounded xctrace rows, hotspots, folded stacks, semantic reports, timeline points, trace diffs, and macOS/Simulator/CoreDevice capture targets | Maintainers; update with Instruments or device schema changes |
 | Sources/AppleDebugCore/AppleDyldSharedCache.swift | Bounded dyld shared-cache discovery, runtime-helper/mount evidence, direct header/image-table parsing, selected-image Mach-O/export/nlist extraction, chained-fixup imports, and ObjC/Swift pointer cross-references | Maintainers; update with public dyld cache layout changes |
 | Sources/AppleDebugCore/AppleMemoryMaps.swift | Typed vmmap regions, persisted snapshots, and region diffs | Maintainers; update with vmmap report format changes |
 | Sources/AppleDebugCore/AppleSimulatorEnvironment.swift | Fixed simctl environment controls and bounded input validation | Maintainers; update with simctl public subcommands |
@@ -35,6 +35,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugPluginHost/ | Separate JSON-line plugin host executable with timeout/output limits and sandbox boundary | Maintainers; update only with signed host/release changes |
 | Sources/AppleDebugPluginXPCService/ | Signed App Sandbox XPC protocol fixture and third-party plugin service contract | Maintainers; update only with XPC protocol or entitlement changes |
 | Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench | Maintainers; update with GUI panels and core API changes |
+| Sources/AppleDebugMenuBar/ | SwiftUI `MenuBarExtra`, `SMAppService.mainApp` login registration, and bundled MCP child supervisor | Maintainers; update with menu actions, startup, or child-process lifecycle changes |
 | Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
 | Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
 | Sources/AppleDebugCore/AppleKernelCapabilities.swift | Kernel-debugging boundary report and supported user-process alternatives | Maintainers; update with SIP/KDK/entitlement boundary changes |
@@ -42,7 +43,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleSimulator.swift | Simulator inventory and policy-gated lifecycle/screenshot operations | Maintainers; update with simctl behavior |
 | Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded identifier/coordinate UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
 | Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
-| Sources/AppleDebugCore/AppleDevice.swift | CoreDevice plus legacy `xcdevice` inventory and transport-specific authorization-gated development-app operations | Maintainers; update with pairing/tunnel and legacy tool policy changes |
+| Sources/AppleDebugCore/AppleDevice.swift | CoreDevice plus legacy `xcdevice` inventory, transport-specific authorization-gated development-app operations, CoreDevice process lifecycle, and sysdiagnose | Maintainers; update with pairing/tunnel, process, and legacy tool policy changes |
 | Sources/AppleDebugCore/LegacyDeviceDebugTransport.swift | Owns legacy `ios-deploy --nolldb` debugserver processes and generates the bounded LLDB-Python DAP attach bridge | Maintainers; update with legacy debugserver/DAP lifecycle changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
 | Sources/AppleDebugMCP/ | MCP server startup and typed tool dispatch | Maintainers; update when the MCP surface changes |
@@ -61,9 +62,9 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `MachOInspector`: parses bounded regular files without executing them; universal binaries expose architecture records and thin binaries expose header/load-command/segment data, symbols, and strings.
 - `AppleBinaryIntelligenceService`, `AppleRuntimeMetadataService`, `DWARFService`, `AppleBinaryDiffService`, and `CrashSymbolicationService`: inspect signed Apple binaries, recover Objective-C/Swift metadata, decode bounded DWARF DIE/type/source data and line tables, compare regular Mach-O files or `.app`/`.dSYM` bundles, and triage crash frames without executing artifacts.
 - `CrashReportAnalyzer`: parses only bounded Apple crash artifacts and returns structured metadata without executing or symbolically loading their contents.
-- `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; Xcode builds return discovered derived-data, product, and dSYM paths, while Xcode tests return an xcresult summary.
+- `AppleSimulatorService`, `AppleSimulatorUIService`, `AppleDeviceService`, `AppleXcodeService`, `AppleLogService`: invoke fixed Apple tools with explicit argument arrays and typed results; physical CoreDevice operations validate paired/tunnel state, positive PIDs, allowlisted signals, and explicit output paths.
 - `AppleProcessRunner`: owns file-backed, bounded stdout/stderr capture for Apple tool invocations so large diagnostics cannot deadlock a synchronous adapter.
-- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates and parses allowlisted performance tables into typed rows, hotspots, folded flame-stack data, generic/semantic reports, timeline points, and trace-to-trace hotspot/counter diffs; the virtual Swift Concurrency schema merges public `swift-task-*`/`swift-actor-*` tables with a per-table row budget.
+- `ApplePerformanceService`: records bounded raw `.trace` artifacts through fixed `xctrace` templates for macOS PIDs, Simulators, or CoreDevice UUIDs and parses allowlisted performance tables into typed rows, hotspots, folded flame-stack data, generic/semantic reports, timeline points, and trace-to-trace hotspot/counter diffs; the virtual Swift Concurrency schema merges public `swift-task-*`/`swift-actor-*` tables with a per-table row budget.
 - `AppleSwiftConcurrencyGraphService`: reconstructs task, actor, continuation-state, and parent/child evidence from materialized public xctrace rows and resolves exported reference nodes without accessing private Swift runtime state.
 - `AppleAssemblerService`: compiles bounded self-contained assembly to a temporary Mach-O object, extracts `__TEXT,__text`, and returns LLVM disassembly; `apple_debug_patch_assembly` feeds only those bytes into the existing expected-bytes transactional memory patch path.
 - `AppleControlFlowService`, `AppleDyldSharedCacheService`, `AppleMemoryMapService`, `AppleSimulatorEnvironmentService`, `AppleReproBundleService`, `AppleSigningAuditService`, and `ApplePatchWorkflowService` provide bounded reverse-engineering and reproducibility evidence; CFG functions include annotated pseudo-code, while dyld image analysis includes chained-fixup imports and direct ObjC/Swift runtime pointer cross-references.
@@ -72,6 +73,7 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `AppleDebugPlugin` is an in-process extension contract; `AppleDebugPluginManifestService` only discovers explicit JSON manifests. Dynamic dylib loading and arbitrary plugin process execution are deliberately outside the MCP trust boundary.
 - `ApplePluginHostService` verifies the candidate XPC service executable's Apple signature and optional team identity, then connects only through the independently signed App Sandbox `AppleDebugPluginXPCProtocol`; `transport=profile` remains an explicit local legacy diagnostic path and no plugin dylib is loaded in-process.
 - `AppleDebugWorkbench` is a SwiftUI macOS executable that consumes read-only core analyzers directly; the MCP server remains the automation surface.
+- `AppleDebugMenuBar` is a menu-bar-only SwiftUI executable. `MCPServerController` owns one bundled stdio child, holds its input pipe open, writes output to `~/Library/Logs/AppleDebugMCP/server.log`, and exposes no network transport.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
 No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.
@@ -87,7 +89,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 7. Session tools send typed DAP requests for launch/attach, breakpoints, threads, paged stack/variables, exception filter options, memory, disassembly, stepping, watchpoints, evaluation, memory search/patch, and continuation.
 8. `apple_debug_stop_snapshot` drains pending stop events and collects a bounded, correlated threads/stack/scopes/registers/modules observation.
 9. `apple_macho_inspect`, `apple_binary_inspect`, `apple_runtime_metadata`, `apple_dwarf_inspect`, `apple_binary_diff`, `apple_symbolicate`, `apple_crash_inspect`, and `apple_crash_symbolicate` analyze local artifacts without launching them.
-10. Simulator and physical-device tools validate known identifiers, transport-specific authorization, and explicit mutation policies before changing target state; legacy iOS devices use `xcdevice`, `ios-deploy`, and the same explicit device-debug grant.
+10. Simulator and physical-device tools validate known identifiers, transport-specific authorization, and explicit mutation policies before changing target state; modern CoreDevice process actions and sysdiagnose use `devicectl`, while legacy iOS devices use `xcdevice` and `ios-deploy`.
 11. Xcode discovery/build tools use explicit project, scheme, configuration, and destination arguments.
 12. `apple_swift_ast_inspect` can resolve an Xcode target's bounded Swift Sources phase, module name, SDK, and target triple before public AST emission; direct file/multi-file mode remains available.
 13. `apple_simulator_ui_snapshot` runs the fixture/project XCUITest target, exports the named JSON attachment from the result bundle, and returns a bounded accessibility tree.
@@ -101,18 +103,20 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 21. `apple_plugin_list` discovers manifests only; `apple_performance_semantic_report`, `apple_performance_timeline`, and `apple_performance_diff` expose bounded trace analysis; `apple_swift_concurrency_graph` combines public Swift Concurrency export tables; `apple-debug-workbench` provides a local native GUI over selected analyzers.
 22. `apple_plugin_host_execute` connects to an embedded signed App Sandbox XPC plugin service; `transport=profile` remains an explicit legacy diagnostic path.
 23. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
-24. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+24. `apple_device_processes`, `apple_device_terminate`, `apple_device_suspend`, `apple_device_resume`, and `apple_device_signal` expose bounded CoreDevice process lifecycle; `apple_device_sysdiagnose` writes only to an explicit destination; `apple_performance_record` accepts a paired CoreDevice UUID.
+25. The menu bar app registers/unregisters its main bundle with `SMAppService.mainApp`, starts the bundled stdio MCP child according to the persisted preference, and stops only that owned child on Quit.
+26. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 
-The topology is local macOS only: one short-lived MCP process, zero listening ports, no hosted service, and no persistent database. Build artifacts remain under `.build`; `make package` creates an unsigned archive and `make release-package` creates an explicitly authorized signed/notarized app archive under ignored `dist/`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows. Remote HTTP transport remains outside the current repository boundary.
+The topology is local macOS only: a short-lived MCP process when launched by a client, or one menu bar app plus one owned stdio child when supervised; zero listening ports, no hosted service, and no persistent database. Build artifacts remain under `.build`; `make package` creates an unsigned archive and `make release-package` creates an explicitly authorized signed/notarized archive containing the server and menu bar app under ignored `dist/`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows. Remote HTTP transport remains outside the current repository boundary.
 
 ## Cross-cutting concerns
 
 - Authentication: stdio inherits the MCP client process boundary; a future HTTP transport must bind locally and require explicit authentication.
 - Authorization: capability reports and environment-gated policy checks guard process control, expression evaluation, memory writes, Simulator mutation, device mutation, and Xcode builds.
 - Filesystem safety: Mach-O/crash analyzers accept bounded regular files; binary diff accepts only a regular Mach-O, an `.app`, or a `.dSYM` with a discovered Mach-O payload; debugger launch requires a regular target and explicit user authorization.
-- Cleanup: failed launches remove their session; explicit close, server shutdown, and adapter failures close pipes and terminate only the owned LLDB-DAP and legacy `ios-deploy` processes.
+- Cleanup: failed launches remove their session; explicit close, server shutdown, and adapter failures close pipes and terminate only the owned LLDB-DAP, legacy `ios-deploy`, and menu-supervised MCP processes.
 - Reliability: external-tool failures become typed MCP errors; no arbitrary-shell fallback is permitted.
 - Licensing: project code is GPL-3.0-or-later under Burak Karahan; upstream dependencies retain their own licenses.
 

@@ -13,6 +13,10 @@ public enum AppleDeviceError: Error, Equatable, LocalizedError, Sendable {
     case invalidIdentifier
     case deviceNotAuthorized(String)
     case appNotFound
+    case invalidProcessID
+    case invalidSignal
+    case invalidPath
+    case coreDeviceOnly(String)
     case legacyToolUnavailable(String)
     case legacyDebugRequiresAppPath
     case legacyDebugUnavailable(String)
@@ -35,6 +39,14 @@ public enum AppleDeviceError: Error, Equatable, LocalizedError, Sendable {
             return "Device is not paired and tunnel-ready for authorized development: \(identifier)"
         case .appNotFound:
             return "Application bundle was not found."
+        case .invalidProcessID:
+            return "Physical-device process ID must be a positive integer."
+        case .invalidSignal:
+            return "Physical-device signal is not in the supported signal allowlist."
+        case .invalidPath:
+            return "Physical-device output path must be absolute, bounded, and have an existing parent directory."
+        case .coreDeviceOnly(let operation):
+            return "Physical-device operation is available only through CoreDevice: \(operation)"
         case .legacyToolUnavailable(let tool):
             return "Legacy Xcode device transport is available, but \(tool) is not installed."
         case .legacyDebugRequiresAppPath:
@@ -57,6 +69,7 @@ public struct AppleDeviceSummary: Codable, Equatable, Sendable {
     public let bootState: String
     public let pairingState: String
     public let tunnelState: String
+    public let deviceUDID: String?
     public let transport: AppleDeviceTransport
     public let isAuthorizedForDevelopment: Bool
 
@@ -67,6 +80,7 @@ public struct AppleDeviceSummary: Codable, Equatable, Sendable {
         bootState: String,
         pairingState: String,
         tunnelState: String,
+        deviceUDID: String? = nil,
         transport: AppleDeviceTransport = .coreDevice
     ) {
         self.identifier = identifier
@@ -75,6 +89,7 @@ public struct AppleDeviceSummary: Codable, Equatable, Sendable {
         self.bootState = bootState
         self.pairingState = pairingState
         self.tunnelState = tunnelState
+        self.deviceUDID = deviceUDID
         self.transport = transport
         self.isAuthorizedForDevelopment = switch transport {
         case .coreDevice:
@@ -97,6 +112,32 @@ public struct AppleDeviceActionResult: Codable, Equatable, Sendable {
         self.identifier = identifier
         self.output = output
         self.processID = processID
+    }
+}
+
+public struct AppleDeviceProcess: Codable, Equatable, Sendable {
+    public let processID: Int
+    public let executable: String
+    public let name: String
+
+    public init(processID: Int, executable: String, name: String) {
+        self.processID = processID
+        self.executable = executable
+        self.name = name
+    }
+}
+
+public struct AppleDeviceSysdiagnoseResult: Codable, Equatable, Sendable {
+    public let identifier: String
+    public let destination: String?
+    public let fullLogs: Bool
+    public let output: String
+
+    public init(identifier: String, destination: String?, fullLogs: Bool, output: String) {
+        self.identifier = identifier
+        self.destination = destination
+        self.fullLogs = fullLogs
+        self.output = output
     }
 }
 
@@ -174,6 +215,7 @@ public enum AppleDeviceService {
                     bootState: device.bootState,
                     pairingState: device.pairingState,
                     tunnelState: "connected",
+                    deviceUDID: device.deviceUDID,
                     transport: device.transport
                 )
             } catch {
@@ -203,6 +245,7 @@ public enum AppleDeviceService {
                 bootState: properties["bootState"] as? String ?? "unknown",
                 pairingState: connection["pairingState"] as? String ?? "unknown",
                 tunnelState: connection["tunnelState"] as? String ?? "unknown",
+                deviceUDID: hardware["udid"] as? String,
                 transport: .coreDevice
             )
         }
@@ -229,6 +272,7 @@ public enum AppleDeviceService {
                 bootState: available ? "available" : "unavailable",
                 pairingState: available ? "legacy-available" : "legacy-unavailable",
                 tunnelState: "not-required",
+                deviceUDID: identifier,
                 transport: .legacyXcode
             )
         }
@@ -288,8 +332,172 @@ public enum AppleDeviceService {
         )
     }
 
+    public static func processes(identifier: String) throws -> [AppleDeviceProcess] {
+        let device = try device(identifier: identifier)
+        guard device.transport == .coreDevice else {
+            throw AppleDeviceError.coreDeviceOnly("process inventory")
+        }
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: outputURL) }
+        _ = try run(arguments: [
+            "devicectl", "device", "info", "processes",
+            "--device", identifier,
+            "--json-output", outputURL.path,
+            "--quiet"
+        ])
+        guard let data = try? Data(contentsOf: outputURL) else {
+            throw AppleDeviceError.invalidResponse
+        }
+        return try parseProcessInventory(data: data)
+    }
+
+    public static func parseProcessInventory(data: Data) throws -> [AppleDeviceProcess] {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let result = root["result"] as? [String: Any],
+              let processes = result["runningProcesses"] as? [[String: Any]] else {
+            throw AppleDeviceError.invalidResponse
+        }
+        return processes.compactMap { process in
+            guard let processID = process["processIdentifier"] as? Int,
+                  processID > 0,
+                  let executable = process["executable"] as? String,
+                  !executable.isEmpty else {
+                return nil
+            }
+            let path = URL(string: executable)?.path ?? executable
+            return AppleDeviceProcess(
+                processID: processID,
+                executable: executable,
+                name: URL(fileURLWithPath: path).lastPathComponent
+            )
+        }
+        .sorted { ($0.name, $0.processID) < ($1.name, $1.processID) }
+    }
+
+    public static func terminate(identifier: String, processID: Int, force: Bool = false) throws -> AppleDeviceActionResult {
+        var arguments = ["devicectl", "device", "process", "terminate", "--device", identifier, "--pid", String(processID)]
+        if force { arguments.append("--kill") }
+        return try coreProcessAction(identifier: identifier, processID: processID, action: "terminate", arguments: arguments)
+    }
+
+    public static func suspend(identifier: String, processID: Int) throws -> AppleDeviceActionResult {
+        try coreProcessAction(
+            identifier: identifier,
+            processID: processID,
+            action: "suspend",
+            arguments: ["devicectl", "device", "process", "suspend", "--device", identifier, "--pid", String(processID)]
+        )
+    }
+
+    public static func resume(identifier: String, processID: Int) throws -> AppleDeviceActionResult {
+        try coreProcessAction(
+            identifier: identifier,
+            processID: processID,
+            action: "resume",
+            arguments: ["devicectl", "device", "process", "resume", "--device", identifier, "--pid", String(processID)]
+        )
+    }
+
+    public static func signal(identifier: String, processID: Int, signal: String) throws -> AppleDeviceActionResult {
+        let normalizedSignal = try validateSignal(signal)
+        return try coreProcessAction(
+            identifier: identifier,
+            processID: processID,
+            action: "signal",
+            arguments: [
+                "devicectl", "device", "process", "signal",
+                "--device", identifier,
+                "--pid", String(processID),
+                "--signal", normalizedSignal
+            ]
+        )
+    }
+
+    public static func sysdiagnose(
+        identifier: String,
+        destination: String,
+        fullLogs: Bool = false
+    ) throws -> AppleDeviceSysdiagnoseResult {
+        let device = try mutate(identifier: identifier)
+        guard device.transport == .coreDevice else {
+            throw AppleDeviceError.coreDeviceOnly("sysdiagnose")
+        }
+        try validateOutputPath(destination)
+        var arguments = [
+            "devicectl", "device", "sysdiagnose",
+            "--device", identifier,
+            "--destination", destination
+        ]
+        if fullLogs { arguments.append("--gather-full-logs") }
+        let output = try run(arguments: arguments)
+        return AppleDeviceSysdiagnoseResult(
+            identifier: identifier,
+            destination: destination,
+            fullLogs: fullLogs,
+            output: output.stdout
+        )
+    }
+
     public static func validateAuthorizedDevice(identifier: String) throws {
         _ = try device(identifier: identifier)
+    }
+
+    private static func coreProcessAction(
+        identifier: String,
+        processID: Int,
+        action: String,
+        arguments: [String]
+    ) throws -> AppleDeviceActionResult {
+        let device = try mutate(identifier: identifier)
+        guard device.transport == .coreDevice else {
+            throw AppleDeviceError.coreDeviceOnly("process \(action)")
+        }
+        try validateProcessID(processID)
+        let output = try run(arguments: arguments)
+        return AppleDeviceActionResult(
+            action: action,
+            identifier: identifier,
+            output: output.stdout,
+            processID: processID
+        )
+    }
+
+    private static func validateProcessID(_ processID: Int) throws {
+        guard processID > 0 else {
+            throw AppleDeviceError.invalidProcessID
+        }
+    }
+
+    private static func validateSignal(_ signal: String) throws -> String {
+        let normalized = signal.uppercased()
+        let allowed = [
+            "SIGHUP", "SIGINT", "SIGQUIT", "SIGILL", "SIGABRT", "SIGFPE", "SIGKILL",
+            "SIGSEGV", "SIGPIPE", "SIGALRM", "SIGTERM", "SIGSTOP", "SIGCONT", "SIGUSR1", "SIGUSR2"
+        ]
+        guard allowed.contains(normalized) else {
+            throw AppleDeviceError.invalidSignal
+        }
+        return normalized
+    }
+
+    private static func validateOutputPath(_ path: String) throws {
+        guard !path.isEmpty,
+              path.utf8.count <= 4_096,
+              !path.contains("\0"),
+              URL(fileURLWithPath: path).path.hasPrefix("/") else {
+            throw AppleDeviceError.invalidPath
+        }
+        let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
+        if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue else { throw AppleDeviceError.invalidPath }
+            return
+        }
+        let parent = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        guard fileManager.fileExists(atPath: parent, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw AppleDeviceError.invalidPath
+        }
     }
 
     private static func mutate(identifier: String) throws -> AppleDeviceSummary {
