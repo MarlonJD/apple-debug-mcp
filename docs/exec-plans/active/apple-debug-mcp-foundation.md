@@ -33,7 +33,8 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-25 20:35Z) Add paired modern CoreDevice physical-device lifecycle, PID discovery, remote LLDB-DAP attach, control, and cleanup evidence on iPhone 17.
 - [x] (2026-08-26 00:15Z) Add CoreDevice process inventory, terminate/suspend/resume/signal controls, sysdiagnose validation, physical xctrace capture, and lifecycle smoke evidence.
 - [x] (2026-08-26 00:20Z) Add the SwiftUI menu bar supervisor with bundled MCP child process control, login-at-startup toggles, server log action, Quit action, package integration, and run-button bootstrap.
-- [x] (2026-08-26 01:46Z) Add the authenticated loopback MCP daemon mode, user-private endpoint discovery, menu-bar health/status supervision, graceful shutdown, fixed default port, transport smoke, and notarized release verification; final source commit and harness attestation remain for this checkpoint.
+- [x] (2026-08-26 01:46Z) Add the authenticated loopback MCP daemon mode, user-private endpoint discovery, menu-bar health/status supervision, graceful shutdown, fixed default port, transport smoke, and notarized release verification.
+- [x] (2026-08-26 02:03Z) Push the final source/doc checkpoint, refresh the 33 HMAC evidence records, create the direct-child attestation, and receive `CERT000` for the standard harness profile.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
