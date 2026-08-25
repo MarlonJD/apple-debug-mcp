@@ -52,7 +52,7 @@ final class MenuBarModel: ObservableObject {
 
     var serverStatusTitle: String {
         switch serverState {
-        case .running(let processID): return "MCP running · \(processID)"
+        case .running(let processID, let url): return "MCP running · \(processID) · \(url.absoluteString)"
         case .starting: return "MCP starting…"
         case .stopping: return "MCP stopping…"
         case .failed(let error): return "MCP failed · \(error)"
@@ -112,6 +112,16 @@ final class MenuBarModel: ObservableObject {
             return
         }
         message = nil
+    }
+
+    func copyEndpointURL() {
+        guard case .running(_, let url) = serverState else {
+            message = "The MCP daemon endpoint is not available."
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        message = "MCP endpoint URL copied."
     }
 
     func quit() {

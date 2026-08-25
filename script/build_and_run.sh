@@ -17,7 +17,7 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
-pkill -f "^$APP_BUNDLE/Contents/Resources/$SERVER_NAME$" >/dev/null 2>&1 || true
+pkill -f "^$APP_BUNDLE/Contents/Resources/$SERVER_NAME( --daemon)?$" >/dev/null 2>&1 || true
 
 cd "$ROOT_DIR"
 swift build --product "$MENU_BAR_PRODUCT"
@@ -58,7 +58,8 @@ case "$MODE" in
         open_app
         sleep 1
         pgrep -x "$APP_NAME" >/dev/null
-        pgrep -f "^$APP_BUNDLE/Contents/Resources/$SERVER_NAME$" >/dev/null
+        pgrep -f "^$APP_BUNDLE/Contents/Resources/$SERVER_NAME --daemon$" >/dev/null
+        python3 "$ROOT_DIR/scripts/mcp_endpoint_health.py"
         ;;
     *)
         echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

@@ -1,6 +1,6 @@
 # Reliability
 
-Apple Debug MCP is currently a short-lived local CLI. It has no hosted availability target, persistent state, background worker, or production deployment.
+Apple Debug MCP is a local CLI with an optional menu-supervised daemon mode. It has no hosted availability target, database, or production deployment; daemon state is limited to one user-private endpoint file and in-memory MCP sessions.
 
 ## Reliability contract
 
@@ -8,6 +8,8 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | --- | --- | --- | --- |
 | Xcode tool is absent or unavailable | apple_toolchain_status returns a missing path | Install/select the required Xcode toolchain and rerun discovery | make check and MCP smoke output |
 | MCP process exits before initialization | Smoke fixture receives no valid initialize response | Run swift build, inspect stderr, and retry the command | scripts/smoke_mcp.sh |
+| MCP daemon endpoint is unavailable | Menu-bar supervisor cannot load a healthy user-private endpoint or daemon smoke cannot complete HTTP initialize | Inspect the bundled daemon stderr, remove only a stale `~/Library/Application Support/AppleDebugMCP/endpoint.json`, and rerun `make mcp-daemon-smoke`; do not expose the port beyond loopback | `make mcp-daemon-smoke` and `script/build_and_run.sh --verify` |
+| MCP daemon shutdown leaves endpoint metadata | `/shutdown` or menu Quit returns but endpoint metadata remains | Confirm the daemon PID/token match the endpoint file, retry the bounded shutdown, and let the next daemon start remove only its stale owned metadata | `make mcp-daemon-smoke` |
 | LLDB-DAP adapter fails during initialization | apple_lldb_dap_initialize returns an MCP error | Inspect the reported DAP failure; do not launch a target as a fallback | scripts/smoke_mcp.sh |
 | Mach-O input is malformed or too large | apple_macho_inspect returns a typed analysis error | Fix the input or reduce scope; never execute the file as a fallback | MachOTests and scripts/smoke_mcp.sh |
 | Debug session leaks an adapter process | DebugSessionTests or process inspection finds lldb-dap after close | Close pipes, terminate, force-kill only the owned adapter, and wait | DebugSessionTests |
@@ -68,7 +70,7 @@ Apple Debug MCP is currently a short-lived local CLI. It has no hosted availabil
 | Simulator recording or location control fails | apple_simulator_record_video or location tools return a typed command error | Keep the selected UDID and output path explicit; preserve the first simctl diagnostic and clean generated media | ios-mcp-tool-smoke |
 | Signed release validation fails | make release-package reports a codesign, notarization, staple, or Gatekeeper error | Preserve the release staging artifact path from the first failure, inspect the exact signing/notary diagnostic, and do not publish the zip until all three validations pass | scripts/release_macos.sh and docs/RELEASE.md |
 | Unsigned package cannot be produced | make package or the release SwiftPM build fails | Inspect the first SwiftPM/archive error; signing and notarization are separate release steps | scripts/package_macos.sh |
-| Hosted availability, failover, and production rollback | Not applicable to the current local CLI | N/A; define only when a hosted service is introduced | N/A |
+| Hosted availability, failover, and production rollback | Not applicable to the current local-only daemon | N/A; the daemon is loopback-only and has no hosted availability target | N/A |
 
 ## Failure policy
 

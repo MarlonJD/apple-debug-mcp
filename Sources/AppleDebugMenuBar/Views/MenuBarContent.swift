@@ -18,7 +18,7 @@ struct MenuBarContent: View {
                     Text(model.serverStatusTitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
 
@@ -29,6 +29,9 @@ struct MenuBarContent: View {
             }
             if model.canStopServer {
                 Button("Stop MCP Server") { model.stopServer() }
+            }
+            if case .running = model.serverState {
+                Button("Copy MCP Endpoint URL") { model.copyEndpointURL() }
             }
             Button("Open Server Log") { model.openServerLog() }
 

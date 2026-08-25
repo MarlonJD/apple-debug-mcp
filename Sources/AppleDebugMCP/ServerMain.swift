@@ -7,6 +7,25 @@ import MCP
 @main
 struct AppleDebugMCPMain {
     static func main() async throws {
+        if CommandLine.arguments.contains("--daemon") {
+            try await AppleDebugMCPDaemon.run()
+            return
+        }
+
+        try await runStdio()
+    }
+
+    private static func runStdio() async throws {
+        let server = await AppleDebugMCPServerFactory.makeServer()
+        let transport = StdioTransport()
+        try await server.start(transport: transport)
+        await server.waitUntilCompleted()
+        await ToolCatalog.shutdown()
+    }
+}
+
+enum AppleDebugMCPServerFactory {
+    static func makeServer() async -> Server {
         let server = Server(
             name: "apple-debug-mcp",
             version: "0.1.0",
@@ -24,9 +43,6 @@ struct AppleDebugMCPMain {
             await ToolCatalog.call(params)
         }
 
-        let transport = StdioTransport()
-        try await server.start(transport: transport)
-        await server.waitUntilCompleted()
-        await ToolCatalog.shutdown()
+        return server
     }
 }

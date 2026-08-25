@@ -41,6 +41,10 @@ let package = Package(
         .package(
             url: "https://github.com/modelcontextprotocol/swift-sdk.git",
             from: "0.11.0"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-nio.git",
+            from: "2.101.3"
         )
     ],
     targets: [
@@ -51,7 +55,10 @@ let package = Package(
             name: "AppleDebugMCP",
             dependencies: [
                 "AppleDebugCore",
-                .product(name: "MCP", package: "swift-sdk")
+                .product(name: "MCP", package: "swift-sdk"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio")
             ]
         ),
         .executableTarget(
@@ -60,7 +67,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "AppleDebugMenuBar",
-            dependencies: []
+            dependencies: ["AppleDebugCore"]
         ),
         .executableTarget(
             name: "AppleDebugPluginHost",

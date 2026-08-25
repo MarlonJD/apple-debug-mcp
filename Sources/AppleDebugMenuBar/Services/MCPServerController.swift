@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Burak Karahan
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AppleDebugCore
 import Darwin
 import Foundation
 
@@ -10,7 +11,7 @@ final class MCPServerController {
     enum State: Equatable {
         case stopped
         case starting
-        case running(Int32)
+        case running(Int32, URL)
         case stopping
         case failed(String)
     }
@@ -24,6 +25,9 @@ final class MCPServerController {
     private var inputWriter: FileHandle?
     private var outputHandle: FileHandle?
     private var errorHandle: FileHandle?
+    private var readinessTask: Task<Void, Never>?
+    private var pendingFailure: String?
+    private(set) var endpoint: AppleDebugDaemonEndpoint?
 
     var logURL: URL {
         FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
@@ -39,6 +43,8 @@ final class MCPServerController {
         }
 
         state = .starting
+        pendingFailure = nil
+        endpoint = nil
         let logDirectory = logURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: logURL.path) {
@@ -53,6 +59,7 @@ final class MCPServerController {
 
         let process = Process()
         process.executableURL = executableURL
+        process.arguments = ["--daemon"]
         process.standardInput = inputPipe
         process.standardOutput = outputHandle
         process.standardError = errorHandle
@@ -75,10 +82,15 @@ final class MCPServerController {
         self.inputWriter = inputPipe.fileHandleForWriting
         self.outputHandle = outputHandle
         self.errorHandle = errorHandle
-        state = .running(process.processIdentifier)
+        let processID = process.processIdentifier
+        readinessTask = Task { @MainActor [weak self] in
+            await self?.waitForReady(processID: processID)
+        }
     }
 
     func stop() {
+        readinessTask?.cancel()
+        readinessTask = nil
         guard let process else {
             state = .stopped
             return
@@ -88,10 +100,14 @@ final class MCPServerController {
         try? writer?.close()
         if process.isRunning {
             state = .stopping
-            process.terminate()
             let processID = process.processIdentifier
+            if let endpoint {
+                Task { @MainActor [weak self] in
+                    await self?.requestShutdown(endpoint)
+                }
+            }
             Task { @MainActor [weak self, weak process] in
-                try? await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(for: .seconds(2))
                 guard let process, process.isRunning else { return }
                 _ = kill(processID, SIGKILL)
                 self?.state = .stopping
@@ -101,17 +117,76 @@ final class MCPServerController {
         }
     }
 
+    private func requestShutdown(_ endpoint: AppleDebugDaemonEndpoint) async {
+        var request = URLRequest(url: endpoint.shutdownURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 1
+        request.setValue(endpoint.authorizationHeader, forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data()
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
     private func handleTermination(status: Int32) {
+        readinessTask?.cancel()
+        readinessTask = nil
+        if let endpoint {
+            AppleDebugDaemonEndpoint.removeIfOwned(
+                pid: endpoint.pid,
+                token: endpoint.token
+            )
+        }
+        endpoint = nil
         try? outputHandle?.close()
         try? errorHandle?.close()
         outputHandle = nil
         errorHandle = nil
         inputWriter = nil
         process = nil
-        if status == 0 || status == SIGTERM || status == SIGKILL {
+        if let pendingFailure {
+            self.pendingFailure = nil
+            state = .failed(pendingFailure)
+        } else if status == 0 || status == SIGTERM || status == SIGKILL {
             state = .stopped
         } else {
             state = .failed("exit status \(status)")
+        }
+    }
+
+    private func waitForReady(processID: Int32) async {
+        let deadline = Date().addingTimeInterval(8)
+        while !Task.isCancelled, Date() < deadline {
+            guard let process, process.processIdentifier == processID, process.isRunning else {
+                return
+            }
+
+            if let candidate = try? AppleDebugDaemonEndpoint.load(),
+                candidate.pid == processID,
+                await isHealthy(candidate)
+            {
+                endpoint = candidate
+                state = .running(processID, candidate.url)
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        guard !Task.isCancelled else { return }
+        pendingFailure = "MCP daemon did not publish a healthy local endpoint."
+        stop()
+    }
+
+    private func isHealthy(_ endpoint: AppleDebugDaemonEndpoint) async -> Bool {
+        var request = URLRequest(url: endpoint.healthURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 1
+        request.setValue(endpoint.authorizationHeader, forHTTPHeaderField: "Authorization")
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            return (response as? HTTPURLResponse)?.statusCode == 200
+        } catch {
+            return false
         }
     }
 

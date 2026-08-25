@@ -40,7 +40,7 @@ Root [AGENTS.md](../../AGENTS.md) is the canonical instruction map. [config.json
 | Knowledge routing | repeatable | Root routes and documentation map | Keep links current as backends appear |
 | Planning continuity | repeatable | Active foundation ExecPlan | Update progress at every checkpoint |
 | Executable verification | repeatable | make check, macOS fixture, and iOS Simulator fixture commands | Add regression coverage for newly adopted Apple SDK behavior |
-| Agent-readable runtime | repeatable | MCP stdio smoke and structured fixture transcripts | Keep tool results typed and bounded |
+| Agent-readable runtime | repeatable | MCP stdio and authenticated loopback-daemon smoke with structured fixture transcripts | Keep tool results typed, bounded, and discoverable from the endpoint contract |
 | Mechanical boundaries | repeatable | Capability tests, policy gates, and allowlisted probing | Add evidence when a new mutation boundary is introduced |
 | Entropy control | candidate | Checklist and debt tracker exist | Run the next dated sweep |
 | Safe autonomy | repeatable | Security and operating-loop boundaries | Add explicit approval flow for mutation |

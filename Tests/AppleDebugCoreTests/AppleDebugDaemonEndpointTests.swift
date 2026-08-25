@@ -1,0 +1,46 @@
+// Apple Debug MCP
+// Copyright (C) 2026 Burak Karahan
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import AppleDebugCore
+import Foundation
+import XCTest
+
+final class AppleDebugDaemonEndpointTests: XCTestCase {
+    func testEndpointRoundTripAndOwnedRemoval() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-daemon-endpoint-\(UUID().uuidString)")
+        let fileURL = directory.appendingPathComponent("endpoint.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let endpoint = AppleDebugDaemonEndpoint(
+            url: URL(string: "http://127.0.0.1:49152/mcp")!,
+            token: String(repeating: "a", count: 64),
+            pid: 1234
+        )
+        try endpoint.write(to: fileURL)
+
+        let loaded = try AppleDebugDaemonEndpoint.load(from: fileURL)
+        XCTAssertEqual(loaded.schemaVersion, endpoint.schemaVersion)
+        XCTAssertEqual(loaded.url, endpoint.url)
+        XCTAssertEqual(loaded.token, endpoint.token)
+        XCTAssertEqual(loaded.pid, endpoint.pid)
+        XCTAssertLessThan(abs(loaded.startedAt.timeIntervalSince(endpoint.startedAt)), 1)
+        AppleDebugDaemonEndpoint.removeIfOwned(
+            pid: endpoint.pid,
+            token: endpoint.token,
+            from: fileURL
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    func testEndpointRejectsNonLoopbackURL() throws {
+        let endpoint = AppleDebugDaemonEndpoint(
+            url: URL(string: "http://localhost:49152/mcp")!,
+            token: String(repeating: "a", count: 64),
+            pid: 1234
+        )
+
+        XCTAssertThrowsError(try endpoint.validate())
+    }
+}

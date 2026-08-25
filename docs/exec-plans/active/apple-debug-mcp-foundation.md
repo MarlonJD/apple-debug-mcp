@@ -2,7 +2,7 @@
 id: apple-debug-mcp-foundation
 status: active
 created: 2026-08-24
-updated: 2026-08-25
+updated: 2026-08-26
 completed:
 owner: Apple Debug MCP maintainers
 -->
@@ -33,6 +33,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-25 20:35Z) Add paired modern CoreDevice physical-device lifecycle, PID discovery, remote LLDB-DAP attach, control, and cleanup evidence on iPhone 17.
 - [x] (2026-08-26 00:15Z) Add CoreDevice process inventory, terminate/suspend/resume/signal controls, sysdiagnose validation, physical xctrace capture, and lifecycle smoke evidence.
 - [x] (2026-08-26 00:20Z) Add the SwiftUI menu bar supervisor with bundled MCP child process control, login-at-startup toggles, server log action, Quit action, package integration, and run-button bootstrap.
+- [x] (2026-08-26 01:46Z) Add the authenticated loopback MCP daemon mode, user-private endpoint discovery, menu-bar health/status supervision, graceful shutdown, fixed default port, transport smoke, and notarized release verification; final source commit and harness attestation remain for this checkpoint.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
@@ -105,6 +106,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - A sandboxed XPC service cannot be treated as a generic child-process launcher on this host; the production plugin contract is therefore service-to-service XPC with each third-party plugin independently signed and App Sandbox enabled.
 - The Swift Concurrency template exposes several public `swift-task-*` and `swift-actor-*` tables rather than one `swift-concurrency` table. The virtual analysis distributes its bounded row budget across available tables, resolves deduplicated references, and reports only public export evidence; task creation, actor execution, and continuation-state rows are not private runtime memory inspection.
 - `dyld_shared_cache_util` is not installed on this host, so shared-cache inspection uses the public header/mapping/image table layout and keeps live-tool absence visible rather than inventing a utility result.
+- The official Swift SDK provides the stateful Streamable HTTP transport but deliberately leaves the HTTP listener/framework adapter to the application; the daemon therefore adds a narrow NIO HTTP/1 adapter and keeps the SDK responsible for MCP framing, sessions, and SSE routing.
+- A loopback-only endpoint still needs authentication: the daemon publishes a random bearer token, validates localhost host/origin and content type, caps request bodies at 2 MiB, and writes endpoint metadata with user-only permissions.
+- Menu shutdown must request the authenticated `/shutdown` endpoint before its bounded kill fallback. Closing the listening channel can race the cleanup continuation, so endpoint metadata is removed before awaiting event-loop shutdown.
 
 ## Decision Log
 
@@ -123,10 +127,16 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - Decision: Treat third-party plugin code as an independently signed App Sandbox XPC service, not as an executable child of a sandboxed broker.
   Rationale: The host environment rejects generic child-process launch from the sandboxed XPC service; service-to-service XPC is the Apple-supported isolation boundary and keeps plugin code out of the MCP process.
   Date/Author: 2026-08-25 / Apple Debug MCP maintainers
+- Decision: Keep stdio as the default MCP transport and add an opt-in daemon mode supervised by the menu bar app.
+  Rationale: Existing MCP clients and smoke scripts retain their process-boundary behavior, while the menu bar app gains one shared endpoint without silently changing client configuration or opening a remote listener.
+  Date/Author: 2026-08-26 / Apple Debug MCP maintainers
+- Decision: Bind the daemon to stable `127.0.0.1:49321` by default, allow explicit port `0` for isolated tests, and publish a random bearer token in `~/Library/Application Support/AppleDebugMCP/endpoint.json`.
+  Rationale: A stable default makes client configuration durable; the test-only ephemeral override avoids collisions, while the private discovery file, token, and localhost validation prevent unauthenticated local or DNS-rebinding access.
+  Date/Author: 2026-08-26 / Apple Debug MCP maintainers
 
 ## Outcomes & Retrospective
 
-The macOS, iOS Simulator, physical-device, and menu bar product paths are locally verified with repository fixtures or explicitly authorized devices. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP, CoreDevice, legacy `ios-deploy`, and menu-supervised child processes, and fails closed for unauthorized mutation. The iPhone 17 CoreDevice fixture is verified through process lifecycle, install, PID-returning launch, remote LLDB-DAP attach, xctrace capture, threads, stack, registers, memory, disassembly, breakpoint hit, evaluation, instruction step, pause/continue, memory rollback, and cleanup. The physical iOS 15 fixture remains verified through its separate legacy debugserver path; release signing/notarization and persistent login registration remain authority-gated by the signed app bundle.
+The macOS, iOS Simulator, physical-device, and menu bar product paths are locally verified with repository fixtures or explicitly authorized devices. The MCP server exposes analysis and debugger tools through typed schemas, cleans up owned LLDB-DAP, CoreDevice, legacy `ios-deploy`, and menu-supervised child processes, and fails closed for unauthorized mutation. The authenticated daemon checkpoint is verified through health authorization, bearer rejection, MCP initialize/session routing, discovery of all 104 tools, a capability call, graceful shutdown, and endpoint-file removal. The iPhone 17 CoreDevice fixture is verified through process lifecycle, install, PID-returning launch, remote LLDB-DAP attach, xctrace capture, threads, stack, registers, memory, disassembly, breakpoint hit, evaluation, instruction step, pause/continue, memory rollback, and cleanup. The physical iOS 15 fixture remains verified through its separate legacy debugserver path; release signing/notarization and persistent login registration remain authority-gated by the signed app bundle.
 
 ## Context and Orientation
 
@@ -147,7 +157,7 @@ Work from `/Users/marlonjd/Developer/monorepos/apple-debug-mcp`.
 2. Run `swift test` and `make check`.
 3. Run `make ios-fixture-smoke` and `make ios-debug-fixture-smoke` only for the explicit local Simulator workflow.
 4. Run `make ios-coredevice-lifecycle-smoke` and `make ios-coredevice-debug-control-smoke` with `APPLE_DEBUG_COREDEVICE_ID` and the explicit physical-device grants when a paired modern device is available; run the legacy target separately for iOS 15 hardware.
-5. Run `./script/build_and_run.sh --verify` and `make package` for the menu bar app and bundle contract.
+5. Run `make mcp-daemon-smoke`, `./script/build_and_run.sh --verify`, and `make package` for the daemon, menu bar app, and bundle contract.
 6. Run `make harness-check` and the bundled harness validator when the source commit is final.
 7. Review `git diff --check`, `git status --short --branch`, and the staged diff before each authorized Conventional Commit.
 8. Push verified source commits and the direct-child harness attestation commit to `main`.
@@ -158,11 +168,12 @@ The current verified checkpoint requires:
 
 - `make check` and `make harness-check` exit 0;
 - MCP initialize, tools/list, capability, toolchain, LLDB-DAP probe, Mach-O, and crash calls return valid JSON-RPC responses;
+- daemon health rejects missing credentials, accepts the private bearer token, routes Streamable HTTP/SSE MCP sessions, and removes endpoint metadata on graceful shutdown;
 - macOS fixture smoke covers launch, breakpoint, threads, stack, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup;
 - iOS Simulator smoke covers build/install/launch/screenshot/terminate/shutdown and LLDB-DAP attach/threads/stack/memory/disassembly/cleanup;
 - modern CoreDevice evidence covers paired/tunnel refresh, install, deterministic launch/PID discovery, LLDB-DAP attach, inspection/control, rollback, and cleanup;
 - modern CoreDevice lifecycle evidence covers process inventory, resume/suspend, termination, and physical xctrace capture;
-- menu bar evidence covers a real `.app` bundle, bundled MCP child startup, package contents, login-at-startup controls, log action, and Quit action;
+- menu bar evidence covers a real `.app` bundle, bundled daemon child startup/health, package contents, login-at-startup controls, log action, endpoint status, and Quit action;
 - authorized legacy physical-device evidence covers `ios-deploy` debugserver ownership and MCP LLDB-DAP inspection;
 - authorized legacy physical-device control evidence covers breakpoint hit, stepping, pause/continue, evaluation, and memory patch/rollback;
 - no unresolved harness placeholders remain;
@@ -184,7 +195,7 @@ Build and test commands are safe to rerun. `make clean` removes only SwiftPM bui
 
 ## Interfaces and Dependencies
 
-The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.ListTools`, `MCP.CallTool`, `MCP.Tool`, and `MCP.Value` from the official Swift SDK. `ToolCatalog.tools` is the MCP surface and `ToolCatalog.call(_:)` dispatches calls. `CapabilityMatrix.reports()` is the stable policy interface. `LLDBDAPSession` owns the adapter process; `DAPFraming` owns Content-Length framing; `DebugSessionManager` owns session policy and cleanup. `AppleDebugMenuBar` owns the SwiftUI `MenuBarExtra`, `SMAppService.mainApp` login registration, and the bundled stdio MCP child supervisor.
+The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.StatefulHTTPServerTransport`, `MCP.ListTools`, `MCP.CallTool`, `MCP.Tool`, and `MCP.Value` from the official Swift SDK. `ToolCatalog.tools` is the MCP surface and `ToolCatalog.call(_:)` dispatches calls. `AppleDebugMCPDaemonServer` owns the loopback NIO listener, bearer validation, endpoint publication, session routing, and graceful cleanup while the SDK owns MCP framing and Streamable HTTP/SSE behavior. `AppleDebugDaemonEndpoint` is the shared endpoint contract. `CapabilityMatrix.reports()` is the stable policy interface. `LLDBDAPSession` owns the adapter process; `DAPFraming` owns Content-Length framing; `DebugSessionManager` owns session policy and cleanup. `AppleDebugMenuBar` owns the SwiftUI `MenuBarExtra`, `SMAppService.mainApp` login registration, health-aware daemon supervision, and bounded shutdown.
 
 ## Revision History
 
@@ -193,4 +204,5 @@ The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.ListTools`, `MCP.Ca
 - 2026-08-25: Added and verified deterministic physical breakpoint/control coverage, memory rollback, and legacy stop-state polling through `make ios-legacy-debug-control-smoke`.
 - 2026-08-25: Added CoreDevice tunnel activation, PID-returning deterministic launch, custom remote LLDB-DAP attach synchronization, bounded adapter cleanup, and full iPhone 17 control evidence through `make ios-coredevice-debug-control-smoke`.
 - 2026-08-26: Added CoreDevice process lifecycle/sysdiagnose/performance tools and smoke evidence, plus the signed-ready SwiftUI menu bar supervisor and package/run integration.
+- 2026-08-26: Added authenticated loopback daemon mode with official SDK Stateful HTTP transport, NIO listener adapter, user-private endpoint discovery, menu-bar health/shutdown supervision, endpoint smoke coverage, and documentation routes.
 - 2026-08-24: Added symbolication, crash analysis, unified logs, Simulator screenshot capture, richer debugger control, and bounded mutation gates.

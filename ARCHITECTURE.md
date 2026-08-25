@@ -2,7 +2,7 @@
 
 ## System context
 
-Apple Debug MCP is a local macOS command-line server that exposes capability-aware Apple debugging and analysis operations through MCP. An MCP client launches it over stdio. The optional SwiftUI menu bar app supervises a bundled stdio server process but does not open a network listener. The server delegates debugger transport to LLDB-DAP and delegates Apple platform operations to fixed Xcode command-line tools.
+Apple Debug MCP is a local macOS command-line server that exposes capability-aware Apple debugging and analysis operations through MCP. An MCP client can launch it over stdio, or connect to the authenticated loopback daemon supervised by the optional SwiftUI menu bar app. The daemon binds only to `127.0.0.1`, publishes a random bearer token in a user-only endpoint file, and does not expose LAN or remote access. The server delegates debugger transport to LLDB-DAP and delegates Apple platform operations to fixed Xcode command-line tools.
 
 The current implementation supports verified macOS and iOS Simulator fixture workflows plus a signed iOS 15 physical fixture build. Physical-device inventory merges CoreDevice and legacy `xcdevice`; lifecycle uses CoreDevice or optional `ios-deploy`, while physical-device LLDB uses CoreDevice for modern devices and an authorization-gated `ios-deploy` debugserver/LLDB-Python bridge for legacy devices.
 
@@ -44,6 +44,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/AppleSimulatorUI.swift | Project-backed and generated XCUITest accessibility probes, bounded identifier/coordinate UI actions, and xcresult attachment decoding | Maintainers; update with XCTest/Xcode behavior |
 | Sources/AppleDebugCore/AppleLogs.swift | Bounded host and Simulator unified-log queries | Maintainers; update with `log`/`simctl` behavior |
 | Sources/AppleDebugCore/AppleDevice.swift | CoreDevice plus legacy `xcdevice` inventory, transport-specific authorization-gated development-app operations, CoreDevice process lifecycle, and sysdiagnose | Maintainers; update with pairing/tunnel, process, and legacy tool policy changes |
+| Sources/AppleDebugCore/AppleDebugDaemonEndpoint.swift | User-private loopback daemon endpoint metadata, token, validation, and cleanup | Maintainers; update with daemon discovery or local-authentication changes |
 | Sources/AppleDebugCore/LegacyDeviceDebugTransport.swift | Owns legacy `ios-deploy --nolldb` debugserver processes and generates the bounded LLDB-Python DAP attach bridge | Maintainers; update with legacy debugserver/DAP lifecycle changes |
 | Sources/AppleDebugCore/AppleXcode.swift | Xcode project discovery and policy-gated builds | Maintainers; update with project/build policy changes |
 | Sources/AppleDebugMCP/ | MCP server startup and typed tool dispatch | Maintainers; update when the MCP surface changes |
@@ -73,16 +74,18 @@ The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `Appl
 - `AppleDebugPlugin` is an in-process extension contract; `AppleDebugPluginManifestService` only discovers explicit JSON manifests. Dynamic dylib loading and arbitrary plugin process execution are deliberately outside the MCP trust boundary.
 - `ApplePluginHostService` verifies the candidate XPC service executable's Apple signature and optional team identity, then connects only through the independently signed App Sandbox `AppleDebugPluginXPCProtocol`; `transport=profile` remains an explicit local legacy diagnostic path and no plugin dylib is loaded in-process.
 - `AppleDebugWorkbench` is a SwiftUI macOS executable that consumes read-only core analyzers directly; the MCP server remains the automation surface.
-- `AppleDebugMenuBar` is a menu-bar-only SwiftUI executable. `MCPServerController` owns one bundled stdio child, holds its input pipe open, writes output to `~/Library/Logs/AppleDebugMCP/server.log`, and exposes no network transport.
+- `AppleDebugMenuBar` is a menu-bar-only SwiftUI executable. `MCPServerController` owns one bundled daemon child, waits for its authenticated health endpoint, writes output to `~/Library/Logs/AppleDebugMCP/server.log`, and requests graceful shutdown through the private endpoint before using a bounded kill fallback.
+- `AppleDebugDaemonEndpoint` is the only shared discovery contract: it records the loopback `/mcp` URL, random bearer token, daemon PID, schema version, and start time under `~/Library/Application Support/AppleDebugMCP/endpoint.json` with user-only permissions.
 - `ToolCatalog`: exposes only named MCP tools; unknown tools fail closed.
 
 No backend may expose arbitrary shell execution or silently broaden a target’s authorization boundary.
 
 ## Data and control flow
 
-1. The MCP client starts `apple-debug-mcp` as a stdio child process.
-2. The server completes MCP initialization and advertises the current tool schemas.
-3. `apple_capabilities` returns platform-specific support and restrictions.
+1. A client either starts `apple-debug-mcp` as a stdio child process or reads the menu-supervised endpoint metadata and connects to `http://127.0.0.1:<ephemeral-port>/mcp` with its bearer token.
+2. The daemon validates loopback host/origin, bearer token, content type, protocol version, and bounded HTTP body size before passing requests to the official MCP Stateful HTTP transport.
+3. The server completes MCP initialization and advertises the current tool schemas.
+4. `apple_capabilities` returns platform-specific support and restrictions.
 4. `apple_toolchain_status` probes a fixed allowlist through `xcrun`/`xcode-select`.
 5. `apple_lldb_dap_initialize` starts LLDB-DAP, completes initialization, drains events, and tears down the probe adapter.
 6. `apple_debug_session_create` creates an owned persistent adapter session.
@@ -104,16 +107,17 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 22. `apple_plugin_host_execute` connects to an embedded signed App Sandbox XPC plugin service; `transport=profile` remains an explicit legacy diagnostic path.
 23. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
 24. `apple_device_processes`, `apple_device_terminate`, `apple_device_suspend`, `apple_device_resume`, and `apple_device_signal` expose bounded CoreDevice process lifecycle; `apple_device_sysdiagnose` writes only to an explicit destination; `apple_performance_record` accepts a paired CoreDevice UUID.
-25. The menu bar app registers/unregisters its main bundle with `SMAppService.mainApp`, starts the bundled stdio MCP child according to the persisted preference, and stops only that owned child on Quit.
-26. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
+25. The menu bar app registers/unregisters its main bundle with `SMAppService.mainApp`, starts the bundled daemon child according to the persisted preference, waits for health, and stops only that owned child on Quit.
+26. The daemon publishes/removes endpoint metadata, owns per-client MCP HTTP sessions, and closes them before the process exits.
+27. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 
 ## Runtime topology
 
-The topology is local macOS only: a short-lived MCP process when launched by a client, or one menu bar app plus one owned stdio child when supervised; zero listening ports, no hosted service, and no persistent database. Build artifacts remain under `.build`; `make package` creates an unsigned archive and `make release-package` creates an explicitly authorized signed/notarized archive containing the server and menu bar app under ignored `dist/`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows. Remote HTTP transport remains outside the current repository boundary.
+The topology is local macOS only: a short-lived stdio MCP process when launched by a client, or one menu bar app plus one authenticated loopback daemon child when supervised. The daemon uses the stable default endpoint `http://127.0.0.1:49321/mcp`; `APPLE_DEBUG_MCP_PORT=0` is reserved for isolated test runs and otherwise an explicit port may be configured. User-private endpoint metadata remains the discovery source; there is no LAN listener, hosted service, or persistent database. Build artifacts remain under `.build`; `make package` creates an unsigned archive and `make release-package` creates an explicitly authorized signed/notarized archive containing the server and menu bar app under ignored `dist/`; simulator/device state belongs to Apple tooling and is changed only by explicit workflows.
 
 ## Cross-cutting concerns
 
-- Authentication: stdio inherits the MCP client process boundary; a future HTTP transport must bind locally and require explicit authentication.
+- Authentication: stdio inherits the MCP client process boundary; daemon HTTP requires the user-private random bearer token and localhost origin/host validation.
 - Authorization: capability reports and environment-gated policy checks guard process control, expression evaluation, memory writes, Simulator mutation, device mutation, and Xcode builds.
 - Filesystem safety: Mach-O/crash analyzers accept bounded regular files; binary diff accepts only a regular Mach-O, an `.app`, or a `.dSYM` with a discovered Mach-O payload; debugger launch requires a regular target and explicit user authorization.
 - Cleanup: failed launches remove their session; explicit close, server shutdown, and adapter failures close pipes and terminate only the owned LLDB-DAP, legacy `ios-deploy`, and menu-supervised MCP processes.

@@ -4,7 +4,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 
 ## Trust boundaries
 
-- The MCP client is the local caller and starts the server through stdio.
+- The MCP client is the local caller and may start the server through stdio or connect to the authenticated loopback daemon endpoint.
 - The server inherits the caller’s macOS identity and developer-tool permissions.
 - Xcode, LLDB, Simulator, CoreDevice, and unified logging are external authority-bearing tools.
 - A physical iOS device and its development-signed application are separate trust targets.
@@ -34,7 +34,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Plugin boundary | External JSON manifests are read-only metadata; no arbitrary dylib or executable plugin is loaded by MCP | `AppleDebugPluginManifestService`, `AppleDebugPluginRegistry` | plugin-smoke |
 | Plugin host | Candidate XPC service executables must pass codesign audit and optional team-ID matching; the production transport connects to an independently signed App Sandbox XPC service with explicit grant, timeout, and bounded payloads. The `profile` transport is legacy-only and explicit | `ApplePluginHostService`, `AppleDebugPluginXPCProtocol` | plugin-xpc-smoke and plugin-smoke |
 | Session cleanup | Failed launch, explicit close, and server shutdown terminate only owned adapters | `DebugSessionManager`, `LLDBDAPSession.stop` | Session tests and fixture smoke |
-| Menu bar supervisor | The menu bar app launches only the bundled `apple-debug-mcp` executable, keeps its stdio input pipe owned, writes output to the user log directory, and never opens a network listener | `MCPServerController`, signed app bundle, `SMAppService.mainApp` | `script/build_and_run.sh --verify`, package inspection, and menu bar UI smoke |
+| Menu bar supervisor | The menu bar app launches only the bundled `apple-debug-mcp --daemon` executable, owns its lifecycle, writes output to the user log directory, and surfaces only the authenticated loopback endpoint | `MCPServerController`, `AppleDebugDaemonEndpoint`, signed app bundle, `SMAppService.mainApp` | `make mcp-daemon-smoke`, `script/build_and_run.sh --verify`, package inspection, and menu bar UI smoke |
 | Simulator mutation | Known UDID and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` are required | `SimulatorService.mutate` | `AppleSimulatorTests`, iOS smoke |
 | Arbitrary Simulator UI probe | Generated XCUITest project may launch/interact only with the explicitly supplied installed bundle ID and selected Simulator; no target app source or binary is modified | `SimulatorUIService`, fixed generated project, mutation gate | `ios-arbitrary-ui-smoke` |
 | Coordinate UI actions | Coordinate taps/presses/swipes are normalized, bounded, mutation-gated XCUITest events; they do not bypass accessibility, app sandbox, or target entitlements | `SimulatorUIService.validate`, generated XCTest runner | `ios-ui-tree-smoke`, `ios-arbitrary-ui-smoke` |
@@ -42,7 +42,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Physical-device LLDB | Session creation requires `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1`; CoreDevice sessions use UUID selection plus named `device process attach --pid` commands, optional signed `.app` symbol loading, and bounded initial-stop synchronization; legacy `xcdevice` UDIDs additionally require `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1`, a signed `.app` path, and the installed `ios-deploy` tool. The legacy path owns a generated LLDB-Python bridge and neither path loads arbitrary user scripts | `DebugSessionManager.create`, `LegacyDeviceDebugTransport`, `LLDBDAPSession` | `DebugSessionTests`, `AppleDeviceTests`, `LegacyDeviceDebugTransportTests`, authorized physical smoke |
 | Xcode builds | Require `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` and explicit project/scheme/configuration/destination | `XcodeService.build` | `AppleXcodeTests` |
 | Unified logs | Duration is bounded, predicates are single-line/limited, and output is capped at 2 MB | `AppleLogService` | `AppleLogsTests` |
-| Network | No HTTP listener exists; future HTTP must be localhost/authenticated/TLS-scoped | Architecture boundary | Review before transport addition |
+| Network | The daemon binds only to `127.0.0.1`, publishes a random bearer token in a user-only endpoint file, validates localhost origin/host, and caps HTTP request bodies; it does not expose LAN/TLS/remote access | `AppleDebugMCPDaemonServer`, `AppleDebugDaemonEndpoint`, NIO adapter | `make mcp-daemon-smoke` and endpoint permission tests |
 | Secrets | No credentials or tokens are stored in the repository | Repository contract | `make check` and review |
 
 ## Physical-device boundary

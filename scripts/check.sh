@@ -5,6 +5,7 @@ swift build
 swift test
 ./scripts/build_debug_fixture.sh >/dev/null
 ./scripts/smoke_mcp.sh
+python3 ./scripts/mcp_daemon_smoke.py
 python3 ./scripts/debug_fixture_smoke.py
 python3 ./scripts/plugin_xpc_smoke.py
 git diff --check

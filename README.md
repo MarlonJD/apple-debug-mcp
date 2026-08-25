@@ -41,22 +41,19 @@ The current product surface includes:
 - Xcode project discovery, explicitly authorized builds with derived-data/`.app`/`.dSYM` manifests, and test execution with `.xcresult` summaries;
 - CoreDevice and legacy `xcdevice` physical-device inventory, plus optional `ios-deploy` authorization-gated development-app install/launch;
 - CoreDevice process inventory, terminate/suspend/resume/signal controls, bounded sysdiagnose collection, and physical-device xctrace capture;
-- a signed-bundle-ready macOS menu bar app that owns the MCP server process, exposes launch-at-login and server-at-login toggles, opens the server log, and provides a Quit action.
+- a signed-bundle-ready macOS menu bar app that owns the authenticated MCP daemon process, exposes launch-at-login and server-at-login toggles, opens the server log, and provides a Quit action.
 
 The server is intentionally local and capability-aware. It does not provide arbitrary shell execution, bypass Apple signing or entitlements, or attach to stock App Store applications without an authorized development boundary.
 
 ## Architecture
 
 ```text
-MCP client
-    │ stdio
-    ▼
-Apple Debug MCP
-    ├── MCP tool catalog and policy gates
-    ├── LLDB-DAP session manager
-    ├── Mach-O, symbolication, and crash-report analyzers
-    ├── Xcode, Simulator, CoreDevice, and unified-log adapters
-    └── Menu bar supervisor for the bundled stdio MCP process
+MCP client ── stdio ──► Apple Debug MCP
+     │                    ├── MCP tool catalog and policy gates
+     └── authenticated     ├── LLDB-DAP session manager
+         loopback HTTP ─►  ├── Mach-O, symbolication, and crash-report analyzers
+         127.0.0.1         ├── Xcode, Simulator, CoreDevice, and unified-log adapters
+                            └── Menu bar supervisor for the bundled daemon
 ```
 
 The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Legacy iOS 15 inventory, profiling, and authorized development-app LLDB-DAP sessions are available when `ios-deploy` and a signed `.app` path are supplied; modern physical sessions use CoreDevice. Simulator screenshot capture, the policy-gated standalone MCP accessibility-tree bridge, and fixture UI actions are available.
@@ -66,7 +63,7 @@ The capability report distinguishes macOS, iOS Simulator, and physical iOS devic
 - macOS 13 or later;
 - Xcode and its command-line tools;
 - Swift 6 / Xcode 16 or later;
-- an MCP-compatible client with local stdio support.
+- an MCP-compatible client with local stdio support or a configured authenticated loopback endpoint.
 
 ## Build and verify
 
@@ -76,6 +73,7 @@ swift test
 make check
 make harness-check
 make package
+make mcp-daemon-smoke
 make release-package
 make fixture
 make ios-fixture
@@ -108,7 +106,7 @@ make workbench-build-smoke
 ./script/build_and_run.sh --verify
 ```
 
-`make check` proves the MCP protocol, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `swift-concurrency-graph-smoke` compiles an async fixture, records the public Swift Concurrency template, and verifies task/actor graph evidence, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation. The explicit physical targets exercise CoreDevice process lifecycle and remote LLDB control on an authorized modern device.
+`make check` proves the stdio MCP protocol, authenticated loopback daemon, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `swift-concurrency-graph-smoke` compiles an async fixture, records the public Swift Concurrency template, and verifies task/actor graph evidence, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation. The explicit physical targets exercise CoreDevice process lifecycle and remote LLDB control on an authorized modern device.
 
 Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
 
@@ -118,10 +116,11 @@ For a signed and notarized archive on a configured release Mac, see [docs/RELEAS
 
 ```sh
 swift run apple-debug-mcp
+swift run apple-debug-mcp --daemon
 ./script/build_and_run.sh --verify
 ```
 
-`script/build_and_run.sh` stages a real `AppleDebugMenuBar.app`, bundles the MCP executable inside it, signs the local bundle with `CODESIGN_IDENTITY` when supplied, and launches it. The menu bar app defaults to starting the MCP child at app launch. `Launch at Login` is registered through `SMAppService.mainApp`; use the signed packaged app from `/Applications` for persistent login registration. `Start MCP at Login` is a separate preference and is enabled by default.
+`script/build_and_run.sh` stages a real `AppleDebugMenuBar.app`, bundles the MCP executable inside it, signs the local bundle with `CODESIGN_IDENTITY` when supplied, and launches it. The menu bar app defaults to starting the authenticated daemon child at app launch. `Launch at Login` is registered through `SMAppService.mainApp`; use the signed packaged app from `/Applications` for persistent login registration. `Start MCP at Login` is a separate preference and is enabled by default. The daemon publishes its URL and bearer token to `~/Library/Application Support/AppleDebugMCP/endpoint.json` with user-only permissions; clients should read that file rather than guess a port.
 
 Safe defaults and opt-in boundaries:
 

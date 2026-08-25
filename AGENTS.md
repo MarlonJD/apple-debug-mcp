@@ -30,6 +30,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | iOS fixture smoke | make ios-fixture-smoke | Explicitly boot/install/launch/screenshot/terminate/shutdown a Simulator fixture |
 | iOS debug fixture smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture and inspect its process |
 | iOS MCP tool smoke | make ios-mcp-tool-smoke | Exercise public MCP Simulator lifecycle, launch flags, app metadata, container, screenshot, and cleanup |
+| MCP daemon smoke | make mcp-daemon-smoke | Exercise the authenticated loopback HTTP daemon, endpoint discovery, MCP session routing, and graceful cleanup |
 | iOS UI tree/action smoke | make ios-ui-tree-smoke | Run the XCUITest accessibility and tap/typeText/swipe/wait bridge through the standalone MCP server |
 | Arbitrary installed-app UI smoke | make ios-arbitrary-ui-smoke | Generate a UI-test-only project and inspect/action an installed Simulator app by bundle ID |
 | DWARF smoke | make dwarf-smoke | Build the generic iOS fixture and verify typed dSYM DIE/source/line/statistics output |
@@ -49,7 +50,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |
-| Run server | swift run apple-debug-mcp | MCP stdio process remains available until stdin closes |
+| Run server | swift run apple-debug-mcp | MCP stdio process remains available until stdin closes; `swift run apple-debug-mcp --daemon` publishes an authenticated loopback endpoint |
 
 ## Working contract
 
@@ -57,6 +58,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 - Keep AppleDebugCore independent of MCP transport details.
 - Add process launch, attach, memory mutation, and device operations only behind explicit capabilities and permission policy.
 - Do not treat a physical iOS device as an unrestricted desktop process; stock App Store applications are out of scope.
+- The supervised daemon binds only to `127.0.0.1`, requires the private endpoint bearer token, and writes endpoint metadata with user-only permissions.
 - Preserve unrelated changes and do not perform branch operations unless explicitly requested.
 - Do not push, release, sign, notarize, or operate production infrastructure without explicit authorization.
 - Use the active ExecPlan for cross-cutting work and keep it current.
