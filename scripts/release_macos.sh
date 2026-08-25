@@ -52,6 +52,10 @@ cp Resources/AppleDebugMenuBar-Info.plist "$menu_bar_app_path/Contents/Info.plis
 cp LICENSE README.md "$menu_bar_app_path/Contents/Resources/"
 chmod +x "$menu_bar_app_path/Contents/MacOS/AppleDebugMenuBar" "$menu_bar_app_path/Contents/Resources/apple-debug-mcp"
 
+codesign --force --options runtime --timestamp --sign "$identity" "$contents_path/MacOS/apple-debug-mcp"
+codesign --force --options runtime --timestamp --sign "$identity" "$contents_path/MacOS/apple-debug-plugin-host"
+codesign --force --options runtime --timestamp --sign "$identity" "$menu_bar_app_path/Contents/Resources/apple-debug-mcp"
+
 if [ -n "$plugin_xpc_bundle" ]; then
     case "$plugin_xpc_bundle" in
         *.xpc) ;;
