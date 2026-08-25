@@ -290,40 +290,77 @@ public actor DebugSessionManager {
         let session: LLDBDAPSession
         let target: String
         let deviceIdentifier: String?
+        let legacyTransport: LegacyDeviceDebugTransport?
+    }
+
+    private struct LegacySessionSetup {
+        let session: LLDBDAPSession
+        let transport: LegacyDeviceDebugTransport
     }
 
     private var sessions: [String: SessionRecord] = [:]
 
     public init() {}
 
-    public func create(deviceIdentifier: String? = nil) async throws -> DebugSessionSummary {
+    public func create(
+        deviceIdentifier: String? = nil,
+        appPath: String? = nil
+    ) async throws -> DebugSessionSummary {
         let sessionID = UUID().uuidString.lowercased()
         let session: LLDBDAPSession
         let target: String
+        let legacyTransport: LegacyDeviceDebugTransport?
+        var sessionStarted = false
         if let deviceIdentifier {
             guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_DEBUG"] == "1" else {
                 throw AppleDeviceError.debugDisabled
             }
             let device = try AppleDeviceService.device(identifier: deviceIdentifier)
-            guard device.transport == .coreDevice else {
-                throw AppleDeviceError.legacyDebugUnavailable(deviceIdentifier)
+            switch device.transport {
+            case .coreDevice:
+                session = try LLDBDAPSession(deviceIdentifier: deviceIdentifier)
+                target = "ios-device:\(deviceIdentifier)"
+                legacyTransport = nil
+            case .legacyXcode:
+                guard ProcessInfo.processInfo.environment["APPLE_DEBUG_ALLOW_DEVICE_MUTATION"] == "1" else {
+                    throw AppleDeviceError.mutationDisabled
+                }
+                guard let appPath else {
+                    throw AppleDeviceError.legacyDebugRequiresAppPath
+                }
+                let setup = try await createLegacySession(
+                    deviceIdentifier: deviceIdentifier,
+                    appPath: appPath
+                )
+                session = setup.session
+                target = "ios-device-legacy:\(deviceIdentifier)"
+                legacyTransport = setup.transport
+                sessionStarted = true
             }
-            session = try LLDBDAPSession(deviceIdentifier: deviceIdentifier)
-            target = "ios-device:\(deviceIdentifier)"
         } else {
+            guard appPath == nil else {
+                throw DebugPolicyError.invalidRequest("appPath is only valid when creating a physical-device debug session.")
+            }
             session = try LLDBDAPSession()
             target = "macos"
+            legacyTransport = nil
         }
         do {
-            _ = try await session.start()
+            if !sessionStarted {
+                _ = try await session.start()
+            }
             sessions[sessionID] = SessionRecord(
                 session: session,
                 target: target,
-                deviceIdentifier: deviceIdentifier
+                deviceIdentifier: deviceIdentifier,
+                legacyTransport: legacyTransport
             )
             return DebugSessionSummary(sessionID: sessionID, target: target)
         } catch {
             await session.stop()
+            if let legacyTransport {
+                await legacyTransport.stop()
+            }
             throw error
         }
     }
@@ -346,7 +383,11 @@ public actor DebugSessionManager {
             throw DAPError.requestFailed("Unknown debug session: \(sessionID)")
         }
         guard record.deviceIdentifier == nil else {
-            throw DebugPolicyError.invalidRequest("Launch is not available for a physical-device session; use apple_device_launch.")
+            throw DebugPolicyError.invalidRequest(
+                record.legacyTransport == nil
+                    ? "Launch is not available for a CoreDevice physical-device session; use apple_device_launch."
+                    : "Legacy physical-device sessions launch their signed app during session creation."
+            )
         }
         do {
             return try await record.session.launch(
@@ -369,6 +410,11 @@ public actor DebugSessionManager {
                 throw AppleDeviceError.debugDisabled
             }
             try AppleDeviceService.validateAuthorizedDevice(identifier: deviceIdentifier)
+            if record.legacyTransport != nil {
+                throw DebugPolicyError.invalidRequest(
+                    "Legacy physical-device sessions are already attached during session creation."
+                )
+            }
         } else {
             try DebugPolicy.validateAttach(processID: processID)
         }
@@ -1120,6 +1166,9 @@ public actor DebugSessionManager {
             return false
         }
         await record.session.stop()
+        if let legacyTransport = record.legacyTransport {
+            await legacyTransport.stop()
+        }
         return true
     }
 
@@ -1128,6 +1177,34 @@ public actor DebugSessionManager {
         self.sessions.removeAll()
         for record in sessions.values {
             await record.session.stop()
+            if let legacyTransport = record.legacyTransport {
+                await legacyTransport.stop()
+            }
+        }
+    }
+
+    private func createLegacySession(
+        deviceIdentifier: String,
+        appPath: String
+    ) async throws -> LegacySessionSetup {
+        let transport = LegacyDeviceDebugTransport(
+            deviceIdentifier: deviceIdentifier,
+            appPath: appPath
+        )
+        do {
+            let configuration = try await transport.start()
+            let session = try LLDBDAPSession(
+                preInitCommands: configuration.preInitCommands
+            )
+            _ = try await session.start()
+            _ = try await session.attach(
+                program: appPath,
+                attachCommands: configuration.attachCommands
+            )
+            return LegacySessionSetup(session: session, transport: transport)
+        } catch {
+            await transport.stop()
+            throw error
         }
     }
 

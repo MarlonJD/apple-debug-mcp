@@ -14,6 +14,7 @@ public enum AppleDeviceError: Error, Equatable, LocalizedError, Sendable {
     case deviceNotAuthorized(String)
     case appNotFound
     case legacyToolUnavailable(String)
+    case legacyDebugRequiresAppPath
     case legacyDebugUnavailable(String)
 
     public var errorDescription: String? {
@@ -27,15 +28,17 @@ public enum AppleDeviceError: Error, Equatable, LocalizedError, Sendable {
         case .debugDisabled:
             return "Physical-device debugging is disabled. Set APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 for an authorized workflow."
         case .unknownDevice(let identifier):
-            return "Device is not in the CoreDevice inventory: \(identifier)"
+            return "Device is not in the Apple device inventory: \(identifier)"
         case .invalidIdentifier:
-            return "Physical-device debugging requires a UUID device identifier."
+            return "Physical-device debugging requires a CoreDevice UUID or a 40-character legacy device UDID."
         case .deviceNotAuthorized(let identifier):
             return "Device is not paired and tunnel-ready for authorized development: \(identifier)"
         case .appNotFound:
             return "Application bundle was not found."
         case .legacyToolUnavailable(let tool):
             return "Legacy Xcode device transport is available, but \(tool) is not installed."
+        case .legacyDebugRequiresAppPath:
+            return "Legacy physical-device LLDB-DAP requires the signed .app path when creating the debug session."
         case .legacyDebugUnavailable(let identifier):
             return "LLDB-DAP cannot attach through the legacy Xcode transport for this device: \(identifier)."
         }
@@ -277,7 +280,7 @@ public enum AppleDeviceService {
         return AppleDeviceActionResult(action: "launch", identifier: identifier, output: output.stdout)
     }
 
-    private static func legacyToolPath() -> String? {
+    static func legacyToolPath() -> String? {
         if let path = ToolchainProbe.path(for: "ios-deploy") {
             return path
         }

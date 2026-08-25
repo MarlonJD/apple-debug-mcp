@@ -56,7 +56,7 @@ Apple Debug MCP
     └── Xcode, Simulator, CoreDevice, and unified-log adapters
 ```
 
-The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Legacy iOS 15 inventory and profiling are available; physical-device remote LLDB attach remains restricted until a CoreDevice-capable or dedicated legacy LLDB bridge is available. Simulator screenshot capture, the policy-gated standalone MCP accessibility-tree bridge, and fixture UI actions are available.
+The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Legacy iOS 15 inventory, profiling, and authorized development-app LLDB-DAP sessions are available when `ios-deploy` and a signed `.app` path are supplied; modern physical sessions use CoreDevice. Simulator screenshot capture, the policy-gated standalone MCP accessibility-tree bridge, and fixture UI actions are available.
 
 ## Requirements
 
@@ -121,7 +121,8 @@ Safe defaults and opt-in boundaries:
 - `APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1` — permit explicit DAP variable mutation for an authorized stopped target;
 - `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` — boot, install, launch, terminate, shut down, or screenshot a Simulator;
 - `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — mutate only a paired, tunnel-ready development device;
-- `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1` — create a physical-device LLDB session only after a CoreDevice UUID or legacy UDID, transport-specific authorization, signing, and Developer Mode checks pass;
+- `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1` — create a physical-device LLDB session only after a CoreDevice UUID or legacy UDID, transport-specific authorization, signing, and Developer Mode checks pass; legacy sessions also require the separate mutation grant;
+- `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — allow legacy session creation to install/launch the supplied signed `.app` through `ios-deploy` (CoreDevice install/launch uses this grant separately);
 - `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` — run an explicitly selected Xcode project/scheme/configuration/destination build.
 
 Do not enable a boundary for software or devices you are not authorized to debug.
@@ -140,7 +141,7 @@ Example MCP configuration after building:
 
 ## Current verification boundary
 
-The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. The iOS 15 physical fixture builds and signs for the connected iPod touch; legacy `xcdevice`/`xctrace` inventory and process profiling are available, while install/launch through MCP requires optional `ios-deploy` and physical LLDB-DAP still requires the CoreDevice transport. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
+The local macOS debugger and iOS Simulator workflows are verified against repository fixtures on the development machine. The iOS 15 physical fixture builds and signs for the connected iPod touch; legacy `xcdevice`/`xctrace` inventory, `ios-deploy` install/debugserver launch, and MCP LLDB-DAP thread/stack/register/memory/disassembly inspection are verified with the signed fixture. Modern physical sessions still require CoreDevice pairing/tunnel support. `make package` produces an unsigned relocatable macOS archive, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
 
 ## License
 

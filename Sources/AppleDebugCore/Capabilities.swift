@@ -135,7 +135,7 @@ public enum CapabilityMatrix {
                     "Physical-device debugging is limited to paired, authorized development targets.",
                     "Stock App Store applications are outside the supported debugging boundary.",
                     "Device access requires the appropriate signing, Developer Mode, and entitlements; legacy iOS 15 devices may use xcdevice/ios-deploy instead of CoreDevice.",
-                    "CoreDevice is required for the current LLDB-DAP physical session path; legacy Xcode lifecycle fallback is available when ios-deploy is installed."
+                    "CoreDevice sessions use paired UUIDs; CoreDevice-incompatible legacy devices use an authorized signed .app path, ios-deploy debugserver, and a generated LLDB-DAP attach bridge."
                 ]
             )
         ]

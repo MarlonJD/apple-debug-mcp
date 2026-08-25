@@ -242,7 +242,8 @@ public enum DAPFraming {
 
 public actor LLDBDAPSession {
     private let executablePath: String
-    private let preInitCommand: String?
+    private let preInitCommands: [String]
+    private let replMode: String?
     private var process: Process?
     private var input: FileHandle?
     private var output: FileHandle?
@@ -250,23 +251,26 @@ public actor LLDBDAPSession {
     private var nextSequence = 1
     private var events: [DAPMessage] = []
 
-    public init(executablePath: String? = nil) throws {
+    public init(
+        executablePath: String? = nil,
+        preInitCommands: [String] = [],
+        replMode: String? = nil
+    ) throws {
         guard let executablePath = executablePath ?? ToolchainProbe.path(for: "lldb-dap") else {
             throw DAPError.toolUnavailable
         }
         self.executablePath = executablePath
-        self.preInitCommand = nil
+        self.preInitCommands = preInitCommands
+        self.replMode = replMode
     }
 
     public init(deviceIdentifier: String) throws {
         guard UUID(uuidString: deviceIdentifier) != nil else {
             throw DAPError.invalidDeviceIdentifier
         }
-        guard let executablePath = ToolchainProbe.path(for: "lldb-dap") else {
-            throw DAPError.toolUnavailable
-        }
-        self.executablePath = executablePath
-        self.preInitCommand = "device select (deviceIdentifier)"
+        try self.init(
+            preInitCommands: ["device select \(deviceIdentifier)"]
+        )
     }
 
     public func start() throws -> DAPMessage {
@@ -347,6 +351,22 @@ public actor LLDBDAPSession {
         )
     }
 
+    public func attach(
+        program: String,
+        attachCommands: [String]
+    ) throws -> DAPMessage {
+        guard !program.isEmpty, !attachCommands.isEmpty else {
+            throw DAPError.requestFailed("Legacy LLDB-DAP attach requires a program and at least one attach command.")
+        }
+        return try send(
+            command: "attach",
+            arguments: .object([
+                "program": .string(program),
+                "attachCommands": .array(attachCommands.map(DAPValue.string))
+            ])
+        )
+    }
+
     public func drainEvents() -> [DAPMessage] {
         defer { events.removeAll(keepingCapacity: true) }
         return events
@@ -411,9 +431,14 @@ public actor LLDBDAPSession {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
-        if let preInitCommand {
-            process.arguments = ["--pre-init-command", preInitCommand]
+        var arguments: [String] = []
+        if let replMode {
+            arguments += ["--repl-mode", replMode]
         }
+        for command in preInitCommands {
+            arguments += ["--pre-init-command", command]
+        }
+        process.arguments = arguments
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         process.standardInput = inputPipe
@@ -458,7 +483,7 @@ public actor LLDBDAPSession {
 
     private func readChunk(
         from output: FileHandle,
-        timeoutMilliseconds: Int = 10_000
+        timeoutMilliseconds: Int = 60_000
     ) throws -> Data {
         var descriptor = pollfd(
             fd: output.fileDescriptor,

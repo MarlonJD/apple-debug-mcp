@@ -16,7 +16,7 @@ The target is an application installed in a local Simulator. The implemented sur
 
 ### Physical iOS device
 
-The target is a paired device and an application that the user is authorized to develop and debug. The workflow requires Apple signing, Developer Mode, device pairing, and the relevant entitlements. Stock App Store applications are not a supported target class.
+The target is a development application installed on a physical device that the user is authorized to develop and debug. Modern devices use CoreDevice pairing/tunnel state; CoreDevice-incompatible legacy iOS devices use `xcdevice` plus `ios-deploy` and require the signed `.app` path when creating an LLDB-DAP session. All physical workflows require Apple signing, Developer Mode, and the relevant entitlements. Stock App Store applications are not a supported target class.
 
 ## Non-goals
 

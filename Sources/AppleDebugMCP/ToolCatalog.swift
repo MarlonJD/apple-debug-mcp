@@ -135,7 +135,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_debug_session_create",
-            description: "Create and initialize an authorized LLDB-DAP session. Pass a physical-device UUID only with APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 and a paired development device.",
+            description: "Create and initialize an authorized LLDB-DAP session. Pass a CoreDevice UUID with APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1, or a legacy physical-device UDID with both APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1 and APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1. Legacy devices also require the signed .app path and are attached through ios-deploy.",
             inputSchema: sessionCreateObjectSchema
         ),
         Tool(
@@ -155,7 +155,7 @@ enum ToolCatalog {
         ),
         Tool(
             name: "apple_debug_attach",
-            description: "Attach an authorized local or paired physical-device LLDB-DAP session to a process ID. Local attach requires APPLE_DEBUG_ALLOW_TARGET_ATTACH=1; device attach requires APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1.",
+            description: "Attach an authorized local or CoreDevice physical-device LLDB-DAP session to a process ID. Legacy physical-device sessions are attached during apple_debug_session_create with appPath. Local attach requires APPLE_DEBUG_ALLOW_TARGET_ATTACH=1; device attach requires APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1.",
             inputSchema: attachObjectSchema
         ),
         Tool(
@@ -866,7 +866,8 @@ enum ToolCatalog {
             do {
                 return result(
                     for: try await sessions.create(
-                        deviceIdentifier: params.arguments?["deviceIdentifier"]?.stringValue
+                        deviceIdentifier: params.arguments?["deviceIdentifier"]?.stringValue,
+                        appPath: params.arguments?["appPath"]?.stringValue
                     )
                 )
             } catch {
@@ -2286,7 +2287,11 @@ enum ToolCatalog {
         "properties": .object([
             "deviceIdentifier": .object([
                 "type": .string("string"),
-                "description": .string("Optional CoreDevice UUID or legacy xcdevice UDID; CoreDevice is required for LLDB-DAP physical attach")
+                "description": .string("Optional CoreDevice UUID or legacy xcdevice UDID")
+            ]),
+            "appPath": .object([
+                "type": .string("string"),
+                "description": .string("Signed .app path; required for legacy physical-device LLDB-DAP sessions")
             ])
         ])
     ])

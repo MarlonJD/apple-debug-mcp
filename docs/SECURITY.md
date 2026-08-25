@@ -38,7 +38,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Arbitrary Simulator UI probe | Generated XCUITest project may launch/interact only with the explicitly supplied installed bundle ID and selected Simulator; no target app source or binary is modified | `SimulatorUIService`, fixed generated project, mutation gate | `ios-arbitrary-ui-smoke` |
 | Coordinate UI actions | Coordinate taps/presses/swipes are normalized, bounded, mutation-gated XCUITest events; they do not bypass accessibility, app sandbox, or target entitlements | `SimulatorUIService.validate`, generated XCTest runner | `ios-ui-tree-smoke`, `ios-arbitrary-ui-smoke` |
 | Physical devices | Install/launch require `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1`, known identifier, paired state, and available tunnel | `AppleDeviceService.mutate` | `AppleDeviceTests`, live inventory |
-| Physical-device LLDB | Session creation requires `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1`; CoreDevice sessions require UUID/pairing/tunnel state, while legacy `xcdevice` UDIDs are discovered but remain fail-closed for LLDB-DAP because the installed adapter has no legacy device bridge | `DebugSessionManager.create`, `LLDBDAPSession(deviceIdentifier:)` | `DebugSessionTests`, `AppleDeviceTests`; physical process profiling is verified through legacy `xctrace` |
+| Physical-device LLDB | Session creation requires `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1`; CoreDevice sessions require UUID/pairing/tunnel state, while legacy `xcdevice` UDIDs additionally require `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1`, a signed `.app` path, and the installed `ios-deploy` tool. The legacy path owns a generated LLDB-Python bridge and never loads arbitrary user scripts | `DebugSessionManager.create`, `LegacyDeviceDebugTransport`, `LLDBDAPSession` | `DebugSessionTests`, `AppleDeviceTests`, `LegacyDeviceDebugTransportTests`, authorized physical smoke |
 | Xcode builds | Require `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` and explicit project/scheme/configuration/destination | `XcodeService.build` | `AppleXcodeTests` |
 | Unified logs | Duration is bounded, predicates are single-line/limited, and output is capped at 2 MB | `AppleLogService` | `AppleLogsTests` |
 | Network | No HTTP listener exists; future HTTP must be localhost/authenticated/TLS-scoped | Architecture boundary | Review before transport addition |
@@ -46,7 +46,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 
 ## Physical-device boundary
 
-The device adapter reports CoreDevice pairing/tunnel state and legacy `xcdevice` availability before any mutation. Legacy lifecycle mutation requires `ios-deploy`; legacy LLDB-DAP is fail-closed until an adapter bridge exists. The server must not infer authorization from a device name, bundle identifier, or a successful inventory command.
+The device adapter reports CoreDevice pairing/tunnel state and legacy `xcdevice` availability before any mutation. Legacy lifecycle and LLDB-DAP mutation require `ios-deploy`, an existing signed `.app`, the explicit device-debug grant, and the separate device-mutation grant. The server must not infer authorization from a device name, bundle identifier, or a successful inventory command; the generated bridge is session-owned and removed during cleanup.
 
 ## Abuse and reporting
 
