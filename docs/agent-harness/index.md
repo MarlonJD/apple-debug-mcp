@@ -4,6 +4,8 @@ This directory is the progressive-disclosure entry point for reliable work on Ap
 
 Root [AGENTS.md](../../AGENTS.md) is the canonical instruction map. [config.json](config.json) declares the downstream authorities; it does not change Codex configuration or create external authority.
 
+Default local gate: `make harness-check`. It runs the product behavioral gate and the repository-owned `scripts/harness_contract.py`; it does not require certificate keys, attestation commits, or external services.
+
 ## Capability map
 
 | Need | Source of truth |
@@ -16,7 +18,7 @@ Root [AGENTS.md](../../AGENTS.md) is the canonical instruction map. [config.json
 | Change-to-verification mapping | [verification-matrix.md](verification-matrix.md) |
 | Recurring drift cleanup | [entropy-cleanup-checklist.md](entropy-cleanup-checklist.md) |
 | Harness capability coverage | [coverage-matrix.md](coverage-matrix.md) |
-| Harness-ready certification | [certification.md](certification.md) and [certification.json](certification.json) |
+| Optional harness certification | [certification.md](certification.md) and [certification.json](certification.json) |
 | Long-running work | [../exec-plans/index.md](../exec-plans/index.md) |
 | Security and reliability | [../SECURITY.md](../SECURITY.md) and [../RELIABILITY.md](../RELIABILITY.md) |
 
@@ -31,7 +33,7 @@ Root [AGENTS.md](../../AGENTS.md) is the canonical instruction map. [config.json
 | Change an architecture boundary | [../../ARCHITECTURE.md](../../ARCHITECTURE.md) | [../design-docs/index.md](../design-docs/index.md) and the active plan |
 | Handle review feedback | [output-contract.md](output-contract.md) | Add a test, rule, runbook, or debt item based on evidence |
 | Sweep drift and debt | [entropy-cleanup-checklist.md](entropy-cleanup-checklist.md) | [../exec-plans/tech-debt-tracker.md](../exec-plans/tech-debt-tracker.md) |
-| Certify the harness | [certification.md](certification.md) | Complete coverage and run the project-native gate plus the bundled validator |
+| Use optional certification | [certification.md](certification.md) | Only when a maintainer explicitly requests commit-bound evidence and attestation |
 
 ## Current maturity
 
@@ -42,5 +44,6 @@ Root [AGENTS.md](../../AGENTS.md) is the canonical instruction map. [config.json
 | Executable verification | repeatable | make check, macOS fixture, and iOS Simulator fixture commands | Add regression coverage for newly adopted Apple SDK behavior |
 | Agent-readable runtime | repeatable | MCP stdio and authenticated loopback-daemon smoke with structured fixture transcripts | Keep tool results typed, bounded, and discoverable from the endpoint contract |
 | Mechanical boundaries | repeatable | Capability tests, policy gates, and allowlisted probing | Add evidence when a new mutation boundary is introduced |
-| Entropy control | candidate | Checklist and debt tracker exist | Run the next dated sweep |
+| Mechanical harness contract | enforced | `scripts/harness_contract.py` checks routes, plans, coverage/evidence shape, registry, and maintenance state | Keep the checker aligned with authority changes |
+| Entropy control | enforced | Dated checklist, debt tracker, and blocking native gate | Promote repeated drift into the checker |
 | Safe autonomy | repeatable | Security and operating-loop boundaries | Add explicit approval flow for mutation |

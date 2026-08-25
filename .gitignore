@@ -5,6 +5,7 @@ xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 .DS_Store
+__pycache__/
 
 # Local MCP/client configuration
 .codex/

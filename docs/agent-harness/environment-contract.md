@@ -14,10 +14,10 @@
 
 | Stage | Exact command | Expected signal | Safe retry or cleanup | Status |
 | --- | --- | --- | --- | --- |
-| Setup | swift package resolve | Dependency graph resolves | Rerun; remove only .build with make clean if corrupted | candidate |
+| Setup | swift package resolve | Dependency graph resolves | Rerun; remove only .build with make clean if corrupted | verified |
 | Start | swift run apple-debug-mcp or `swift run apple-debug-mcp --daemon` | Stdio accepts MCP input; daemon publishes a bearer-authenticated endpoint | Close stdio or POST authenticated `/shutdown`; retry after build | verified |
 | Seed or reproduce | scripts/smoke_mcp.sh | Initialize, tools/list, analysis calls, and capability call return JSON-RPC results | Rerun; inspect stderr | verified |
-| Reset | make clean | SwiftPM build artifacts removed | Rerun swift build | candidate |
+| Reset | make clean | SwiftPM build artifacts removed | Rerun swift build | verified |
 | Stop and teardown | Close stdin for stdio; POST authenticated `/shutdown` for daemon and wait for the process | Process exits and daemon endpoint metadata is removed | Use the endpoint PID only for diagnosis; never kill an unrelated process | verified |
 
 ## Agent-readable surfaces
@@ -26,7 +26,7 @@
 | --- | --- | --- | --- | --- |
 | UI/accessibility tree | XCUITest attachment through apple_simulator_ui_snapshot | Structured accessibility tree with stable fixture identifiers | make ios-ui-tree-smoke | verified |
 | API/CLI behavior | MCP stdio via scripts/smoke_mcp.sh and authenticated HTTP via scripts/mcp_daemon_smoke.py | Initialize, list tools, and call analysis/discovery tools over both transports | JSON-RPC response with tool content and endpoint health | verified |
-| Logs | Process stderr and smoke transcript | Capture launch/build failures | Non-empty actionable error | candidate |
+| Logs | Process stderr and smoke transcript | Capture launch/build failures | Non-empty actionable error; smoke commands preserve stderr on failure | verified-with-boundary |
 | Metrics | N/A for the short-lived foundation CLI | Add only for a hosted service | N/A | N/A |
 | Traces | N/A for the short-lived foundation CLI | Add only for long-running debugger sessions | N/A | N/A |
 

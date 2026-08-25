@@ -10,6 +10,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 - Plan policy: [docs/PLANS.md](docs/PLANS.md)
 - Active work: [docs/exec-plans/index.md](docs/exec-plans/index.md)
 - Agent harness: [docs/agent-harness/index.md](docs/agent-harness/index.md)
+- Agent command catalog: [docs/agent-harness/registry.md](docs/agent-harness/registry.md)
 
 ## Repository orientation
 
@@ -50,6 +51,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |
+| Harness contract only | python3 scripts/harness_contract.py | Read-only authority, plan, coverage/evidence, registry, route, and maintenance checks pass |
 | Run server | swift run apple-debug-mcp | MCP stdio process remains available until stdin closes; `swift run apple-debug-mcp --daemon` publishes an authenticated loopback endpoint |
 
 ## Working contract

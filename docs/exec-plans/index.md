@@ -15,7 +15,7 @@ The files under active/ and completed/ are authoritative. Keep this index synchr
 | Plan | Completed (UTC) | Outcome | Verification |
 | --- | --- | --- | --- |
 <!-- harness:plans:completed:start -->
-_None._
+| [Complete the Apple Debug MCP operational harness](completed/harness-engineering-completion.md) | 2026-08-26 | Added a repository-owned operational harness contract without certificate/attestation maintenance | `make check`, `make harness-check`, native checker, and bundled standard warnings-as-errors check |
 <!-- harness:plans:completed:end -->
 
 ## Lifecycle rules

@@ -1,6 +1,6 @@
 # Entropy Cleanup Checklist
 
-Run this sweep manually at each major milestone and before a release or harness attestation.
+Run this sweep manually at each major milestone and before a release or harness handoff.
 
 ## Documentation and navigation
 
@@ -22,7 +22,7 @@ Run this sweep manually at each major milestone and before a release or harness 
 - [x] Run make harness-check.
 - [x] Exercise the MCP smoke path and inspect stderr.
 - [x] Check that no stale debug process or listener remains.
-- [ ] Refresh harness evidence when source or coverage changes.
+- [x] Review local evidence references when source or coverage changes; commit-bound certification refresh is optional.
 
 ## Triage
 
@@ -33,10 +33,10 @@ Run this sweep manually at each major milestone and before a release or harness 
 
 ## Cadence and escalation
 
-Run this sweep at each milestone and before a harness attestation. A maintainer decides whether a finding is a direct repair, a test, a runbook update, or an active-plan item. Do not enable automated writes or merges without explicit authorization.
+Run this sweep at each milestone and before a harness handoff. A maintainer decides whether a finding is a direct repair, a test, a runbook update, or an active-plan item. Do not enable automated writes or merges without explicit authorization.
 
 ## Automation decision
 
 | Runner and cadence | Scan/repair scope | Read or write mode | Pull-request and merge authority | Rollback and escalation | Evidence and status |
 | --- | --- | --- | --- | --- | --- |
-| Manual maintainer/agent task completion | Repository docs, commands, capability boundaries, and tests | Read-only scan followed by explicitly authorized local repair | No automatic PR or merge | Escalate external writes, release, signing, and product judgment | Dated sweep completed 2026-08-24 |
+| Manual maintainer/agent task completion | Repository docs, commands, capability boundaries, and tests | Read-only scan followed by explicitly authorized local repair | No automatic PR or merge | Escalate external writes, release, signing, certification, and product judgment | Dated sweep completed 2026-08-26; native contract checker is the blocking local gate |

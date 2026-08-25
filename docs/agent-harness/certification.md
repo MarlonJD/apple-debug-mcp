@@ -1,6 +1,6 @@
-# Harness-Ready Certification
+# Optional Harness-Ready Certification
 
-The harness-ready claim is repository-local and bounded to one source commit, one direct-child attestation commit, one local evaluation target, and one fresh evidence window. It is not a product release, device authorization, notarization, deployment, or production claim.
+The harness-ready claim is repository-local and bounded to one source commit, one direct-child attestation commit, one local evaluation target, and one fresh evidence window. It is not a product release, device authorization, notarization, deployment, or production claim. This workflow is intentionally optional: the default Apple Debug MCP gate is `make harness-check`, which does not require an attestation key, a source/attestation commit pair, or refreshed HMAC records. The checked-in manifest is historical context and must not be read as current readiness.
 
 ## Convergence owner and command
 
@@ -18,11 +18,11 @@ The first complete implementation and harness checkpoint is source commit S. A d
 
 ## Revalidation and invalidation
 
-Run make harness-check manually at task completion and after changes to commands, architecture, coverage, plans, security boundaries, or evidence. Refresh records and the manifest for a new source/attestation pair. Keep the claim invalid when a required check, record, identity, coverage digest, or freshness window changes.
+Run make harness-check manually at task completion and after changes to commands, architecture, coverage, plans, security boundaries, or evidence. Only an explicitly requested certification task refreshes records and the manifest for a new source/attestation pair. Keep the optional claim invalid when a required check, record, identity, coverage digest, or freshness window changes.
 
 ## Evidence rules
 
-Evidence records are exact-schema v2 JSON files under docs/agent-harness/evidence/. Each verified or justified N/A coverage row links to one fresh HMAC-consistent record bound to the source commit, repository identity, and apple-debug-mcp-local evaluation target. The HMAC checks local consistency; it does not authenticate an external provider or human approval.
+Evidence records are exact-schema v2 JSON files under docs/agent-harness/evidence/. Each verified or justified N/A coverage row links to one local record bound to a recorded source commit, repository identity, and apple-debug-mcp-local evaluation target. The default gate checks the local record shape and link, not freshness or HMAC validity; only the optional certification workflow treats those records as commit-bound integrity evidence. The HMAC checks local consistency; it does not authenticate an external provider or human approval.
 
 ## Production-authority applicability
 

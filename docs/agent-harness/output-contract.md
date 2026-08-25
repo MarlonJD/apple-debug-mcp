@@ -7,6 +7,7 @@
 - Report exact verification commands and scoped outcomes.
 - Separate remaining implementation gaps from approval-dependent work.
 - State whether external writes, release, signing, deployment, or real-device work actually occurred.
+- For routine harness maintenance, report `verified locally` after `make harness-check`; do not use `harness-ready` unless the optional commit-bound certification workflow was explicitly requested and completed.
 
 ## Evidence labels
 
@@ -16,7 +17,7 @@
 | not run | The check was intentionally omitted with a reason |
 | blocked | A named condition prevented required progress or verification |
 | candidate-only | The implementation exists but lacks required behavior evidence |
-| harness-ready | The current source/attestation harness contract passed with CERT000; it is not a production claim |
+| harness-ready | The optional current source/attestation harness contract passed with CERT000; it is not a production claim |
 | release pending | Local work is complete but release evidence does not exist |
 | production-ready | Use only with explicitly requested provider-authenticated production evidence |
 

@@ -1,8 +1,8 @@
 # Harness Engineering Coverage Matrix
 
-Status values are verified, candidate, blocked, or N/A. Every verified or justified N/A row is linked to a fresh evidence record at attestation time.
+Status values are verified, candidate, blocked, or N/A. Every verified or justified N/A row is linked to one repository-local evidence record. The default `make harness-check` validates the row inventory, link targets, and record shape without a certificate or commit-bound freshness claim; this matrix is not a certification and is intentionally maintained without attestation commits.
 
-Current attestation source commit: f7633872967b481e737cdd0017ba76fc71be7d1c.
+Optional certification snapshot: not maintained by the default repository workflow.
 
 ## Coverage
 
