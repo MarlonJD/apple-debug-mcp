@@ -254,29 +254,61 @@ public enum SimulatorService {
             throw SimulatorError.invalidRecordingRequest
         }
 
-        var arguments = ["simctl", "io", udid, "recordVideo", "--codec=\(codec)"]
+        guard let simctlPath = ToolchainProbe.path(for: "simctl") else {
+            throw SimulatorError.commandFailed("simctl is unavailable in the selected Xcode toolchain.")
+        }
+        var arguments = ["io", udid, "recordVideo", "--codec=\(codec)"]
         if let display { arguments += ["--display=\(display)"] }
         arguments.append(destination.path)
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        process.executableURL = URL(fileURLWithPath: simctlPath)
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
         do {
             try process.run()
             Thread.sleep(forTimeInterval: TimeInterval(durationSeconds))
             if process.isRunning {
                 _ = Darwin.kill(process.processIdentifier, SIGINT)
             }
-            process.waitUntilExit()
+            let deadline = Date().addingTimeInterval(10)
+            while process.isRunning, Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            if process.isRunning {
+                _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                process.waitUntilExit()
+                throw SimulatorError.commandFailed("simctl recordVideo did not stop within the 10-second shutdown grace period.")
+            }
         } catch {
+            if process.isRunning {
+                _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                process.waitUntilExit()
+            }
+            if let simulatorError = error as? SimulatorError {
+                throw simulatorError
+            }
             throw SimulatorError.commandFailed(error.localizedDescription)
+        }
+        let diagnostic = String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard process.terminationStatus == 0 else {
+            throw SimulatorError.commandFailed(
+                diagnostic.isEmpty
+                    ? "simctl recordVideo exited with status \(process.terminationStatus)."
+                    : diagnostic
+            )
         }
         guard FileManager.default.fileExists(atPath: destination.path),
               let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path),
               let size = attributes[.size] as? NSNumber,
               size.intValue > 0 else {
-            throw SimulatorError.commandFailed("simctl recordVideo did not produce a non-empty video file.")
+            throw SimulatorError.commandFailed(
+                diagnostic.isEmpty
+                    ? "simctl recordVideo did not produce a non-empty video file."
+                    : "simctl recordVideo did not produce a non-empty video file: \(diagnostic)"
+            )
         }
         return SimulatorRecordingResult(
             udid: udid,

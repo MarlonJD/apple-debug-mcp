@@ -44,7 +44,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-26 15:45Z) Move hosted CI from macOS-14 to the arm64 macOS-26 image after its Swift 5.10 toolchain could not resolve the current Swift 6.1/6.2 dependency graph; restore the current SDK/NIO pins and confirm the new CI run reaches package resolution.
 - [x] (2026-08-26 16:14Z) Make the Mach-O regression test independent of whether the hosted Apple toolchain exposes a universal or thin `lldb-dap`, while retaining explicit thin-image parsing coverage.
 - [x] (2026-08-26 16:34Z) Give the stdio MCP smoke enough bounded time for the hosted toolchain probe and require its actual response before validating the remaining transcript.
-- [ ] (2026-08-26 16:54Z) Align Simulator video recording with the current public `simctl` default codec (`hevc`) after hosted macOS-26 produced an empty H.264 recording; verify the complete Simulator tier remotely.
+- [ ] (2026-08-26 16:54Z) Align Simulator video recording with the current public `simctl` default codec (`hevc`) and run the selected `simctl` directly with bounded signal shutdown/diagnostics after hosted macOS-26 produced an empty recording; local Simulator MCP smoke is verified, and the complete Simulator tier remains pending the next remote run.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
