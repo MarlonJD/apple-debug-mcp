@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   macos:
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - name: Check out source
@@ -36,7 +36,7 @@ jobs:
 
   host-integration:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 25
     steps:
       - name: Check out source
@@ -50,7 +50,7 @@ jobs:
 
   simulator-integration:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - name: Check out source

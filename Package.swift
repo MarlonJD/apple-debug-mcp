@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 
 // Apple Debug MCP
 // Copyright (C) 2026 Burak Karahan
@@ -44,7 +44,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio.git",
-            "2.86.2" ..< "2.87.0"
+            from: "2.101.3"
         )
     ],
     targets: [
