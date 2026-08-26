@@ -40,6 +40,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-26 03:04Z) Give each stdio/daemon MCP server a distinct ToolCatalog context, close owned debugger/kernel-lab state with HTTP session cleanup, enforce an eight-session daemon limit, and verify DELETE cleanup through the daemon smoke.
 - [x] (2026-08-26 09:45Z) Add all-registered-tool dispatch coverage, real daemon debugger-session isolation/owned-debuggee cleanup smoke, deterministic/host/Simulator/physical verification tiers, scheduled/manual CI routing, and the compatibility/SDK baseline matrix.
 - [x] (2026-08-26 15:12Z) Split the MCP catalog into schema, support, router, and domain dispatch files; add representative domain success/error contract coverage; verify the refactor with `make check`, `make harness-check`, and `git diff --check`.
+- [x] (2026-08-26 15:38Z) Repair CI SwiftPM manifest parsing by moving the tools-version marker to the first line; add the cross-domain MCP behavior matrix and verify foundation, artifact, debugger lifecycle, performance, Simulator, device, and Xcode dispatch contracts locally.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
@@ -179,6 +180,7 @@ The current verified checkpoint requires:
 - MCP initialize, tools/list, capability, toolchain, LLDB-DAP probe, Mach-O, and crash calls return valid JSON-RPC responses;
 - daemon health rejects missing credentials, accepts the private bearer token, routes Streamable HTTP/SSE MCP sessions, and removes endpoint metadata on graceful shutdown;
 - all registered MCP tools reach a named dispatch branch under bounded empty-argument contract exercise, without requiring mutation or physical-device access;
+- the CI-compatible SwiftPM manifest resolves successfully and the domain behavior matrix exercises real MCP success/error envelopes across all dispatch domains;
 - separate daemon MCP clients cannot see or use one another’s debugger sessions, and deleting a client session cleans its launched fixture/debugger state;
 - deterministic PR, host integration, Simulator, physical-device, and compatibility baseline tiers have explicit commands and authority boundaries;
 - macOS fixture smoke covers launch, breakpoint, threads, stack, scopes, variables, evaluate, memory, disassembly, step, continue, and cleanup;
@@ -218,4 +220,5 @@ The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.StatefulHTTPServerT
 - 2026-08-26: Added CoreDevice process lifecycle/sysdiagnose/performance tools and smoke evidence, plus the signed-ready SwiftUI menu bar supervisor and package/run integration.
 - 2026-08-26: Added authenticated loopback daemon mode with official SDK Stateful HTTP transport, NIO listener adapter, user-private endpoint discovery, menu-bar health/shutdown supervision, endpoint smoke coverage, and documentation routes.
 - 2026-08-26: Added bounded external-process/DAP handling, preflighted file inputs, MCP contract tests, unique Xcode test bundles, per-server ToolCatalog contexts, daemon session limits, and HTTP DELETE ownership cleanup.
+- 2026-08-26: Repaired SwiftPM tools-version parsing for hosted CI and added the cross-domain MCP behavior matrix with debugger lifecycle and policy-boundary evidence.
 - 2026-08-24: Added symbolication, crash analysis, unified logs, Simulator screenshot capture, richer debugger control, and bounded mutation gates.

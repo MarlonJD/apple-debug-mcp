@@ -1,8 +1,8 @@
+// swift-tools-version: 6.0
+
 // Apple Debug MCP
 // Copyright (C) 2026 Burak Karahan
 // SPDX-License-Identifier: GPL-3.0-or-later
-
-// swift-tools-version: 6.0
 
 import PackageDescription
 

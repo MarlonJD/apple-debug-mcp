@@ -1,4 +1,4 @@
-.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke menubar-build-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke menubar-build-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -58,6 +58,9 @@ ios-coredevice-lifecycle-smoke: build ios-physical-fixture
 
 mcp-daemon-smoke: build
 	python3 ./scripts/mcp_daemon_smoke.py
+
+mcp-domain-behavior-smoke: build fixture
+	python3 ./scripts/mcp_domain_behavior_smoke.py
 
 menubar-build-smoke:
 	./script/build_and_run.sh --verify
