@@ -12,6 +12,20 @@ trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 output_file="$tmp_dir/output.jsonl"
 error_file="$tmp_dir/stderr.log"
 
+cleanup() {
+    status=$?
+    trap - EXIT HUP INT TERM
+    if [ "$status" -ne 0 ]; then
+        printf '%s\n' 'smoke: protocol transcript failed; stderr:' >&2
+        tail -n 80 "$error_file" >&2 || true
+        printf '%s\n' 'smoke: protocol transcript failed; last responses:' >&2
+        tail -n 20 "$output_file" >&2 || true
+    fi
+    rm -rf "$tmp_dir"
+    exit "$status"
+}
+trap cleanup EXIT HUP INT TERM
+
 {
     sleep 0.2
     printf '%s\n' \
@@ -28,7 +42,7 @@ error_file="$tmp_dir/stderr.log"
         '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"apple_binary_inspect","arguments":{"path":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"apple_binary_diff","arguments":{"leftPath":"/bin/echo","rightPath":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"apple_crash_symbolicate","arguments":{"crashPath":"Tests/Fixtures/example.crash","artifacts":[{"imageName":"AppleDebugFixture","binaryPath":"/bin/echo","architecture":"arm64e"}]}}}'
-    sleep 5
+    sleep 15
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
 grep -q '"id":1' "$output_file"
