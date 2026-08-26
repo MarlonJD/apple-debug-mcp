@@ -127,10 +127,12 @@ public enum AppleSimulatorEnvironmentService {
     private static func execute(udid: String, operation: String, arguments: [String], input: Data? = nil) throws -> SimulatorEnvironmentResult {
         let result: AppleProcessResult
         do {
-            if let input { result = try runWithInput(arguments: arguments, input: input) }
-            else {
-                result = try AppleProcessRunner.run(executable: "/usr/bin/xcrun", arguments: arguments, maximumOutputSize: maximumOutput)
-            }
+            result = try AppleProcessRunner.run(
+                executable: "/usr/bin/xcrun",
+                arguments: arguments,
+                maximumOutputSize: maximumOutput,
+                input: input
+            )
         } catch AppleProcessRunnerError.outputTooLarge { throw SimulatorEnvironmentError.outputTooLarge }
         catch AppleProcessRunnerError.launchFailed(let message) { throw SimulatorEnvironmentError.commandFailed(message) }
         catch { throw SimulatorEnvironmentError.commandFailed(error.localizedDescription) }
@@ -140,32 +142,6 @@ public enum AppleSimulatorEnvironmentService {
             throw SimulatorEnvironmentError.commandFailed([stderr, stdout].filter { !$0.isEmpty }.joined(separator: "\n"))
         }
         return SimulatorEnvironmentResult(udid: udid, operation: operation, output: stdout)
-    }
-
-    private static func runWithInput(arguments: [String], input: Data) throws -> AppleProcessResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = arguments
-        let inputPipe = Pipe()
-        process.standardInput = inputPipe
-        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("apple-debug-mcp-sim-env-\(UUID().uuidString).out")
-        let errorURL = FileManager.default.temporaryDirectory.appendingPathComponent("apple-debug-mcp-sim-env-\(UUID().uuidString).err")
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        defer { try? FileManager.default.removeItem(at: outputURL); try? FileManager.default.removeItem(at: errorURL) }
-        let outputHandle = try FileHandle(forWritingTo: outputURL)
-        let errorHandle = try FileHandle(forWritingTo: errorURL)
-        process.standardOutput = outputHandle
-        process.standardError = errorHandle
-        try process.run()
-        try inputPipe.fileHandleForWriting.write(contentsOf: input)
-        try inputPipe.fileHandleForWriting.close()
-        process.waitUntilExit()
-        try outputHandle.close(); try errorHandle.close()
-        let stdout = try Data(contentsOf: outputURL)
-        let stderr = try Data(contentsOf: errorURL)
-        guard stdout.count <= maximumOutput, stderr.count <= maximumOutput else { throw AppleProcessRunnerError.outputTooLarge }
-        return AppleProcessResult(stdout: stdout, stderr: stderr, terminationStatus: process.terminationStatus)
     }
 
     private static func appendStatusArguments(_ arguments: inout [String], overrides: [String: String]) throws {

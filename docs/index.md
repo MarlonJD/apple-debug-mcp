@@ -7,6 +7,7 @@ Use this page to find the authoritative source for repository knowledge.
 | Agent working instructions | [../AGENTS.md](../AGENTS.md) | Commands, constraints, or definition of done changes |
 | Architecture | [../ARCHITECTURE.md](../ARCHITECTURE.md) | Boundaries, components, or data flow changes |
 | Product behavior and scope | [product-specs/platform-scope.md](product-specs/platform-scope.md) | Supported platform or authorization boundary changes |
+| Compatibility and verification tiers | [product-specs/compatibility-matrix.md](product-specs/compatibility-matrix.md) | Declared version, host, Simulator, physical-device, CI, or manual-tier changes |
 | ExecPlan policy | [PLANS.md](PLANS.md) | Plan authoring or lifecycle changes |
 | Work registry | [exec-plans/index.md](exec-plans/index.md) | A plan changes lifecycle state |
 | Agent harness | [agent-harness/index.md](agent-harness/index.md) | Capabilities or verification paths change |

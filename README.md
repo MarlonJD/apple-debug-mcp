@@ -1,98 +1,207 @@
 # Apple Debug MCP
 
-Apple Debug MCP is a local, GPL-licensed MCP server for AI-assisted debugging and reverse engineering of authorized Apple targets.
+[![CI](https://github.com/MarlonJD/apple-debug-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/MarlonJD/apple-debug-mcp/actions/workflows/ci.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-The current product surface includes:
+Apple Debug MCP is a local, GPL-3.0-or-later [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for AI-assisted debugging, analysis, and reproducible investigation of authorized macOS and iOS targets.
 
-- macOS LLDB-DAP launch and attach sessions;
-- source/function/exception/instruction breakpoints, breakpoint-location lookup, threads, stack traces, scopes, registers, variables, completions, modules, statement/line/instruction stepping, pause/continue, disassembly, and bounded memory reads;
-- watchpoint plumbing through DAP data breakpoints;
-- explicitly authorized expression evaluation and memory writes, plus target terminate/disconnect control;
-- bounded memory pattern search and expected-bytes transactional patch/rollback (write permission required);
-- authorized macOS `vmmap` memory-region reporting (attach permission required);
-- bounded `xctrace` Time Profiler, Allocations, and System Trace capture for macOS or Simulator targets;
-- parsed Time Profiler rows, symbol/frame hotspots, percentages, and folded flame-stack records from `.trace` bundles;
-- semantic performance summaries for allocation bytes/events, running/blocked samples, hitches, signposts, and Swift concurrency task/actor/continuation rows;
-- template-specific semantic xctrace reports with explicit domains and bounded numeric totals for Time Profiler, Allocations, System Trace, Power/Energy, Animation, Signposts, and Swift Concurrency;
-- bounded xctrace timeline points plus trace-to-trace semantic/hotspot diffs for regression work;
-- trace-backed Swift Concurrency task/actor/continuation graphs that merge the public `swift-task-*` and `swift-actor-*` xctrace schemas with explicit sampling and private-runtime boundaries;
-- Apple-native heap/leaks/malloc-history/sample diagnostics for authorized macOS processes;
-- bounded arm64/x86_64 assembly, disassembly, and transactional assembly patching through LLDB-DAP memory writes;
-- Mach-O CFG/basic-block/call-graph/xref/relocation reports with address-based branch/call references, annotated decompiler-style pseudo-code, and a native workbench graph view;
-- direct dyld shared-cache header/mapping/image parsing with selected-image export/nlist extraction, chained-fixup imports, ObjC/Swift runtime strings, and bounded pointer cross-references;
-- typed vmmap region reports, persisted memory snapshots, and region diffs;
-- Simulator status-bar/UI/privacy/pasteboard/keychain/media/push/environment controls and reproducible screenshot/appinfo/log evidence bundles;
-- read-only signing/entitlement/Gatekeeper audits, patch previews, and release-authority re-sign plans;
-- a native SwiftUI macOS workbench with session launch/threads/snapshots/pause/continue/instruction stepping/evaluation controls, CFG graph/pseudo-code, and trace timeline/diff panels;
-- signed plugin manifest validation plus an App Sandbox XPC plugin protocol; third-party plugin code stays in its own independently signed `.xpc` service, while `transport=profile` is an explicit legacy diagnostic path;
-- explicit forward execution stop traces plus fail-closed reports for unavailable reverse/time-travel and kernel-memory capabilities;
-- structured stop snapshots that bundle stop events, threads, stack, scopes, registers, and modules;
-- Mach-O/universal-binary headers, segments, symbols, and printable strings;
-- Apple binary intelligence: code signatures, entitlements, linked libraries, nm symbols, and dyld exports;
-- Objective-C classes/protocols/selectors and demangled Swift symbol metadata;
-- deep bounded DWARF inspection from Mach-O/dSYM inputs, including DIE hierarchy, typed attributes, declaration locations, source lists, line-table rows, statistics, and address lookups;
-- source-backed typed Swift AST inspection through public `swiftc -dump-ast`, with declarations, types, functions, variables, imports, compiler locations, bounded multi-file modules, and Xcode project/scheme SDK context;
-- read-only binary diffing for Mach-O files, `.app` bundles, and `.dSYM` bundles, including symbols, exports, dependencies, signatures, entitlements, hashes, and UUIDs;
-- `atos` symbolication from Mach-O files, `.app` executables, or `.dSYM` payloads, plus `.crash`/`.ips` crash-report inspection;
-- crash-frame triage with multi-artifact image matching and per-frame symbolication errors;
-- iOS Simulator inventory, lifecycle, app install/launch/terminate, screenshots, logs, and LLDB-DAP attach;
-- generated XCUITest runners that inspect and act on arbitrary applications already installed in a Simulator, without requiring the target app’s Xcode project;
-- Simulator URL opening, deterministic location injection/clear, and bounded video recording for automated reproduction;
-- Xcode project discovery, explicitly authorized builds with derived-data/`.app`/`.dSYM` manifests, and test execution with `.xcresult` summaries;
-- CoreDevice and legacy `xcdevice` physical-device inventory, plus optional `ios-deploy` authorization-gated development-app install/launch;
-- CoreDevice process inventory, terminate/suspend/resume/signal controls, bounded sysdiagnose collection, and physical-device xctrace capture;
-- a signed-bundle-ready macOS menu bar app that owns the authenticated MCP daemon process, exposes launch-at-login and server-at-login toggles, opens the server log, and provides a Quit action.
+It turns Apple's debugger and developer-tool ecosystem—LLDB-DAP, Xcode, Simulator, CoreDevice, `xctrace`, `atos`, `dwarfdump`, Mach-O tools, signing tools, and unified logs—into one capability-aware surface that an MCP-compatible client can discover and call with typed inputs and structured results.
 
-The server is intentionally local and capability-aware. It does not provide arbitrary shell execution, bypass Apple signing or entitlements, or attach to stock App Store applications without an authorized development boundary.
+> This is a local developer tool for software and devices you are authorized to debug. It is not a signing bypass, a remote public debugger, or an arbitrary shell-execution service.
+
+## Why does this project exist?
+
+Apple debugging is powerful, but its useful evidence is spread across many tools and stateful workflows. An AI agent that only has a terminal often has to parse ad-hoc text, reconstruct debugger state from separate commands, guess which Apple capability is available, and clean up processes or Simulators itself.
+
+Apple Debug MCP provides the missing execution layer:
+
+- the MCP client supplies reasoning, orchestration, and the user experience;
+- this server supplies named tools for observation and controlled action;
+- AppleDebugCore owns policy, target lifecycle, adapters, parsers, bounds, and cleanup;
+- capability reports make supported and restricted operations explicit before an agent attempts them.
+
+The result is a reusable bridge between an AI agent and the real Apple target—not another prompt that tells an agent to “try LLDB.” The agent can inspect a stop snapshot, correlate a crash with a binary and dSYM, capture a trace, compare two artifacts, operate a Simulator UI, or execute a bounded debugger step while keeping the session and authorization boundary visible.
+
+## How is this different from “Build for macOS” or “Build for iOS” skills?
+
+Codex build workflows and Apple Debug MCP are complementary layers, not competing versions of the same feature.
+
+| Concern | Codex build workflows, such as Build for macOS or Build for iOS | Apple Debug MCP |
+| --- | --- | --- |
+| Main question | How should an app project be created, built, run, tested, or fixed? | What is an authorized Apple target doing, and how can it be inspected or controlled? |
+| Primary unit | Source repository, Xcode project/workspace, scheme, and build/run workflow | Process, LLDB-DAP session, binary, `.app`, `.dSYM`, `.crash`, `.trace`, Simulator, or development device |
+| Interface | Guidance, project-local scripts, and Xcode-aware workflow tools | 111 typed MCP tools with stable schemas and structured results |
+| State | Usually coordinates a build/run/debug task around a project | Owns persistent debugger sessions, stop observations, bounded actions, artifact analysis, and cleanup |
+| Apple surface | Centered on app development and Xcode workflow completion | Spans runtime debugging, binary/DWARF/crash analysis, profiling, Simulator/device lifecycle, signing audits, and evidence capture |
+| Safety model | Uses the permissions and boundaries of the selected development workflow | Reports capabilities per target and keeps launch, attach, evaluation, writes, Simulator mutation, device mutation, builds, and plugin execution explicitly gated |
+
+In short: a skill is generally the workflow guidance; MCP is the callable capability surface. A Build for iOS workflow can build and launch an app, while this server can give an agent a structured LLDB session, inspect its dSYM, capture a trace, query its Simulator UI, and preserve evidence. Apple Debug MCP does not replace app scaffolding, SwiftUI design guidance, or Xcode project setup. It gives those workflows a deeper and reusable debugging/analysis backend when an MCP client is configured to use it.
+
+## What does the MCP server provide?
+
+The server exposes more than 100 named tools. The main domains are:
+
+| Domain | Examples |
+| --- | --- |
+| Capability and toolchain discovery | `apple_capabilities`, `apple_toolchain_status`, `apple_lldb_dap_initialize` |
+| macOS and Simulator debugging | Persistent LLDB-DAP sessions, launch/attach, source/function/instruction/exception breakpoints, watchpoints, threads, stack, scopes, variables, registers, stepping, pause/continue, stop snapshots, completions, disassembly, bounded memory reads, and controlled evaluation or mutation |
+| Execution history and kernel lab | Bounded checkpoint capture/source-location replay for authorized local macOS launches, DriverKit/system-extension processes through normal LLDB, and a separately gated read-only remote KDP lab provider |
+| Apple artifact intelligence | Mach-O headers/segments/symbols/strings, code signatures and entitlements, linked libraries, dyld exports, Objective-C/Swift metadata, Swift AST, DWARF/DIE/source/line data, CFG/basic blocks/call graph/xrefs/relocations, shared-cache data, binary diffs, symbolication, and crash-frame triage |
+| Performance and runtime evidence | Bounded `xctrace` recording and analysis, hotspots, folded flame stacks, semantic reports, timeline points, trace diffs, Swift Concurrency graphs, `vmmap` snapshots/diffs, heap/leaks/malloc-history/sample diagnostics, and bounded unified logs |
+| iOS Simulator workflows | Inventory, boot/shutdown, install/launch/terminate, screenshots, URLs, locations, video, app metadata, containers, environment controls, reproducible evidence bundles, project-backed XCUITest trees/actions, and generated UI probes for an installed bundle ID |
+| Authorized physical iOS workflows | CoreDevice and legacy `xcdevice` inventory, development-app install/launch, process lifecycle, sysdiagnose, xctrace capture, and authorization-gated LLDB-DAP sessions |
+| Xcode and release analysis | Project discovery, explicitly authorized builds/tests with `.app`/`.dSYM`/`.xcresult` metadata, signing audits, non-destructive patch previews, and re-sign plans |
+| Extension boundary | Read-only plugin manifest discovery and independently signed App Sandbox XPC plugin validation/execution |
+
+The important part is not only the number of tools. The server also provides:
+
+- typed request schemas instead of free-form debugger commands;
+- capability-aware results that distinguish macOS, iOS Simulator, and physical iOS support;
+- stateful LLDB-DAP sessions with bounded stop snapshots and deterministic cleanup;
+- transaction-style expected-byte memory patching and readback/rollback paths where mutation is authorized;
+- bounded file and output handling so large Apple-tool responses do not silently become unbounded agent context;
+- explicit failure for unavailable Apple features instead of pretending to provide Windows-style reverse debugging or unrestricted kernel access.
+
+## Why use it?
+
+Use Apple Debug MCP when you want an AI agent or automation client to work with real Apple runtime state and evidence, not only source code or build output.
+
+Typical benefits include:
+
+- **Faster diagnosis:** correlate a stopped process, stack, registers, modules, source, symbols, crash report, and dSYM through one tool surface.
+- **Repeatable investigations:** turn a manual LLDB/Xcode sequence into named MCP calls with bounded arguments and explicit cleanup.
+- **Better evidence:** return structured snapshots, trace summaries, symbolication results, UI trees, screenshots, and reproducibility bundles instead of a wall of terminal text.
+- **Safer automation:** dangerous operations are disabled by default, scoped to known targets, bounded, and separately authorized.
+- **Local privacy:** the server runs on the Mac and does not publish a hosted debugger or send target state to a remote Apple service.
+- **Cross-tool correlation:** connect runtime behavior with Mach-O metadata, DWARF, signing state, performance traces, Simulator state, and crash artifacts.
+- **A useful agent loop:** discover capabilities → inspect → form a hypothesis → take one bounded action → verify the result → save evidence.
+
+## Practical use cases
+
+### AI-assisted crash triage
+
+Give the agent a `.crash` or `.ips`, the matching `.app`/Mach-O and dSYM artifacts, and let it inspect images, symbolicate frames, identify missing symbols, and produce a bounded explanation of the failing path.
+
+### Runtime debugging of an authorized macOS process
+
+Create a session, set a source or function breakpoint, wait for a stop, collect a correlated stop snapshot, inspect scopes/registers/modules, step forward, and evaluate an expression only when the explicit grant is enabled.
+
+### Simulator UI and regression reproduction
+
+Build and install a development app, launch it with known arguments, inspect its accessibility tree, perform bounded taps/text/gestures, capture screenshots or video, collect logs, and package the resulting evidence.
+
+### Performance investigation
+
+Record a bounded `xctrace` trace, inspect CPU/allocation/concurrency/hitch evidence, extract hotspots and flame stacks, compare two traces, and connect a regression to a concrete symbol or source location.
+
+### Binary and reverse-engineering analysis
+
+Inspect Mach-O layout, symbols, exports, code signatures, Objective-C/Swift metadata, DWARF, CFGs, relocations, shared-cache information, crash frames, and disassembly without turning the MCP surface into an unrestricted command console.
+
+### Authorized physical-device debugging
+
+Work with paired, development-authorized devices using CoreDevice or the legacy `ios-deploy` path for supported devices. Install or launch a signed development app, inspect processes, capture performance data, and attach LLDB-DAP when signing, Developer Mode, pairing, and grants are correct.
+
+### Release and patch preparation
+
+Audit signing and entitlements, compare binaries or bundles, preview patch payloads, and generate a re-sign plan for review. The server does not silently overwrite or sign release artifacts.
+
+## What should you expect?
+
+You should expect:
+
+- a local macOS process with stdio MCP transport, plus an optional authenticated loopback daemon;
+- a tool catalog that exposes exactly what the server knows how to do;
+- capability reports that can say “restricted” or “unavailable” for the current host/target;
+- read-only inspection as the default posture;
+- opt-in permissions for launch, attach, expression evaluation, variable/memory writes, Simulator mutation, device mutation, Xcode builds, and plugin execution;
+- bounded inputs, outputs, file paths, traces, memory reads, and diagnostic durations;
+- cleanup of debugger adapters and child processes owned by the server;
+- checkpoint artifacts and source-location replay for deterministic debug-build investigations;
+- evidence that is tied to the selected target, build, device, and installed Apple toolchain.
+
+## What should you not expect?
+
+This project intentionally does not provide:
+
+- arbitrary shell execution or arbitrary LLDB command injection;
+- a way to bypass Apple code signing, entitlements, Developer Mode, SIP, sandboxing, or device security;
+- debugging of stock App Store applications or devices you are not authorized to inspect;
+- a hosted, LAN-accessible, or internet-facing debugger service—the daemon binds to `127.0.0.1` and requires its private bearer token;
+- a replacement for Xcode, Instruments, Hopper, IDA, Ghidra, or every Apple development workflow;
+- native Apple LLDB reverse-step, reverse-continue, or exact time-travel state restoration when the installed toolchain does not provide it;
+- checkpoint replay does not restore registers, memory, scheduler, kernel, or external-I/O state;
+- unrestricted local kernel debugging, kernel memory writes, or kext debugging;
+- physical-device UI inspection or file-backed screenshots where the public Apple tooling does not expose a supported interface;
+- a guarantee that a tool works on every Mac, Xcode version, Simulator runtime, device, entitlement set, or build configuration;
+- an inference that an AI-generated explanation is proof. Treat the returned artifact, snapshot, trace, and command context as the evidence.
+
+## Supported target boundary
+
+| Target | Supported surface | Important restrictions |
+| --- | --- | --- |
+| macOS | LLDB-DAP launch/attach/control, artifact analysis, runtime diagnostics, xctrace, logs, memory maps, signing audits, patch workflows, checkpoint/source-location replay, DriverKit process debugging, and native workbench analyzers | Target permissions and entitlements apply; native reverse execution/time-travel and kernel debugging remain restricted |
+| iOS Simulator | Build/discovery, install/launch/debug, screenshots, logs, UI trees/actions, environment controls, performance, crash/DWARF/symbol analysis, and reproducible evidence | Simulator behavior is not physical-device evidence; kernel and native reverse execution remain restricted |
+| Physical iOS device | Paired development-device lifecycle, CoreDevice or supported legacy transport, xctrace, sysdiagnose, and signed development-app LLDB-DAP workflows | Requires signing, Developer Mode, pairing/tunnel state, explicit grants, and compatible tools; stock App Store apps and public physical UI capture are out of scope |
 
 ## Architecture
 
 ```text
-MCP client ── stdio ──► Apple Debug MCP
-     │                    ├── MCP tool catalog and policy gates
-     └── authenticated     ├── LLDB-DAP session manager
-         loopback HTTP ─►  ├── Mach-O, symbolication, and crash-report analyzers
-         127.0.0.1         ├── Xcode, Simulator, CoreDevice, and unified-log adapters
-                            └── Menu bar supervisor for the bundled daemon
+MCP client ── stdio ───────────────► apple-debug-mcp
+     │                                  ├── typed MCP tool catalog
+     └── authenticated loopback HTTP ──►├── capability and policy gates
+       127.0.0.1                         ├── LLDB-DAP session manager
+                                        ├── Apple tool adapters and analyzers
+                                        └── evidence, cleanup, and daemon lifecycle
 ```
 
-The capability report distinguishes macOS, iOS Simulator, and physical iOS device targets. Legacy iOS 15 inventory, profiling, and authorized development-app LLDB-DAP sessions are available when `ios-deploy` and a signed `.app` path are supplied; modern physical sessions use CoreDevice. Simulator screenshot capture, the policy-gated standalone MCP accessibility-tree bridge, and fixture UI actions are available.
+The executable depends on `AppleDebugCore` and the official Swift MCP SDK. `AppleDebugCore` does not depend on MCP transport details, so policy, parsing, and Apple adapters remain testable without a client connection.
+
+The default transport is stdio. `--daemon` enables a local Streamable HTTP/SSE endpoint supervised by the optional SwiftUI menu bar app. The daemon validates loopback host/origin, requires a random bearer token, caps request bodies, and stores discovery metadata in a user-private endpoint file. It never binds a LAN or public interface.
 
 ## Requirements
 
 - macOS 13 or later;
-- Xcode and its command-line tools;
 - Swift 6 / Xcode 16 or later;
-- an MCP-compatible client with local stdio support or a configured authenticated loopback endpoint.
+- Xcode and its command-line tools;
+- an MCP-compatible client with local stdio support, or a client configured for the authenticated loopback endpoint;
+- for physical-device workflows: a paired development device, Developer Mode, valid signing/entitlements, compatible Apple tools, and explicit authorization.
 
 ## Build and verify
 
 ```sh
+swift package resolve
 swift build
 swift test
 make check
 make harness-check
-make package
 make mcp-daemon-smoke
-make release-package
+make pr-check
+make host-integration-check
+make simulator-check
+# physical-device-check is manual and requires explicit device inputs
+make package
+```
+
+`make pr-check` is the deterministic push/pull-request gate. It covers the core tests, MCP protocol smoke, registered-tool dispatch coverage, capability/toolchain probes, Mach-O/crash fixtures, the signed macOS debugger fixture, daemon session isolation, replay, plugin XPC, and cleanup. `make host-integration-check` repeats the host-only integration tier, while `make simulator-check` is an explicit manual/scheduled Simulator tier. `make physical-device-check` never runs automatically and requires explicit device IDs, a signed app, Developer Mode, and grants. `make harness-check` validates repository-owned workflow and evidence contracts. `make package` creates an unsigned relocatable macOS archive; signing and notarization are separate release-authorized steps. See the [compatibility and verification matrix](docs/product-specs/compatibility-matrix.md) for declared versus exercised baselines.
+
+The repository also includes focused smoke workflows:
+
+```sh
 make fixture
+make replay-smoke
 make ios-fixture
 make ios-fixture-smoke
 make ios-debug-fixture-smoke
 make ios-mcp-tool-smoke
 make ios-ui-tree-smoke
 make ios-arbitrary-ui-smoke
-APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-smoke
-APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-control-smoke
-APPLE_DEBUG_PHYSICAL_UDID=<iphone-udid> APPLE_DEBUG_COREDEVICE_ID=<coredevice-uuid> make ios-coredevice-lifecycle-smoke
-APPLE_DEBUG_PHYSICAL_UDID=<iphone-udid> APPLE_DEBUG_COREDEVICE_ID=<coredevice-uuid> make ios-coredevice-debug-control-smoke
 make dwarf-smoke
 make swift-ast-smoke
 make performance-analysis-smoke
 make swift-concurrency-graph-smoke
 make runtime-diagnostics-smoke
 make assembler-smoke
-make reverse-capability-smoke
 make control-flow-smoke
 make memory-map-smoke
 make simulator-environment-smoke
@@ -101,41 +210,28 @@ make signing-audit-smoke
 make patch-workflow-smoke
 make plugin-smoke
 make plugin-xpc-smoke
-make plugin-host-build-smoke
 make workbench-build-smoke
-./script/build_and_run.sh --verify
+make reverse-capability-smoke
 ```
 
-`make check` proves the stdio MCP protocol, authenticated loopback daemon, tool discovery, Mach-O/crash fixtures, signed macOS debugger fixture, and debugger cleanup. The iOS targets are explicit Simulator workflows; `ios-mcp-tool-smoke` exercises the public MCP lifecycle, `ios-ui-tree-smoke` exercises the XCUITest accessibility bridge end to end, `dwarf-smoke` builds the generic iOS fixture and verifies typed dSYM entries, source paths, line rows, and statistics, `performance-analysis-smoke` verifies xctrace XML rows/hotspots/flame stacks, `swift-concurrency-graph-smoke` compiles an async fixture, records the public Swift Concurrency template, and verifies task/actor graph evidence, `runtime-diagnostics-smoke` verifies Apple heap/leaks/sample tools, and `assembler-smoke` verifies arm64/x86_64 code generation. The explicit physical targets exercise CoreDevice process lifecycle and remote LLDB control on an authorized modern device.
+Physical-device smokes are intentionally explicit and require an authorized device:
 
-Pushes and pull requests run the macOS core/MCP checks and upload the reproducible unsigned package as a CI artifact. Signing and notarization require a separate release workflow with Apple Developer credentials.
+```sh
+APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<legacy-device-udid> make ios-legacy-debug-control-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<iphone-udid> APPLE_DEBUG_COREDEVICE_ID=<coredevice-uuid> make ios-coredevice-lifecycle-smoke
+APPLE_DEBUG_PHYSICAL_UDID=<iphone-udid> APPLE_DEBUG_COREDEVICE_ID=<coredevice-uuid> make ios-coredevice-debug-control-smoke
+```
 
-For a signed and notarized archive on a configured release Mac, see [docs/RELEASE.md](docs/RELEASE.md) and run `CODESIGN_IDENTITY='Developer ID Application: Burak Karahan (UPK4SC93AN)' NOTARY_PROFILE=general-notary make release-package`.
+For a signed and notarized archive on a configured release Mac, see [docs/RELEASE.md](docs/RELEASE.md). Release signing, notarization, and distribution credentials are never assumed by the normal build or CI path.
 
 ## Run
 
+Run the stdio server:
+
 ```sh
 swift run apple-debug-mcp
-swift run apple-debug-mcp --daemon
-./script/build_and_run.sh --verify
 ```
-
-`script/build_and_run.sh` stages a real `AppleDebugMenuBar.app`, bundles the MCP executable inside it, signs the local bundle with `CODESIGN_IDENTITY` when supplied, and launches it. The menu bar app defaults to starting the authenticated daemon child at app launch. `Launch at Login` is registered through `SMAppService.mainApp`; use the signed packaged app from `/Applications` for persistent login registration. `Start MCP at Login` is a separate preference and is enabled by default. The daemon publishes its URL and bearer token to `~/Library/Application Support/AppleDebugMCP/endpoint.json` with user-only permissions; clients should read that file rather than guess a port.
-
-Safe defaults and opt-in boundaries:
-
-- `APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1` — launch a known local target;
-- `APPLE_DEBUG_ALLOW_TARGET_ATTACH=1` — attach to an explicitly selected local process ID;
-- `APPLE_DEBUG_ALLOW_EVALUATE=1` — permit LLDB expression evaluation;
-- `APPLE_DEBUG_ALLOW_MEMORY_WRITE=1` — permit at most 4096-byte DAP memory writes;
-- `APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1` — permit explicit DAP variable mutation for an authorized stopped target;
-- `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1` — boot, install, launch, terminate, shut down, or screenshot a Simulator;
-- `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — mutate only a paired, tunnel-ready development device;
-- `APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1` — create a physical-device LLDB session only after a CoreDevice UUID or legacy UDID, transport-specific authorization, signing, and Developer Mode checks pass; legacy sessions also require the separate mutation grant;
-- `APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1` — allow legacy session creation to install/launch the supplied signed `.app` through `ios-deploy` (CoreDevice install/launch uses this grant separately);
-- `APPLE_DEBUG_ALLOW_XCODE_BUILD=1` — run an explicitly selected Xcode project/scheme/configuration/destination build.
-
-Do not enable a boundary for software or devices you are not authorized to debug.
 
 Example MCP configuration after building:
 
@@ -149,9 +245,54 @@ Example MCP configuration after building:
 }
 ```
 
+Run the authenticated local daemon:
+
+```sh
+swift run apple-debug-mcp --daemon
+```
+
+The daemon uses `127.0.0.1:49321` by default and publishes its URL, bearer token, process ID, and schema version to:
+
+```text
+~/Library/Application Support/AppleDebugMCP/endpoint.json
+```
+
+Clients should read that file rather than guess a port. Set `APPLE_DEBUG_MCP_PORT=0` only for isolated test runs. The packaged menu bar app owns the bundled daemon, provides launch-at-login/server-at-login controls, and writes its log to the user log directory.
+
+## Authorization and safe defaults
+
+The server does not infer permission from a client request. State-changing operations require explicit environment grants and still validate target identifiers, paths, signing, and toolchain state.
+
+```text
+APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1       launch a known local target
+APPLE_DEBUG_ALLOW_TARGET_ATTACH=1       attach to an explicitly selected local process
+APPLE_DEBUG_ALLOW_EVALUATE=1            evaluate an expression in a stopped target
+APPLE_DEBUG_ALLOW_MEMORY_WRITE=1        enable bounded DAP memory writes and patches
+APPLE_DEBUG_ALLOW_VARIABLE_WRITE=1      enable bounded debugger variable mutation
+APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1  mutate a selected Simulator or run UI probes
+APPLE_DEBUG_ALLOW_DEVICE_MUTATION=1     mutate a paired development device
+APPLE_DEBUG_ALLOW_DEVICE_DEBUG=1        create an authorized physical-device LLDB session
+APPLE_DEBUG_ALLOW_KERNEL_LAB=1          connect to an explicitly configured read-only remote KDP lab
+APPLE_DEBUG_ALLOW_XCODE_BUILD=1         run an explicitly selected Xcode build/test
+APPLE_DEBUG_ALLOW_PLUGIN_EXECUTION=1    execute an explicitly selected signed plugin path
+```
+
+Memory writes are bounded to 4096 bytes per operation, expression evaluation is bounded, and assembly patching goes through expected-byte validation plus the existing transactional memory path. Do not enable a grant for software or devices you are not authorized to debug.
+
 ## Current verification boundary
 
-The local macOS debugger, menu bar app, iOS Simulator, iOS 15 legacy device, and iPhone 17 CoreDevice workflows are verified against repository fixtures or the explicitly authorized devices. `make ios-coredevice-lifecycle-smoke` covers process inventory, launch PID, resume, suspend, resume, and terminate; `make ios-coredevice-debug-control-smoke` covers remote LLDB-DAP inspection/control and memory rollback. Public CoreDevice tooling does not expose a supported file-backed physical screenshot interface here, so physical UI capture remains restricted. `make package` produces an unsigned relocatable macOS archive containing the menu bar app, while `make release-package` produces the separately authorized signed/notarized archive. Apple LLDB reverse execution/time-travel and kernel memory debugging are explicit platform/toolchain restrictions; the server reports them as unsupported and exposes forward tracing plus Apple-native user-process alternatives.
+The local macOS debugger, checkpoint/source-location replay, menu bar app, iOS Simulator, legacy iOS transport, and modern CoreDevice workflows are verified against repository fixtures or explicitly authorized devices. The kernel-lab provider is verified fail-closed without a configured KDP target; an actual two-machine KDK/KDP session remains environment-dependent. CI builds and tests the unsigned macOS path; signing and notarization require a separate release workflow with Apple Developer credentials.
+
+Apple tool availability and security policy vary by host. Physical-device support depends on the device transport, Xcode version, signing, Developer Mode, entitlements, and pairing state. The server reports those differences through `apple_capabilities` and fails closed when a required boundary is unavailable.
+
+## Documentation
+
+- [Architecture](ARCHITECTURE.md)
+- [Platform scope](docs/product-specs/platform-scope.md)
+- [Security model](docs/SECURITY.md)
+- [Reliability and cleanup](docs/RELIABILITY.md)
+- [Release and notarization](docs/RELEASE.md)
+- [Documentation map](docs/index.md)
 
 ## License
 

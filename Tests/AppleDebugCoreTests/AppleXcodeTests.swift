@@ -40,6 +40,15 @@ final class AppleXcodeTests: XCTestCase {
         }
     }
 
+    func testDefaultResultBundlePathsAreUnique() {
+        let first = XcodeService.defaultResultBundleURL()
+        let second = XcodeService.defaultResultBundleURL()
+
+        XCTAssertNotEqual(first, second)
+        XCTAssertTrue(first.path.hasSuffix(".xcresult"))
+        XCTAssertTrue(second.path.hasSuffix(".xcresult"))
+    }
+
     func testDiscoversIOSFixtureProject() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

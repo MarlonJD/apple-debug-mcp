@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Foundation
-import Darwin
 
 @objc public protocol AppleDebugPluginXPCProtocol {
     func analyze(
@@ -101,7 +100,7 @@ public enum ApplePluginHostService {
         var manifest: AppleDebugPluginManifest?
         if let manifestPath {
             guard manifestPath.utf8.count <= 4_096, !manifestPath.contains("\0"), FileManager.default.fileExists(atPath: manifestPath) else { throw ApplePluginHostError.invalidRequest }
-            manifest = try JSONDecoder().decode(AppleDebugPluginManifest.self, from: Data(contentsOf: URL(fileURLWithPath: manifestPath)))
+            manifest = try loadManifest(path: manifestPath)
         }
         return ApplePluginHostPlan(
             executablePath: executablePath,
@@ -243,8 +242,12 @@ public enum ApplePluginHostService {
               FileManager.default.fileExists(atPath: path) else {
             throw ApplePluginHostError.invalidRequest
         }
-        let data = try Data(contentsOf: URL(fileURLWithPath: path))
-        guard data.count <= 64 * 1024 else { throw ApplePluginHostError.invalidRequest }
+        let data: Data
+        do {
+            data = try AppleBoundedFile.readData(atPath: path, maximumSize: 64 * 1024)
+        } catch {
+            throw ApplePluginHostError.invalidRequest
+        }
         do {
             let manifest = try JSONDecoder().decode(AppleDebugPluginManifest.self, from: data)
             guard !manifest.id.isEmpty, !manifest.name.isEmpty, !manifest.version.isEmpty else {
@@ -297,57 +300,29 @@ public enum ApplePluginHostService {
         input: String,
         timeoutSeconds: Double
     ) throws -> (exitCode: Int32, timedOut: Bool, stdout: String, stderr: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = arguments
-        let inputPipe = Pipe()
-        let stdoutURL = FileManager.default.temporaryDirectory.appendingPathComponent("apple-debug-mcp-plugin-\(UUID().uuidString).stdout")
-        let stderrURL = FileManager.default.temporaryDirectory.appendingPathComponent("apple-debug-mcp-plugin-\(UUID().uuidString).stderr")
-        FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
-        FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
-        defer {
-            try? FileManager.default.removeItem(at: stdoutURL)
-            try? FileManager.default.removeItem(at: stderrURL)
-        }
-        let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)
-        let stderrHandle = try FileHandle(forWritingTo: stderrURL)
-        process.standardInput = inputPipe
-        process.standardOutput = stdoutHandle
-        process.standardError = stderrHandle
-        let termination = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in termination.signal() }
+        let result: AppleProcessResult
         do {
-            try process.run()
+            result = try AppleProcessRunner.run(
+                executable: executablePath,
+                arguments: arguments,
+                maximumOutputSize: maximumOutputSize,
+                timeoutMilliseconds: Int(timeoutSeconds * 1_000),
+                input: Data(input.utf8)
+            )
+        } catch AppleProcessRunnerError.timedOut {
+            throw ApplePluginHostError.timedOut
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw ApplePluginHostError.outputTooLarge
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw ApplePluginHostError.executionFailed(message)
         } catch {
-            try? stdoutHandle.close()
-            try? stderrHandle.close()
             throw ApplePluginHostError.executionFailed(error.localizedDescription)
         }
-        inputPipe.fileHandleForWriting.write(Data(input.utf8))
-        try? inputPipe.fileHandleForWriting.close()
-        let deadline = DispatchTime.now() + timeoutSeconds
-        var timedOut = false
-        if termination.wait(timeout: deadline) == .timedOut {
-            timedOut = true
-            process.terminate()
-            if termination.wait(timeout: .now() + 1.0) == .timedOut {
-                kill(process.processIdentifier, SIGKILL)
-                _ = termination.wait(timeout: .now() + 1.0)
-            }
-        }
-        try? stdoutHandle.close()
-        try? stderrHandle.close()
-        let stdout = try Data(contentsOf: stdoutURL)
-        let stderr = try Data(contentsOf: stderrURL)
-        guard stdout.count <= maximumOutputSize, stderr.count <= maximumOutputSize else {
-            throw ApplePluginHostError.outputTooLarge
-        }
-        if timedOut { throw ApplePluginHostError.timedOut }
         return (
-            process.terminationStatus,
+            result.terminationStatus,
             false,
-            String(decoding: stdout, as: UTF8.self),
-            String(decoding: stderr, as: UTF8.self)
+            String(decoding: result.stdout, as: UTF8.self),
+            String(decoding: result.stderr, as: UTF8.self)
         )
     }
 }

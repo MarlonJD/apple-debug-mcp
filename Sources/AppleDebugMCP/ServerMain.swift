@@ -16,16 +16,17 @@ struct AppleDebugMCPMain {
     }
 
     private static func runStdio() async throws {
-        let server = await AppleDebugMCPServerFactory.makeServer()
+        let context = ToolCatalog.makeContext()
+        let server = await AppleDebugMCPServerFactory.makeServer(context: context)
         let transport = StdioTransport()
         try await server.start(transport: transport)
         await server.waitUntilCompleted()
-        await ToolCatalog.shutdown()
+        await context.shutdown()
     }
 }
 
 enum AppleDebugMCPServerFactory {
-    static func makeServer() async -> Server {
+    static func makeServer(context: ToolCatalog.Context) async -> Server {
         let server = Server(
             name: "apple-debug-mcp",
             version: "0.1.0",
@@ -40,7 +41,7 @@ enum AppleDebugMCPServerFactory {
         }
 
         await server.withMethodHandler(CallTool.self) { params in
-            await ToolCatalog.call(params)
+            await ToolCatalog.call(params, context: context)
         }
 
         return server

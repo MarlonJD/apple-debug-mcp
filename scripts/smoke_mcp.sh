@@ -28,7 +28,7 @@ error_file="$tmp_dir/stderr.log"
         '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"apple_binary_inspect","arguments":{"path":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"apple_binary_diff","arguments":{"leftPath":"/bin/echo","rightPath":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"apple_crash_symbolicate","arguments":{"crashPath":"Tests/Fixtures/example.crash","artifacts":[{"imageName":"AppleDebugFixture","binaryPath":"/bin/echo","architecture":"arm64e"}]}}}'
-    sleep 2
+    sleep 5
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
 grep -q '"id":1' "$output_file"
@@ -53,6 +53,10 @@ grep -q 'apple_performance_record' "$output_file"
 grep -q 'apple_debug_wait_for_stop' "$output_file"
 grep -q 'apple_debug_search_memory' "$output_file"
 grep -q 'apple_debug_patch_memory' "$output_file"
+grep -q 'apple_debug_checkpoint' "$output_file"
+grep -q 'apple_debug_replay' "$output_file"
+grep -q 'apple_kernel_lab_connect' "$output_file"
+grep -q 'apple_kernel_lab_inspect' "$output_file"
 grep -q 'EXC_BAD_ACCESS' "$output_file"
 grep -q 'apple_simulator_app_info' "$output_file"
 grep -q 'apple_simulator_get_app_container' "$output_file"

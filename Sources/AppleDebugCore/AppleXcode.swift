@@ -218,9 +218,16 @@ public enum XcodeService {
         )
         let kind = try validateProject(path: path)
         let resultURL = resultBundlePath.map(URL.init(fileURLWithPath:))
-            ?? FileManager.default.temporaryDirectory
-                .appendingPathComponent("apple-debug-mcp-(UUID().uuidString).xcresult")
-        guard resultURL.path.hasPrefix("/"), !FileManager.default.fileExists(atPath: resultURL.path) else {
+            ?? defaultResultBundleURL()
+        let parentAttributes = try? FileManager.default.attributesOfItem(
+            atPath: resultURL.deletingLastPathComponent().path
+        )
+        guard resultURL.path.hasPrefix("/"),
+              resultURL.path.utf8.count <= 4_096,
+              !resultURL.path.contains("\0"),
+              resultURL.path.hasSuffix(".xcresult"),
+              !FileManager.default.fileExists(atPath: resultURL.path),
+              parentAttributes?[.type] as? FileAttributeType == .typeDirectory else {
             throw XcodeError.invalidBuildRequest
         }
         var arguments = [
@@ -592,48 +599,33 @@ public enum XcodeService {
         throw XcodeError.invalidProjectPath
     }
 
+    static func defaultResultBundleURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-\(UUID().uuidString).xcresult")
+    }
+
     private struct CommandResult {
         let stdout: String
         let stderr: String
     }
 
     private static func run(arguments: [String]) throws -> CommandResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
-        process.arguments = arguments
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-xcode-\(UUID().uuidString).stdout")
-        let errorURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-xcode-\(UUID().uuidString).stderr")
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        defer {
-            try? FileManager.default.removeItem(at: outputURL)
-            try? FileManager.default.removeItem(at: errorURL)
-        }
-
+        let result: AppleProcessResult
         do {
-            let outputHandle = try FileHandle(forWritingTo: outputURL)
-            let errorHandle = try FileHandle(forWritingTo: errorURL)
-            process.standardOutput = outputHandle
-            process.standardError = errorHandle
-            try process.run()
-            process.waitUntilExit()
-            try outputHandle.close()
-            try errorHandle.close()
+            result = try AppleProcessRunner.run(
+                executable: "/usr/bin/xcodebuild",
+                arguments: arguments,
+                maximumOutputSize: maximumCommandOutput,
+                timeoutMilliseconds: 600_000
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw XcodeError.commandFailed("xcodebuild output exceeds the 16 MB analysis limit.")
         } catch {
             throw XcodeError.commandFailed(error.localizedDescription)
         }
-
-        let stdoutData = try Data(contentsOf: outputURL)
-        let stderrData = try Data(contentsOf: errorURL)
-        guard stdoutData.count <= maximumCommandOutput,
-              stderrData.count <= maximumCommandOutput else {
-            throw XcodeError.commandFailed("xcodebuild output exceeds the 16 MB analysis limit.")
-        }
-        let stdout = String(decoding: stdoutData, as: UTF8.self)
-        let stderr = String(decoding: stderrData, as: UTF8.self)
-        guard process.terminationStatus == 0 else {
+        let stdout = String(decoding: result.stdout, as: UTF8.self)
+        let stderr = String(decoding: result.stderr, as: UTF8.self)
+        guard result.terminationStatus == 0 else {
             throw XcodeError.commandFailed(
                 stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? stdout : stderr
             )

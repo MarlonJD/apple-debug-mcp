@@ -43,4 +43,41 @@ final class AppleDebugDaemonEndpointTests: XCTestCase {
 
         XCTAssertThrowsError(try endpoint.validate())
     }
+
+    func testEndpointLoadRejectsOversizedFile() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-daemon-endpoint-\(UUID().uuidString)")
+        let fileURL = directory.appendingPathComponent("endpoint.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(repeating: 65, count: 64 * 1024 + 1).write(to: fileURL)
+
+        XCTAssertThrowsError(try AppleDebugDaemonEndpoint.load(from: fileURL)) { error in
+            guard case .invalidFile = error as? EndpointError else {
+                return XCTFail("Expected invalidFile, got \(error)")
+            }
+        }
+    }
+
+    func testEndpointLoadRejectsSymlink() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-daemon-endpoint-\(UUID().uuidString)")
+        let fileURL = directory.appendingPathComponent("endpoint.json")
+        let linkURL = directory.appendingPathComponent("link.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let endpoint = AppleDebugDaemonEndpoint(
+            url: URL(string: "http://127.0.0.1:49152/mcp")!,
+            token: String(repeating: "a", count: 64),
+            pid: 1234
+        )
+        try endpoint.write(to: fileURL)
+        try FileManager.default.createSymbolicLink(at: linkURL, withDestinationURL: fileURL)
+
+        XCTAssertThrowsError(try AppleDebugDaemonEndpoint.load(from: linkURL)) { error in
+            guard case .invalidFile = error as? EndpointError else {
+                return XCTFail("Expected invalidFile, got \(error)")
+            }
+        }
+    }
 }

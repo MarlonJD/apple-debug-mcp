@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / ".build" / "debug" / "apple-debug-mcp"
+MAXIMUM_CONCURRENT_SESSIONS = 8
 
 
 def load_endpoint(path: Path) -> dict[str, object]:
@@ -93,6 +94,49 @@ def post_mcp(
     finally:
         connection.close()
     raise RuntimeError("MCP daemon did not return an SSE JSON-RPC response")
+
+
+def post_mcp_status(
+    endpoint: dict[str, object],
+    token: str,
+    message: dict[str, object],
+    session_id: str | None = None,
+) -> tuple[int, str]:
+    parts = urlsplit(str(endpoint["url"]))
+    connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=3)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+        "Origin": f"http://127.0.0.1:{parts.port}",
+        "MCP-Protocol-Version": "2025-11-25",
+    }
+    if session_id is not None:
+        headers["MCP-Session-Id"] = session_id
+    connection.request("POST", parts.path, json.dumps(message).encode(), headers)
+    response = connection.getresponse()
+    body = response.read().decode()
+    status = response.status
+    connection.close()
+    return status, body
+
+
+def delete_mcp(endpoint: dict[str, object], token: str, session_id: str) -> tuple[int, str]:
+    parts = urlsplit(str(endpoint["url"]))
+    connection = http.client.HTTPConnection(parts.hostname, parts.port, timeout=3)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json, text/event-stream",
+        "Origin": f"http://127.0.0.1:{parts.port}",
+        "MCP-Protocol-Version": "2025-11-25",
+        "MCP-Session-Id": session_id,
+    }
+    connection.request("DELETE", parts.path, headers=headers)
+    response = connection.getresponse()
+    body = response.read().decode()
+    status = response.status
+    connection.close()
+    return status, body
 
 
 def main() -> None:
@@ -190,9 +234,61 @@ def main() -> None:
             if "result" not in capabilities:
                 raise RuntimeError(f"MCP capabilities call failed: {capabilities}")
 
+            for index in range(MAXIMUM_CONCURRENT_SESSIONS - 1):
+                extra_initialize, extra_session_id = post_mcp(
+                    endpoint,
+                    token,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 100 + index,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2025-11-25",
+                            "capabilities": {},
+                            "clientInfo": {"name": f"apple-debug-mcp-limit-{index}", "version": "0.1.0"},
+                        },
+                    },
+                )
+                if "result" not in extra_initialize or not extra_session_id:
+                    raise RuntimeError(f"daemon session-limit setup failed: {extra_initialize}")
+
+            rejected_status, rejected_body = post_mcp_status(
+                endpoint,
+                token,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 200,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "apple-debug-mcp-over-limit", "version": "0.1.0"},
+                    },
+                },
+            )
+            if rejected_status != 429:
+                raise RuntimeError(
+                    f"daemon did not enforce the concurrent session limit: HTTP {rejected_status} {rejected_body}"
+                )
+
+            delete_status, delete_body = delete_mcp(endpoint, token, session_id)
+            if delete_status != 200:
+                raise RuntimeError(f"daemon session DELETE failed: HTTP {delete_status} {delete_body}")
+            closed_status, closed_body = post_mcp_status(
+                endpoint,
+                token,
+                {"jsonrpc": "2.0", "id": 201, "method": "tools/list", "params": {}},
+                session_id,
+            )
+            if closed_status != 404:
+                raise RuntimeError(
+                    f"daemon retained a deleted MCP session: HTTP {closed_status} {closed_body}"
+                )
+
             print(
                 "daemon-smoke: authenticated health, bearer rejection, MCP initialize, "
-                f"session routing, tool discovery ({len(tool_names)} tools), and capability call passed"
+                f"session routing, tool discovery ({len(tool_names)} tools), capability call, "
+                f"{MAXIMUM_CONCURRENT_SESSIONS}-session limit, and DELETE cleanup passed"
             )
         finally:
             if endpoint is not None and process.poll() is None:

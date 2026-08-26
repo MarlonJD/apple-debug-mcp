@@ -152,39 +152,23 @@ public enum AppleRuntimeMetadataService {
     }
 
     private static func runXcrun(arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = arguments
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-runtime-\(UUID().uuidString).stdout")
-        let errorURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-runtime-\(UUID().uuidString).stderr")
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        defer {
-            try? FileManager.default.removeItem(at: outputURL)
-            try? FileManager.default.removeItem(at: errorURL)
-        }
+        let result: AppleProcessResult
         do {
-            let outputHandle = try FileHandle(forWritingTo: outputURL)
-            let errorHandle = try FileHandle(forWritingTo: errorURL)
-            process.standardOutput = outputHandle
-            process.standardError = errorHandle
-            try process.run()
-            process.waitUntilExit()
-            try outputHandle.close()
-            try errorHandle.close()
+            result = try AppleProcessRunner.run(
+                executable: "/usr/bin/xcrun",
+                arguments: arguments,
+                maximumOutputSize: 8 * 1024 * 1024
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw AppleBinaryError.outputTooLarge
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw AppleBinaryError.commandFailed(message)
         } catch {
             throw AppleBinaryError.commandFailed(error.localizedDescription)
         }
-        let stdout = try Data(contentsOf: outputURL)
-        let stderr = try Data(contentsOf: errorURL)
-        guard stdout.count <= 8 * 1024 * 1024, stderr.count <= 8 * 1024 * 1024 else {
-            throw AppleBinaryError.outputTooLarge
+        guard result.terminationStatus == 0 else {
+            throw AppleBinaryError.commandFailed(String(decoding: result.stderr, as: UTF8.self))
         }
-        guard process.terminationStatus == 0 else {
-            throw AppleBinaryError.commandFailed(String(decoding: stderr, as: UTF8.self))
-        }
-        return String(decoding: stdout, as: UTF8.self)
+        return String(decoding: result.stdout, as: UTF8.self)
     }
 }

@@ -7,6 +7,8 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 - The MCP client is the local caller and may start the server through stdio or connect to the authenticated loopback daemon endpoint.
 - The server inherits the caller’s macOS identity and developer-tool permissions.
 - Xcode, LLDB, Simulator, CoreDevice, and unified logging are external authority-bearing tools.
+- Checkpoint artifacts are local evidence files; replay relaunches only the previously authorized local macOS launch target and does not restore arbitrary process or kernel state.
+- Kernel-lab sessions are a separate user-authorized two-machine boundary; KDK, KDP, SIP, boot security, and target preparation remain outside MCP automation.
 - A physical iOS device and its development-signed application are separate trust targets.
 - Stock App Store applications are outside the supported target boundary.
 
@@ -27,6 +29,8 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Assembly patching | Code bytes can be written only through expected-byte transactional patch/rollback and `APPLE_DEBUG_ALLOW_MEMORY_WRITE=1` | `apple_debug_patch_assembly`, `DebugSessionManager.patchMemory` | macOS fixture smoke |
 | Runtime diagnostics | Heap/leaks/malloc-history/sample commands use fixed allowlisted modes and attach authorization; no arbitrary flags or shell execution are accepted | `RuntimeDiagnosticsService` | runtime-diagnostics-smoke |
 | Reverse and kernel boundaries | Unsupported reverse/time-travel and kernel memory operations are reported fail-closed; the server does not emulate or bypass Apple security controls | `ReverseExecutionService`, `AppleKernelCapabilityService` | reverse-capability-smoke |
+| Checkpoint replay | Checkpoints are bounded, non-overwriting JSON artifacts; replay requires a prior local launch configuration and stops at a recorded source location without claiming exact state restoration | `CheckpointReplayManager`, `DebugSessionManager` | `ReplayTests`, `replay-smoke` |
+| Kernel lab | Remote KDP uses a fixed target-create/symbols/kdp-remote sequence, an explicit `APPLE_DEBUG_ALLOW_KERNEL_LAB=1` grant, validated paths/host, and read-only DAP inspection; memory writes and arbitrary commands are unavailable | `KernelLabSessionManager`, `KernelLabService` | `AppleKernelCapabilitiesTests`, `reverse-capability-smoke`, external KDK lab evidence when available |
 | Static binary analysis | CFG/shared-cache parsers read bounded regular files and never execute or rewrite them; dyld runtime cross-references are direct-pointer evidence and chained fixups are metadata-only | `AppleControlFlowService`, `AppleDyldSharedCacheService` | control-flow-smoke and dyld unit test |
 | Memory snapshots | vmmap snapshots write only to an explicit non-existing JSON path and require target attach authorization | `AppleMemoryMapService` | memory-map-smoke |
 | Simulator environment | Fixed simctl operations validate enum values, paths, payload sizes, and mutation policy; arbitrary spawn/shell is not exposed | `AppleSimulatorEnvironmentService` | simulator-environment-smoke |

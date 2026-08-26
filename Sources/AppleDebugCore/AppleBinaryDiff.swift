@@ -11,6 +11,7 @@ public enum AppleBinaryDiffError: Error, Equatable, LocalizedError, Sendable {
     case executableNotFound
     case malformedInfoPlist
     case outputTooLarge
+    case commandFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -24,6 +25,8 @@ public enum AppleBinaryDiffError: Error, Equatable, LocalizedError, Sendable {
             return "The app bundle Info.plist is malformed or unavailable."
         case .outputTooLarge:
             return "The binary diff helper output exceeds the analysis limit."
+        case .commandFailed(let message):
+            return "Binary diff helper failed: \(message)"
         }
     }
 }
@@ -457,38 +460,22 @@ public enum AppleBinaryDiffService {
     }
 
     private static func runXcrun(arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = arguments
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-diff-\(UUID().uuidString).stdout")
-        let errorURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-diff-\(UUID().uuidString).stderr")
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        defer {
-            try? FileManager.default.removeItem(at: outputURL)
-            try? FileManager.default.removeItem(at: errorURL)
-        }
+        let result: AppleProcessResult
         do {
-            let outputHandle = try FileHandle(forWritingTo: outputURL)
-            let errorHandle = try FileHandle(forWritingTo: errorURL)
-            process.standardOutput = outputHandle
-            process.standardError = errorHandle
-            try process.run()
-            process.waitUntilExit()
-            try outputHandle.close()
-            try errorHandle.close()
-        } catch {
-            throw AppleBinaryDiffError.unsupportedArtifact
-        }
-        let stdout = try Data(contentsOf: outputURL)
-        let stderr = try Data(contentsOf: errorURL)
-        guard stdout.count <= 2 * 1024 * 1024, stderr.count <= 2 * 1024 * 1024 else {
+            result = try AppleProcessRunner.run(
+                executable: "/usr/bin/xcrun",
+                arguments: arguments,
+                maximumOutputSize: 2 * 1024 * 1024
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
             throw AppleBinaryDiffError.outputTooLarge
+        } catch AppleProcessRunnerError.launchFailed(let message) {
+            throw AppleBinaryDiffError.commandFailed(message)
+        } catch {
+            throw AppleBinaryDiffError.commandFailed(error.localizedDescription)
         }
-        guard process.terminationStatus == 0 else { return "" }
-        return String(decoding: stdout, as: UTF8.self)
+        guard result.terminationStatus == 0 else { return "" }
+        return String(decoding: result.stdout, as: UTF8.self)
     }
 
     private static func bounded(_ values: Set<String>) -> [String] {

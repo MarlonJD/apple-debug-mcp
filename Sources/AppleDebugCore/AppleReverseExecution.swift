@@ -50,7 +50,7 @@ public enum ReverseExecutionService {
             notes: [
                 "The installed Apple LLDB exposes process trace start/stop commands but no process record, reverse-step, reverse-continue, or replay command.",
                 "The server therefore fails closed for reverse execution and exposes forward LLDB-DAP stop snapshots as the supported deterministic alternative.",
-                "xctrace Time Profiler export and crash/DWARF analysis provide post-run evidence but cannot restore process state."
+                "CheckpointReplayManager provides bounded local relaunch-to-source replay, but xctrace Time Profiler export, crash/DWARF analysis, and checkpoint artifacts cannot restore process state."
             ]
         )
     }

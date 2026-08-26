@@ -50,17 +50,16 @@ enum AppleDebugMCPDaemon {
             try await server.waitUntilStopped()
         } catch {
             await server.stop()
-            await ToolCatalog.shutdown()
             throw error
         }
 
         await server.stop()
-        await ToolCatalog.shutdown()
     }
 }
 
 actor AppleDebugMCPDaemonServer {
     private static let defaultPort = 49321
+    private static let maximumConcurrentSessions = 8
 
     private struct FixedSessionIDGenerator: SessionIDGenerator {
         let sessionID: String
@@ -73,6 +72,7 @@ actor AppleDebugMCPDaemonServer {
     private struct SessionContext {
         let server: Server
         let transport: StatefulHTTPServerTransport
+        let toolContext: ToolCatalog.Context
         var lastAccessedAt: Date
     }
 
@@ -256,18 +256,26 @@ actor AppleDebugMCPDaemonServer {
     }
 
     private func createSessionAndHandle(_ request: HTTPRequest) async -> HTTPResponse {
+        guard sessions.count < Self.maximumConcurrentSessions else {
+            return .error(
+                statusCode: 429,
+                .invalidRequest("The MCP daemon has reached its concurrent session limit.")
+            )
+        }
         let sessionID = UUID().uuidString
         let transport = StatefulHTTPServerTransport(
             sessionIDGenerator: FixedSessionIDGenerator(sessionID: sessionID),
             validationPipeline: validationPipeline
         )
-        let server = await AppleDebugMCPServerFactory.makeServer()
+        let toolContext = ToolCatalog.makeContext()
+        let server = await AppleDebugMCPServerFactory.makeServer(context: toolContext)
 
         do {
             try await server.start(transport: transport)
             sessions[sessionID] = SessionContext(
                 server: server,
                 transport: transport,
+                toolContext: toolContext,
                 lastAccessedAt: Date()
             )
             let response = await transport.handleRequest(request)
@@ -277,6 +285,7 @@ actor AppleDebugMCPDaemonServer {
             return response
         } catch {
             await server.stop()
+            await toolContext.shutdown()
             return .error(
                 statusCode: 500,
                 .internalError("Failed to create MCP session: \(error.localizedDescription)")
@@ -287,6 +296,7 @@ actor AppleDebugMCPDaemonServer {
     private func closeSession(_ sessionID: String) async {
         guard let session = sessions.removeValue(forKey: sessionID) else { return }
         await session.server.stop()
+        await session.toolContext.shutdown()
     }
 
     private func sessionCleanupLoop() async {

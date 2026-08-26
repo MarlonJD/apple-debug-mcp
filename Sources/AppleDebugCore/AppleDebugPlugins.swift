@@ -94,8 +94,17 @@ public enum AppleDebugPluginManifestService {
         var manifests: [AppleDebugPluginManifest] = []
         for entry in entries {
             let url = URL(fileURLWithPath: directory).appendingPathComponent(entry)
-            let data = try Data(contentsOf: url)
-            guard data.count <= maximumManifestSize else { throw AppleDebugPluginError.manifestTooLarge }
+            let data: Data
+            do {
+                data = try AppleBoundedFile.readData(
+                    atPath: url.path,
+                    maximumSize: maximumManifestSize
+                )
+            } catch AppleBoundedFileError.tooLarge {
+                throw AppleDebugPluginError.manifestTooLarge
+            } catch {
+                throw AppleDebugPluginError.invalidManifest("manifest must be a regular readable file")
+            }
             do {
                 let manifest = try JSONDecoder().decode(AppleDebugPluginManifest.self, from: data)
                 try validate(manifest)

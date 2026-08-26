@@ -157,6 +157,10 @@ public struct DAPEventWaitResult: Codable, Equatable, Sendable {
 public enum DAPError: Error, Equatable, LocalizedError, Sendable {
     case invalidHeader
     case missingContentLength
+    case invalidContentLength
+    case messageTooLarge
+    case eventBufferOverflow
+    case stderrTooLarge
     case invalidMessage
     case processUnavailable
     case processExited(Int32)
@@ -171,6 +175,14 @@ public enum DAPError: Error, Equatable, LocalizedError, Sendable {
             return "LLDB-DAP returned an invalid message header."
         case .missingContentLength:
             return "LLDB-DAP message did not include Content-Length."
+        case .invalidContentLength:
+            return "LLDB-DAP returned an invalid Content-Length."
+        case .messageTooLarge:
+            return "LLDB-DAP returned a message larger than the configured limit."
+        case .eventBufferOverflow:
+            return "LLDB-DAP produced more buffered events than the configured limit."
+        case .stderrTooLarge:
+            return "LLDB-DAP stderr exceeded the configured limit."
         case .invalidMessage:
             return "LLDB-DAP returned an invalid JSON message."
         case .processUnavailable:
@@ -190,8 +202,14 @@ public enum DAPError: Error, Equatable, LocalizedError, Sendable {
 }
 
 public enum DAPFraming {
+    public static let maximumHeaderSize = 64 * 1024
+    public static let maximumBodySize = 16 * 1024 * 1024
+
     public static func frame(_ message: DAPMessage) throws -> Data {
         let body = try JSONEncoder().encode(message)
+        guard body.count <= maximumBodySize else {
+            throw DAPError.messageTooLarge
+        }
         var result = Data("Content-Length: \(body.count)\r\n\r\n".utf8)
         result.append(body)
         return result
@@ -200,7 +218,14 @@ public enum DAPFraming {
     public static func nextMessage(from buffer: inout Data) throws -> DAPMessage? {
         let separator = Data("\r\n\r\n".utf8)
         guard let headerRange = buffer.range(of: separator) else {
+            guard buffer.count <= maximumHeaderSize else {
+                throw DAPError.messageTooLarge
+            }
             return nil
+        }
+
+        guard headerRange.lowerBound <= maximumHeaderSize else {
+            throw DAPError.messageTooLarge
         }
 
         let headerData = buffer.subdata(in: buffer.startIndex..<headerRange.lowerBound)
@@ -215,16 +240,22 @@ public enum DAPFraming {
                 throw DAPError.invalidHeader
             }
             if parts[0].trimmingCharacters(in: .whitespaces).lowercased() == "content-length" {
-                contentLength = Int(parts[1].trimmingCharacters(in: .whitespaces))
+                guard let value = Int(parts[1].trimmingCharacters(in: .whitespaces)), value >= 0 else {
+                    throw DAPError.invalidContentLength
+                }
+                contentLength = value
             }
         }
 
         guard let contentLength else {
             throw DAPError.missingContentLength
         }
+        guard contentLength <= maximumBodySize else {
+            throw DAPError.messageTooLarge
+        }
 
         let bodyStart = headerRange.upperBound
-        guard buffer.count >= bodyStart + contentLength else {
+        guard buffer.count - bodyStart >= contentLength else {
             return nil
         }
 
@@ -248,9 +279,14 @@ public actor LLDBDAPSession {
     private var process: Process?
     private var input: FileHandle?
     private var output: FileHandle?
+    private var stderrHandle: FileHandle?
+    private var stderrURL: URL?
     private var buffer = Data()
     private var nextSequence = 1
     private var events: [DAPMessage] = []
+
+    private static let maximumBufferedEvents = 4_096
+    private static let maximumStderrSize = 1 * 1024 * 1024
 
     public init(
         executablePath: String? = nil,
@@ -316,29 +352,39 @@ public actor LLDBDAPSession {
 
         try input.write(contentsOf: DAPFraming.frame(request))
 
+        let deadline = Date().addingTimeInterval(Double(readTimeoutMilliseconds) / 1_000.0)
         while true {
-            let data = try readChunk(
-                from: output,
-                timeoutMilliseconds: readTimeoutMilliseconds
-            )
-            if data.isEmpty {
-                let status = processStatus()
-                throw DAPError.processExited(status)
+            try validateStderrSize()
+            let remaining = Int(deadline.timeIntervalSinceNow * 1_000)
+            guard remaining > 0 else {
+                throw DAPError.timeout
             }
-            buffer.append(data)
+            do {
+                let data = try readChunk(
+                    from: output,
+                    timeoutMilliseconds: min(remaining, 250)
+                )
+                if data.isEmpty {
+                    let status = processStatus()
+                    throw DAPError.processExited(status)
+                }
+                buffer.append(data)
 
-            while let message = try DAPFraming.nextMessage(from: &buffer) {
-                if message.type == "event" {
-                    events.append(message)
-                    continue
+                while let message = try DAPFraming.nextMessage(from: &buffer) {
+                    if message.type == "event" {
+                        try appendEvent(message)
+                        continue
+                    }
+                    guard message.type == "response", message.requestSequence == sequence else {
+                        continue
+                    }
+                    guard message.success != false else {
+                        throw DAPError.requestFailed(failureMessage(for: message))
+                    }
+                    return message
                 }
-                guard message.type == "response", message.requestSequence == sequence else {
-                    continue
-                }
-                guard message.success != false else {
-                    throw DAPError.requestFailed(failureMessage(for: message))
-                }
-                return message
+            } catch DAPError.timeout {
+                continue
             }
         }
     }
@@ -399,6 +445,24 @@ public actor LLDBDAPSession {
         )
     }
 
+    public func terminateDebuggee() throws {
+        guard process != nil else { return }
+        _ = try send(
+            command: "terminate",
+            arguments: .object(["terminateDebuggee": .boolean(true)]),
+            readTimeoutMilliseconds: 2_000
+        )
+    }
+
+    public func disconnectDebuggee() throws {
+        guard process != nil else { return }
+        _ = try send(
+            command: "disconnect",
+            arguments: .object(["terminateDebuggee": .boolean(true)]),
+            readTimeoutMilliseconds: 2_000
+        )
+    }
+
     public func drainEvents() -> [DAPMessage] {
         defer { events.removeAll(keepingCapacity: true) }
         return events
@@ -412,6 +476,7 @@ public actor LLDBDAPSession {
         let deadline = Date().addingTimeInterval(Double(timeoutMilliseconds) / 1_000.0)
         var nextThreadStateProbe = Date().addingTimeInterval(2)
         while true {
+            try validateStderrSize()
             try appendBufferedEvents()
             if hasStopEvent(events) {
                 return DAPEventWaitResult(events: drainEvents(), timedOut: false)
@@ -447,7 +512,7 @@ public actor LLDBDAPSession {
             do {
                 let data = try readChunk(
                     from: output,
-                    timeoutMilliseconds: min(remaining, pollThreadsForStop ? 250 : 10_000)
+                    timeoutMilliseconds: min(remaining, 250)
                 )
                 if data.isEmpty {
                     let status = processStatus()
@@ -456,9 +521,7 @@ public actor LLDBDAPSession {
                 buffer.append(data)
                 try appendBufferedEvents()
             } catch DAPError.timeout {
-                if !pollThreadsForStop {
-                    return DAPEventWaitResult(events: drainEvents(), timedOut: true)
-                }
+                continue
             }
         }
     }
@@ -467,6 +530,7 @@ public actor LLDBDAPSession {
         if let process {
             try? input?.close()
             try? output?.close()
+            try? stderrHandle?.close()
             let terminated = DispatchSemaphore(value: 0)
             process.terminationHandler = { _ in
                 terminated.signal()
@@ -483,6 +547,11 @@ public actor LLDBDAPSession {
         process = nil
         input = nil
         output = nil
+        stderrHandle = nil
+        if let stderrURL {
+            try? FileManager.default.removeItem(at: stderrURL)
+        }
+        self.stderrURL = nil
         buffer.removeAll(keepingCapacity: false)
         events.removeAll(keepingCapacity: false)
     }
@@ -502,19 +571,33 @@ public actor LLDBDAPSession {
         process.arguments = arguments
         let inputPipe = Pipe()
         let outputPipe = Pipe()
+        let stderrURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-lldb-\(UUID().uuidString).stderr")
+        FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+        let stderrHandle: FileHandle
+        do {
+            stderrHandle = try FileHandle(forWritingTo: stderrURL)
+        } catch {
+            try? FileManager.default.removeItem(at: stderrURL)
+            throw DAPError.processUnavailable
+        }
         process.standardInput = inputPipe
         process.standardOutput = outputPipe
-        process.standardError = Pipe()
+        process.standardError = stderrHandle
 
         do {
             try process.run()
         } catch {
+            try? stderrHandle.close()
+            try? FileManager.default.removeItem(at: stderrURL)
             throw DAPError.processUnavailable
         }
 
         self.process = process
         input = inputPipe.fileHandleForWriting
         output = outputPipe.fileHandleForReading
+        self.stderrHandle = stderrHandle
+        self.stderrURL = stderrURL
         Thread.sleep(forTimeInterval: 0.1)
     }
 
@@ -548,9 +631,27 @@ public actor LLDBDAPSession {
     private func appendBufferedEvents() throws {
         while let message = try DAPFraming.nextMessage(from: &buffer) {
             if message.type == "event" {
-                events.append(message)
+                try appendEvent(message)
             }
         }
+    }
+
+    private func appendEvent(_ message: DAPMessage) throws {
+        guard events.count < Self.maximumBufferedEvents else {
+            stop()
+            throw DAPError.eventBufferOverflow
+        }
+        events.append(message)
+    }
+
+    private func validateStderrSize() throws {
+        guard let stderrURL,
+              let size = try? FileManager.default.attributesOfItem(atPath: stderrURL.path)[.size] as? NSNumber,
+              size.intValue > Self.maximumStderrSize else {
+            return
+        }
+        stop()
+        throw DAPError.stderrTooLarge
     }
 
     private func processStatus() -> Int32 {

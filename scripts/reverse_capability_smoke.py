@@ -37,9 +37,13 @@ def main() -> int:
         process.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}\n')
         process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "apple_debug_reverse_capabilities", "arguments": {}}}) + "\n")
         process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "apple_kernel_capabilities", "arguments": {}}}) + "\n")
+        process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "apple_debug_replay_capabilities", "arguments": {}}}) + "\n")
+        process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "apple_kernel_lab_capabilities", "arguments": {}}}) + "\n")
         process.stdin.flush()
         reverse_payload = None
         kernel_payload = None
+        replay_payload = None
+        kernel_lab_payload = None
         while True:
             line = process.stdout.readline()
             if not line:
@@ -49,13 +53,21 @@ def main() -> int:
                 reverse_payload = json.loads(response["result"]["content"][0]["text"])
             if response.get("id") == 3:
                 kernel_payload = json.loads(response["result"]["content"][0]["text"])
-            if reverse_payload is not None and kernel_payload is not None:
+            if response.get("id") == 4:
+                replay_payload = json.loads(response["result"]["content"][0]["text"])
+            if response.get("id") == 5:
+                kernel_lab_payload = json.loads(response["result"]["content"][0]["text"])
+            if all(payload is not None for payload in (reverse_payload, kernel_payload, replay_payload, kernel_lab_payload)):
                 break
         if any(reverse_payload.get(key) for key in ("processRecordSupported", "reverseStepSupported", "reverseContinueSupported", "timeTravelSupported")):
             raise RuntimeError(f"reverse capability report claimed unsupported Apple features: {reverse_payload}")
         if any(kernel_payload.get(key) for key in ("kernelTaskAttachSupported", "kernelMemoryReadSupported", "kernelMemoryWriteSupported", "kextDebuggingSupported")):
             raise RuntimeError(f"kernel capability report claimed unsupported Apple features: {kernel_payload}")
-        print("reverse-capability-smoke: Apple LLDB reverse/time-travel and kernel memory support are reported fail-closed")
+        if not replay_payload.get("checkpointReplaySupported") or replay_payload.get("nativeReverseExecutionSupported") or replay_payload.get("externalRecordReplaySupported"):
+            raise RuntimeError(f"replay capability boundary is incorrect: {replay_payload}")
+        if kernel_lab_payload.get("memoryWriteSupported"):
+            raise RuntimeError(f"kernel lab capability report exposed memory write: {kernel_lab_payload}")
+        print("reverse-capability-smoke: reverse/time-travel, checkpoint replay, kernel memory, and kernel-lab write boundaries passed")
         return 0
     except Exception as error:
         print(f"reverse-capability-smoke: {error}", file=sys.stderr)

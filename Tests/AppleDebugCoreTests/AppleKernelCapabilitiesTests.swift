@@ -16,4 +16,11 @@ final class AppleKernelCapabilitiesTests: XCTestCase {
         XCTAssertTrue(report.userProcessMemoryMapSupported)
         XCTAssertTrue(report.supportedAlternatives.contains("apple_debug_runtime_diagnose"))
     }
+
+    func testKernelLabProviderIsReadOnly() {
+        let report = KernelLabService.capabilities()
+
+        XCTAssertFalse(report.memoryWriteSupported)
+        XCTAssertTrue(report.notes.contains { $0.localizedCaseInsensitiveContains("read-only") })
+    }
 }

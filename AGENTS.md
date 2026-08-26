@@ -51,6 +51,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Unsigned macOS package | make package | Release-build the server and create a relocatable unsigned tar archive |
 | Full repository check | make check | Build, all tests, smoke protocol, macOS debugger fixture, whitespace, and placeholder checks pass |
 | Harness check | make harness-check | Project-native and harness structural checks pass |
+| Verification tiers | make pr-check; make host-integration-check; make simulator-check; make physical-device-check | Run deterministic PR, host, Simulator, or explicitly authorized physical-device validation; see docs/product-specs/compatibility-matrix.md |
 | Harness contract only | python3 scripts/harness_contract.py | Read-only authority, plan, coverage/evidence, registry, route, and maintenance checks pass |
 | Run server | swift run apple-debug-mcp | MCP stdio process remains available until stdin closes; `swift run apple-debug-mcp --daemon` publishes an authenticated loopback endpoint |
 

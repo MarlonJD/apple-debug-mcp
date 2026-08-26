@@ -3,6 +3,9 @@ name: Apple Debug MCP CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
 
 permissions:
   contents: read
@@ -19,7 +22,7 @@ jobs:
         run: swift package resolve
 
       - name: Run core and MCP checks
-        run: make check
+        run: make pr-check
 
       - name: Build unsigned package
         run: make package
@@ -30,3 +33,31 @@ jobs:
           name: apple-debug-mcp-macos-unsigned
           path: dist/*.tar.gz
           if-no-files-found: error
+
+  host-integration:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve Swift package
+        run: swift package resolve
+
+      - name: Run host integration tier
+        run: make host-integration-check
+
+  simulator-integration:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve Swift package
+        run: swift package resolve
+
+      - name: Run Simulator integration tier
+        run: make simulator-check

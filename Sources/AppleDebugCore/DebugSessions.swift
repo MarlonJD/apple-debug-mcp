@@ -125,6 +125,30 @@ public struct DebugSessionSummary: Codable, Equatable, Sendable {
     }
 }
 
+public struct DebugLaunchConfiguration: Codable, Equatable, Sendable {
+    public let program: String
+    public let arguments: [String]
+    public let stopOnEntry: Bool
+
+    public init(program: String, arguments: [String], stopOnEntry: Bool) {
+        self.program = program
+        self.arguments = arguments
+        self.stopOnEntry = stopOnEntry
+    }
+}
+
+public struct DebugRelaunchResult: Codable, Equatable, Sendable {
+    public let sessionID: String
+    public let launchResponse: DAPMessage
+    public let wait: DebugWaitForStopResult
+
+    public init(sessionID: String, launchResponse: DAPMessage, wait: DebugWaitForStopResult) {
+        self.sessionID = sessionID
+        self.launchResponse = launchResponse
+        self.wait = wait
+    }
+}
+
 public struct RegisterSnapshot: Codable, Equatable, Sendable {
     public let scopes: DAPMessage
     public let variables: DAPMessage?
@@ -292,6 +316,7 @@ public actor DebugSessionManager {
         let deviceIdentifier: String?
         let programPath: String?
         let legacyTransport: LegacyDeviceDebugTransport?
+        let launchConfiguration: DebugLaunchConfiguration?
     }
 
     private struct LegacySessionSetup {
@@ -359,7 +384,8 @@ public actor DebugSessionManager {
                 target: target,
                 deviceIdentifier: deviceIdentifier,
                 programPath: programPath,
-                legacyTransport: legacyTransport
+                legacyTransport: legacyTransport,
+                launchConfiguration: nil
             )
             return DebugSessionSummary(sessionID: sessionID, target: target)
         } catch {
@@ -396,14 +422,98 @@ public actor DebugSessionManager {
             )
         }
         do {
-            return try await record.session.launch(
+            let response = try await record.session.launch(
                 program: program,
                 arguments: arguments,
                 stopOnEntry: stopOnEntry
             )
+            sessions[sessionID] = SessionRecord(
+                session: record.session,
+                target: record.target,
+                deviceIdentifier: record.deviceIdentifier,
+                programPath: record.programPath,
+                legacyTransport: record.legacyTransport,
+                launchConfiguration: DebugLaunchConfiguration(
+                    program: program,
+                    arguments: arguments,
+                    stopOnEntry: stopOnEntry
+                )
+            )
+            return response
         } catch {
             await record.session.stop()
             sessions.removeValue(forKey: sessionID)
+            throw error
+        }
+    }
+
+    public func relaunchLocal(
+        sessionID: String,
+        sourcePath: String,
+        sourceLine: Int,
+        timeoutMilliseconds: Int
+    ) async throws -> DebugRelaunchResult {
+        guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096 else {
+            throw DebugPolicyError.invalidRequest("Replay source path is invalid.")
+        }
+        try DebugPolicy.validatePositive(sourceLine, label: "Replay source line")
+        try DebugPolicy.validatePositive(
+            timeoutMilliseconds,
+            label: "Replay stop timeout",
+            maximum: 120_000
+        )
+
+        let record = try record(for: sessionID)
+        guard record.deviceIdentifier == nil, record.target == "macos" else {
+            throw DebugPolicyError.invalidRequest(
+                "Checkpoint replay is currently limited to an authorized local macOS launch session."
+            )
+        }
+        guard let launchConfiguration = record.launchConfiguration else {
+            throw DebugPolicyError.invalidRequest(
+                "Checkpoint replay requires a prior local launch configuration."
+            )
+        }
+        try DebugPolicy.validateLaunchTarget(path: launchConfiguration.program)
+
+        let replacement = try LLDBDAPSession()
+        do {
+            _ = try await replacement.start()
+            _ = try await replacement.send(
+                command: "setBreakpoints",
+                arguments: .object([
+                    "source": .object(["path": .string(sourcePath)]),
+                    "breakpoints": .array([
+                        .object(["line": .integer(sourceLine)])
+                    ])
+                ])
+            )
+            let launchResponse = try await replacement.launch(
+                program: launchConfiguration.program,
+                arguments: launchConfiguration.arguments,
+                stopOnEntry: false
+            )
+            sessions[sessionID] = SessionRecord(
+                session: replacement,
+                target: record.target,
+                deviceIdentifier: record.deviceIdentifier,
+                programPath: record.programPath,
+                legacyTransport: record.legacyTransport,
+                launchConfiguration: launchConfiguration
+            )
+            await record.session.stop()
+
+            let wait = try await waitForStop(
+                sessionID: sessionID,
+                timeoutMilliseconds: timeoutMilliseconds
+            )
+            return DebugRelaunchResult(
+                sessionID: sessionID,
+                launchResponse: launchResponse,
+                wait: wait
+            )
+        } catch {
+            await replacement.stop()
             throw error
         }
     }
@@ -1175,10 +1285,7 @@ public actor DebugSessionManager {
         guard let record = sessions.removeValue(forKey: sessionID) else {
             return false
         }
-        await record.session.stop()
-        if let legacyTransport = record.legacyTransport {
-            await legacyTransport.stop()
-        }
+        await stop(record: record)
         return true
     }
 
@@ -1186,10 +1293,18 @@ public actor DebugSessionManager {
         let sessions = self.sessions
         self.sessions.removeAll()
         for record in sessions.values {
-            await record.session.stop()
-            if let legacyTransport = record.legacyTransport {
-                await legacyTransport.stop()
-            }
+            await stop(record: record)
+        }
+    }
+
+    private func stop(record: SessionRecord) async {
+        if record.launchConfiguration != nil {
+            try? await record.session.terminateDebuggee()
+            try? await record.session.disconnectDebuggee()
+        }
+        await record.session.stop()
+        if let legacyTransport = record.legacyTransport {
+            await legacyTransport.stop()
         }
     }
 

@@ -192,7 +192,7 @@ def main() -> int:
         stack_reference = stack_pointer_match.group(0)
         tool(
             "apple_debug_completions",
-            {"sessionID": session_id, "frameID": frame_id, "text": "debug_", "column": 7, "line": 10},
+            {"sessionID": session_id, "text": "debug_", "column": 7},
         )
 
         memory_response = tool(

@@ -9,6 +9,7 @@ import Foundation
 /// The file containing this value is user-private and is intended for an MCP client
 /// configuration helper. The token is never included in the menu-bar status text.
 public struct AppleDebugDaemonEndpoint: Codable, Equatable, Sendable {
+    private static let maximumFileSize = 64 * 1024
     public static let currentSchemaVersion = 1
 
     public let schemaVersion: Int
@@ -106,7 +107,18 @@ public struct AppleDebugDaemonEndpoint: Codable, Equatable, Sendable {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let endpoint = try decoder.decode(Self.self, from: Data(contentsOf: fileURL))
+        let endpointData: Data
+        do {
+            endpointData = try AppleBoundedFile.readData(
+                atPath: fileURL.path,
+                maximumSize: Self.maximumFileSize
+            )
+        } catch AppleBoundedFileError.tooLarge {
+            throw EndpointError.invalidFile("endpoint file exceeds the configured size limit")
+        } catch {
+            throw EndpointError.invalidFile("endpoint path is not a regular readable file")
+        }
+        let endpoint = try decoder.decode(Self.self, from: endpointData)
         try endpoint.validate()
         return endpoint
     }

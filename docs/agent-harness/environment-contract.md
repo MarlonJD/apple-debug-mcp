@@ -20,6 +20,16 @@
 | Reset | make clean | SwiftPM build artifacts removed | Rerun swift build | verified |
 | Stop and teardown | Close stdin for stdio; POST authenticated `/shutdown` for daemon and wait for the process | Process exits and daemon endpoint metadata is removed | Use the endpoint PID only for diagnosis; never kill an unrelated process | verified |
 
+## Verification tiers
+
+| Tier | Command | Intended trigger | State/authority boundary | Status |
+| --- | --- | --- | --- | --- |
+| Deterministic PR | `make pr-check` | Every push and pull request | No Simulator, physical device, release credential, or menu bar UI requirement | configured |
+| Host integration | `make host-integration-check` | Manual or scheduled host integration validation | Uses only local fixtures, authenticated loopback, and signed repository XPC fixtures | configured-with-boundary |
+| Simulator | `make simulator-check` | Manual or scheduled validation on a configured Mac | Requires an available runtime and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1`; cleans only selected fixture state | configured-with-boundary |
+| Physical device | `make physical-device-check` | Explicit maintainer-authorized run | Requires device identifiers, signed app, Developer Mode, and explicit debug/mutation grants; never automatic | configured-with-boundary |
+| Release | `make package` / `make release-package` | Release preparation | Signing/notarization is authority-gated and not part of the PR tier | release pending |
+
 ## Agent-readable surfaces
 
 | Surface | Access path | Useful queries or actions | Expected evidence | Status |

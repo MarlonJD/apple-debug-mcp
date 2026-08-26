@@ -786,42 +786,22 @@ private struct ElementRecord: Codable {
     }
 
     private static func run(executable: String, arguments: [String]) throws -> CommandResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-ui-\(UUID().uuidString).stdout")
-        let errorURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("apple-debug-mcp-ui-\(UUID().uuidString).stderr")
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        defer {
-            try? FileManager.default.removeItem(at: outputURL)
-            try? FileManager.default.removeItem(at: errorURL)
-        }
-
+        let result: AppleProcessResult
         do {
-            let outputHandle = try FileHandle(forWritingTo: outputURL)
-            let errorHandle = try FileHandle(forWritingTo: errorURL)
-            process.standardOutput = outputHandle
-            process.standardError = errorHandle
-            try process.run()
-            process.waitUntilExit()
-            try outputHandle.close()
-            try errorHandle.close()
+            result = try AppleProcessRunner.run(
+                executable: executable,
+                arguments: arguments,
+                maximumOutputSize: maximumCommandOutput,
+                timeoutMilliseconds: 600_000
+            )
+        } catch AppleProcessRunnerError.outputTooLarge {
+            throw SimulatorUIError.outputTooLarge
         } catch {
             throw SimulatorUIError.commandFailed(error.localizedDescription)
         }
-
-        let stdoutData = try Data(contentsOf: outputURL)
-        let stderrData = try Data(contentsOf: errorURL)
-        guard stdoutData.count <= maximumCommandOutput,
-              stderrData.count <= maximumCommandOutput else {
-            throw SimulatorUIError.outputTooLarge
-        }
-        let stdout = String(decoding: stdoutData, as: UTF8.self)
-        let stderr = String(decoding: stderrData, as: UTF8.self)
-        guard process.terminationStatus == 0 else {
+        let stdout = String(decoding: result.stdout, as: UTF8.self)
+        let stderr = String(decoding: result.stderr, as: UTF8.self)
+        guard result.terminationStatus == 0 else {
             let diagnostics = [stderr, stdout]
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }

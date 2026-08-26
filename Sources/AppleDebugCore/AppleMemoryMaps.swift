@@ -262,7 +262,10 @@ public enum AppleMemoryMapService {
     }
 
     private static func loadSnapshot(_ path: String) throws -> AppleMemoryMapReport {
-        do { return try JSONDecoder().decode(AppleMemoryMapReport.self, from: Data(contentsOf: URL(fileURLWithPath: path))) }
+        do {
+            let data = try AppleBoundedFile.readData(atPath: path, maximumSize: 8 * 1024 * 1024)
+            return try JSONDecoder().decode(AppleMemoryMapReport.self, from: data)
+        }
         catch { throw AppleMemoryMapServiceError.invalidSnapshot }
     }
 }

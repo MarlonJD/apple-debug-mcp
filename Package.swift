@@ -80,6 +80,10 @@ let package = Package(
         .testTarget(
             name: "AppleDebugCoreTests",
             dependencies: ["AppleDebugCore"]
+        ),
+        .testTarget(
+            name: "AppleDebugMCPTests",
+            dependencies: ["AppleDebugMCP"]
         )
     ]
 )
