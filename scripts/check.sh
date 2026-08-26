@@ -8,7 +8,7 @@ swift test
 python3 ./scripts/mcp_domain_behavior_smoke.py
 python3 ./scripts/mcp_daemon_smoke.py
 python3 ./scripts/daemon_session_isolation_smoke.py
-python3 ./scripts/debug_fixture_smoke.py
+python3 ./scripts/debug_fixture_smoke.py --extended --evidence-output .build/evidence/mcp-mac-debug-workflow.json
 python3 ./scripts/replay_smoke.py
 python3 ./scripts/plugin_xpc_smoke.py
 git diff --check

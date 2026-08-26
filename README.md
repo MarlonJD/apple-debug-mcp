@@ -189,6 +189,7 @@ The repository also includes focused smoke workflows:
 
 ```sh
 make fixture
+make mcp-mac-debug-workflow-smoke
 make replay-smoke
 make ios-fixture
 make ios-fixture-smoke

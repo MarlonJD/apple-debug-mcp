@@ -27,6 +27,7 @@ This repository is a Swift Package Manager command-line MCP server for authorize
 | Resolve and build | swift build | SwiftPM exits 0 and produces apple-debug-mcp |
 | Focused tests | swift test --filter CapabilitiesTests | XCTest exits 0 |
 | Authorized fixture | make fixture | clang/codesign produces the get-task-allow fixture binary |
+| macOS MCP debugger workflow | make mcp-mac-debug-workflow-smoke | Real stdio MCP flow covers launch, stop inspection, memory patch/rollback, policy rejection, failed-launch cleanup, and a bounded JSON evidence manifest |
 | iOS fixture | make ios-fixture | xcodebuild produces the Simulator app bundle and dSYM |
 | iOS fixture smoke | make ios-fixture-smoke | Explicitly boot/install/launch/screenshot/terminate/shutdown a Simulator fixture |
 | iOS debug fixture smoke | make ios-debug-fixture-smoke | Attach LLDB-DAP to the Simulator fixture and inspect its process |
