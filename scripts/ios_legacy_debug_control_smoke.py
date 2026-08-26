@@ -141,6 +141,9 @@ def main() -> int:
             "apple_debug_step",
             {"sessionID": session_id, "threadID": thread_id, "kind": "next", "granularity": "instruction"},
         )
+        step_wait = tool("apple_debug_wait_for_stop", {"sessionID": session_id, "timeoutMilliseconds": 10_000})
+        if not step_wait.get("stopped") or step_wait.get("terminated"):
+            raise RuntimeError(f"physical instruction step did not stop: {step_wait}")
         stopped_thread_and_frame()
 
         tool("apple_debug_continue", {"sessionID": session_id, "threadID": thread_id})
