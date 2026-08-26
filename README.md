@@ -144,6 +144,8 @@ This project intentionally does not provide:
 | iOS Simulator | Build/discovery, install/launch/debug, screenshots, logs, UI trees/actions, environment controls, performance, crash/DWARF/symbol analysis, and reproducible evidence | Simulator behavior is not physical-device evidence; kernel and native reverse execution remain restricted |
 | Physical iOS device | Paired development-device lifecycle, CoreDevice or supported legacy transport, xctrace, sysdiagnose, and signed development-app LLDB-DAP workflows | Requires signing, Developer Mode, pairing/tunnel state, explicit grants, and compatible tools; stock App Store apps and public physical UI capture are out of scope |
 
+The native Workbench adds a target picker, policy-aware debugger session controls, and typed stop evidence for the same local `AppleDebugCore` reports used by MCP. Run `make workbench-build-smoke` for the product build and `make mcp-mac-debug-workflow-smoke` for the end-to-end local debugger evidence.
+
 ## Architecture
 
 ```text
