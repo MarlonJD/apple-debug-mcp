@@ -153,7 +153,7 @@ def main() -> int:
                 "udid": simulator_id,
                 "path": str(video_path),
                 "durationSeconds": 1,
-                "codec": "h264",
+                "codec": "hevc",
             },
         )
         if not video_path.is_file() or video_path.stat().st_size == 0:

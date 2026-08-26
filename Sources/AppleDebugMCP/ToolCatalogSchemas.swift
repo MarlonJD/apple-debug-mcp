@@ -1088,7 +1088,8 @@ extension ToolCatalog {
             ]),
             "codec": .object([
                 "type": .string("string"),
-                "enum": .array([.string("h264"), .string("hevc")])
+                "enum": .array([.string("h264"), .string("hevc")]),
+                "description": .string("Video codec; defaults to hevc, matching simctl's current public default")
             ]),
             "display": .object(["type": .string("string")])
         ]),

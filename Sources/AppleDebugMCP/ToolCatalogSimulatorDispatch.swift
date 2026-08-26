@@ -128,7 +128,7 @@ extension ToolCatalog {
                         udid: udid,
                         path: path,
                         durationSeconds: intValue(from: params.arguments?["durationSeconds"]) ?? 1,
-                        codec: params.arguments?["codec"]?.stringValue ?? "h264",
+                        codec: params.arguments?["codec"]?.stringValue ?? "hevc",
                         display: params.arguments?["display"]?.stringValue
                     )
                 )

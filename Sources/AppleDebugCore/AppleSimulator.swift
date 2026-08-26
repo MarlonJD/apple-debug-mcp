@@ -240,7 +240,7 @@ public enum SimulatorService {
         udid: String,
         path: String,
         durationSeconds: Int,
-        codec: String = "h264",
+        codec: String = "hevc",
         display: String? = nil
     ) throws -> SimulatorRecordingResult {
         try validateMutationTarget(udid: udid)
