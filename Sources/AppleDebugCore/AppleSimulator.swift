@@ -267,9 +267,23 @@ public enum SimulatorService {
         let errorPipe = Pipe()
         process.standardError = errorPipe
         var requestedStop = false
+        func recordingIsNonEmpty() -> Bool {
+            guard FileManager.default.fileExists(atPath: destination.path),
+                  let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path),
+                  let size = attributes[.size] as? NSNumber else {
+                return false
+            }
+            return size.intValue > 0
+        }
         do {
             try process.run()
-            Thread.sleep(forTimeInterval: TimeInterval(durationSeconds))
+            let startupDeadline = Date().addingTimeInterval(10)
+            while process.isRunning, Date() < startupDeadline, !recordingIsNonEmpty() {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            if process.isRunning, recordingIsNonEmpty() {
+                Thread.sleep(forTimeInterval: TimeInterval(durationSeconds))
+            }
             if process.isRunning {
                 requestedStop = true
                 _ = Darwin.kill(process.processIdentifier, SIGINT)
@@ -295,10 +309,7 @@ public enum SimulatorService {
         }
         let diagnostic = String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let recordingSize = (try? FileManager.default.attributesOfItem(atPath: destination.path))?[.size] as? NSNumber
-        guard FileManager.default.fileExists(atPath: destination.path),
-              let recordingSize,
-              recordingSize.intValue > 0 else {
+        guard recordingIsNonEmpty() else {
             let status = process.terminationStatus == 0 ? "" : " (exit status \(process.terminationStatus))"
             throw SimulatorError.commandFailed(
                 diagnostic.isEmpty
