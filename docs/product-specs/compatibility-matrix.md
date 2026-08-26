@@ -17,7 +17,7 @@ This matrix separates the environments exercised by the repository from the mini
 | Component | Declared baseline | Exercised baseline | Compatibility claim |
 | --- | --- | --- | --- |
 | macOS | macOS 13 or later | macOS 26.5.2 arm64e | Current-host behavior is verified; macOS 13 is not independently run in this checkout |
-| Xcode/Swift | Xcode 16 or later; Swift 6 | Xcode 26.6; Apple Swift 6.3.3 | Current-host behavior is verified; older Xcode 16 compatibility remains unverified |
+| Xcode/Swift | Xcode 16 or later; Swift 6 compiler; SwiftPM tools 5.10 manifest floor | Xcode 26.6; Apple Swift 6.3.3 | Current-host behavior is verified; older Xcode 16 compatibility remains unverified; the 5.10 manifest floor is required for the hosted macOS-14 runner |
 | MCP Swift SDK | Package requirement starts at 0.11.0 | `Package.resolved` pins 0.12.1 | The locked 0.12.1 graph is verified; 0.11.0 is a declared floor, not a separately certified build |
 | Swift NIO | Package requirement starts at 2.101.3 | `Package.resolved` pins 2.101.3 | Locked version is verified through the daemon build/smoke |
 | iOS Simulator | Xcode-provided available runtime | Local fixture and the selected available Simulator | Simulator behavior is conditional on the installed runtime and is not part of every PR run |
