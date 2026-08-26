@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct WorkbenchView: View {
     @StateObject private var model = WorkbenchModel()
     @State private var showingTargetImporter = false
+    @State private var showingEvidenceImporter = false
 
     var body: some View {
         NavigationSplitView {
@@ -41,6 +42,7 @@ struct WorkbenchView: View {
                 case .controlFlow: ControlFlowPanel(model: model)
                 case .performance: PerformancePanel(model: model)
                 case .boundaries: BoundaryPanel(model: model)
+                case .evidence: EvidencePanel(model: model)
                 }
             }
             .padding(24)
@@ -52,6 +54,12 @@ struct WorkbenchView: View {
                     showingTargetImporter = true
                 } label: {
                     Label("Open Target", systemImage: "folder")
+                }
+
+                Button {
+                    showingEvidenceImporter = true
+                } label: {
+                    Label("Open Evidence", systemImage: "checkmark.seal")
                 }
 
                 if model.hasTarget, model.sessionID == nil {
@@ -74,6 +82,20 @@ struct WorkbenchView: View {
             case .success(let urls):
                 if let url = urls.first {
                     model.setTarget(url: url)
+                }
+            case .failure(let error):
+                model.errorMessage = error.localizedDescription
+            }
+        }
+        .fileImporter(
+            isPresented: $showingEvidenceImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    model.setEvidence(url: url)
                 }
             case .failure(let error):
                 model.errorMessage = error.localizedDescription
@@ -115,6 +137,7 @@ struct WorkbenchView: View {
         case .controlFlow: return "point.3.connected.trianglepath.dotted"
         case .performance: return "waveform.path.ecg"
         case .boundaries: return "shield.lefthalf.filled"
+        case .evidence: return "checkmark.seal"
         }
     }
 }

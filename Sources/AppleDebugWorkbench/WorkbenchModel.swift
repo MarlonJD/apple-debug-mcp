@@ -32,6 +32,56 @@ struct WorkbenchRegisterRow: Identifiable {
     let value: String
 }
 
+struct WorkbenchEvidenceManifest: Decodable {
+    let schemaVersion: Int
+    let workflow: String
+    let transport: String
+    let status: String
+    let createdAt: String
+    let target: WorkbenchEvidenceTarget
+    let steps: [WorkbenchEvidenceStep]
+    let toolCalls: [WorkbenchEvidenceToolCall]
+    let cleanup: WorkbenchEvidenceCleanup
+    let extendedProbes: WorkbenchEvidenceProbes?
+}
+
+struct WorkbenchEvidenceTarget: Decodable {
+    let kind: String
+    let serverPath: String?
+    let fixturePath: String?
+    let architecture: String?
+}
+
+struct WorkbenchEvidenceStep: Decodable, Identifiable {
+    let name: String
+    let status: String
+
+    var id: String { name }
+}
+
+struct WorkbenchEvidenceToolCall: Decodable {
+    let name: String
+    let status: String
+}
+
+struct WorkbenchEvidenceCleanup: Decodable {
+    let sessionClosed: Bool
+    let serverExited: Bool
+}
+
+struct WorkbenchEvidenceProbe: Decodable {
+    let status: String
+    let operation: String?
+    let sessionClosed: Bool?
+    let sessionRemoved: Bool?
+    let closeAfterRemoval: Bool?
+}
+
+struct WorkbenchEvidenceProbes: Decodable {
+    let policy: WorkbenchEvidenceProbe?
+    let failedLaunchCleanup: WorkbenchEvidenceProbe?
+}
+
 @MainActor
 final class WorkbenchModel: ObservableObject {
     enum Panel: String, CaseIterable, Identifiable {
@@ -41,6 +91,7 @@ final class WorkbenchModel: ObservableObject {
         case controlFlow = "Control Flow"
         case performance = "Performance"
         case boundaries = "Boundaries"
+        case evidence = "Evidence"
 
         var id: String { rawValue }
     }
@@ -48,6 +99,9 @@ final class WorkbenchModel: ObservableObject {
     @Published var panel: Panel = .overview
     @Published var targetPath = ""
     @Published var targetDisplayName = "No target selected"
+    @Published var evidencePath = ""
+    @Published var evidenceManifest: WorkbenchEvidenceManifest?
+    @Published var evidenceRawJSON = ""
     @Published var sessionID: String?
     @Published var debuggerState: WorkbenchDebuggerState = .ready
     @Published var isBusy = false
@@ -77,6 +131,7 @@ final class WorkbenchModel: ObservableObject {
 
     let capabilities = CapabilityMatrix.reports()
     private let sessions = DebugSessionManager()
+    private let maximumEvidenceBytes = 4 * 1024 * 1024
 
     var hasTarget: Bool { !targetPath.isEmpty }
 
@@ -114,6 +169,25 @@ final class WorkbenchModel: ObservableObject {
         }
         targetPath = ""
         targetDisplayName = "No target selected"
+        errorMessage = nil
+    }
+
+    func setEvidence(url: URL) {
+        loadEvidence(path: url.standardizedFileURL.path)
+    }
+
+    func loadEvidence() {
+        guard !evidencePath.isEmpty else {
+            errorMessage = "Choose an evidence manifest first."
+            return
+        }
+        loadEvidence(path: evidencePath)
+    }
+
+    func clearEvidence() {
+        evidencePath = ""
+        evidenceManifest = nil
+        evidenceRawJSON = ""
         errorMessage = nil
     }
 
@@ -383,6 +457,38 @@ final class WorkbenchModel: ObservableObject {
         debuggerOutput = formatted(snapshot)
     }
 
+    private func loadEvidence(path: String) {
+        guard !path.isEmpty, path.hasPrefix("/") else {
+            errorMessage = "Evidence manifest path must be absolute."
+            return
+        }
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: path)
+            guard let type = attributes[.type] as? FileAttributeType, type == .typeRegular,
+                  let size = attributes[.size] as? NSNumber,
+                  size.intValue <= maximumEvidenceBytes else {
+                throw EvidenceLoadError.invalidFile
+            }
+            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            guard data.count <= maximumEvidenceBytes else {
+                throw EvidenceLoadError.invalidFile
+            }
+            let manifest = try JSONDecoder().decode(WorkbenchEvidenceManifest.self, from: data)
+            guard manifest.schemaVersion == 1, manifest.workflow == "macos-debugger-v1" else {
+                throw EvidenceLoadError.unsupportedManifest
+            }
+            evidencePath = path
+            evidenceManifest = manifest
+            let raw = String(decoding: data, as: UTF8.self)
+            evidenceRawJSON = raw.count <= 64_000 ? raw : String(raw.prefix(64_000)) + "\n… raw manifest truncated …"
+            errorMessage = nil
+        } catch let error as EvidenceLoadError {
+            errorMessage = error.localizedDescription
+        } catch {
+            errorMessage = "Evidence manifest could not be loaded: \(error.localizedDescription)"
+        }
+    }
+
     private func formatted<T: Encodable>(_ value: T) -> String {
         guard let data = try? JSONEncoder().encode(value) else { return String(describing: value) }
         return String(decoding: data, as: UTF8.self)
@@ -438,6 +544,20 @@ final class WorkbenchModel: ObservableObject {
         case .integer(let integer): return integer
         case .double(let double): return Int(double)
         default: return nil
+        }
+    }
+}
+
+private enum EvidenceLoadError: Error, LocalizedError {
+    case invalidFile
+    case unsupportedManifest
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidFile:
+            return "Choose a regular JSON evidence file no larger than 4 MiB."
+        case .unsupportedManifest:
+            return "This file is not a supported macOS debugger workflow manifest."
         }
     }
 }

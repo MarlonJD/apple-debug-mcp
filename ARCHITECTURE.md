@@ -36,7 +36,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugCore/ApplePluginHost.swift | Signed executable validation, explicit-grant legacy profile transport, and App Sandbox XPC plugin protocol/client | Maintainers; update only with a reviewed sandbox/IPC boundary |
 | Sources/AppleDebugPluginHost/ | Separate JSON-line plugin host executable with timeout/output limits and sandbox boundary | Maintainers; update only with signed host/release changes |
 | Sources/AppleDebugPluginXPCService/ | Signed App Sandbox XPC protocol fixture and third-party plugin service contract | Maintainers; update only with XPC protocol or entitlement changes |
-| Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench | Maintainers; update with GUI panels and core API changes |
+| Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench with target/session, typed stop-evidence, analyzer, and read-only workflow-evidence panels | Maintainers; update with GUI panels and core API changes |
 | Sources/AppleDebugMenuBar/ | SwiftUI `MenuBarExtra`, `SMAppService.mainApp` login registration, and bundled MCP child supervisor | Maintainers; update with menu actions, startup, or child-process lifecycle changes |
 | Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
 | Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
