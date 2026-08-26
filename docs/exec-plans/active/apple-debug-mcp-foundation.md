@@ -45,7 +45,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-26 16:14Z) Make the Mach-O regression test independent of whether the hosted Apple toolchain exposes a universal or thin `lldb-dap`, while retaining explicit thin-image parsing coverage.
 - [x] (2026-08-26 16:34Z) Give the stdio MCP smoke enough bounded time for the hosted toolchain probe and require its actual response before validating the remaining transcript.
 - [x] (2026-08-26 18:58Z) Align Simulator video recording with the current public `simctl` default codec (`hevc`) and run the selected `simctl` directly with bounded startup readiness, signal shutdown, and diagnostics after hosted macOS-26 produced an empty recording; wait up to 10 seconds for the first non-empty artifact, accept a valid finalized movie after the intentional SIGINT even when hosted `simctl` reports a non-zero status, and verify the video path remotely in CI run `32998363346` (`ios-mcp-tool-smoke` passed).
-- [ ] (2026-08-26 18:58Z) Bound the hosted Simulator repro-bundle smoke: the same CI run reached `repro-bundle-smoke` only after the video, UI, arbitrary-UI, Xcode, and environment smokes passed, then hit the Simulator job timeout before the repro-bundle result was emitted.
+- [ ] (deferred, 2026-08-26 18:58Z) Bound the hosted Simulator repro-bundle smoke: the same CI run reached `repro-bundle-smoke` only after the video, UI, arbitrary-UI, Xcode, and environment smokes passed, then hit the Simulator job timeout before the repro-bundle result was emitted. The local repro-bundle smoke passes; revisit only if hosted Simulator becomes a required PR or release gate.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
@@ -146,6 +146,9 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
   Date/Author: 2026-08-26 / Apple Debug MCP maintainers
 - Decision: Bind the daemon to stable `127.0.0.1:49321` by default, allow explicit port `0` for isolated tests, and publish a random bearer token in `~/Library/Application Support/AppleDebugMCP/endpoint.json`.
   Rationale: A stable default makes client configuration durable; the test-only ephemeral override avoids collisions, while the private discovery file, token, and localhost validation prevent unauthenticated local or DNS-rebinding access.
+  Date/Author: 2026-08-26 / Apple Debug MCP maintainers
+- Decision: Treat hosted Simulator full-tier completion as non-blocking for the local-first product.
+  Rationale: Local `make check` and Simulator smoke evidence pass, while the hosted macOS-26 run verified video/UI/Xcode/environment paths and timed out only at the final repro-bundle step; do not spend repeated CI time on an optional environment gate.
   Date/Author: 2026-08-26 / Apple Debug MCP maintainers
 
 ## Outcomes & Retrospective
