@@ -144,20 +144,6 @@ def main() -> int:
             {"udid": simulator_id, "latitude": 37.3349, "longitude": -122.0090},
         )
         tool("apple_simulator_clear_location", {"udid": simulator_id})
-        with tempfile.NamedTemporaryFile(prefix="apple-debug-mcp-", suffix=".mov", delete=False) as handle:
-            video_path = Path(handle.name)
-        video_path.unlink()
-        tool(
-            "apple_simulator_record_video",
-            {
-                "udid": simulator_id,
-                "path": str(video_path),
-                "durationSeconds": 1,
-                "codec": "hevc",
-            },
-        )
-        if not video_path.is_file() or video_path.stat().st_size == 0:
-            raise RuntimeError("Simulator MCP video recording was missing or empty")
         logs = tool(
             "apple_log_show",
             {
@@ -172,6 +158,20 @@ def main() -> int:
             "apple_simulator_terminate",
             {"udid": simulator_id, "bundleID": "com.burakkarahan.AppleDebugFixture"},
         )
+        with tempfile.NamedTemporaryFile(prefix="apple-debug-mcp-", suffix=".mov", delete=False) as handle:
+            video_path = Path(handle.name)
+        video_path.unlink()
+        tool(
+            "apple_simulator_record_video",
+            {
+                "udid": simulator_id,
+                "path": str(video_path),
+                "durationSeconds": 1,
+                "codec": "hevc",
+            },
+        )
+        if not video_path.is_file() or video_path.stat().st_size == 0:
+            raise RuntimeError("Simulator MCP video recording was missing or empty")
         print(
             "ios-mcp-tool-smoke: MCP list, boot, install, launch flags, app info, container, screenshot, location, video, logs, terminate, and cleanup passed for %s"
             % simulator_id
