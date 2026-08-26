@@ -26,14 +26,18 @@ struct MenuBarContent: View {
 
             if model.canStartServer {
                 Button("Start MCP Server") { model.startServer() }
+                    .accessibilityIdentifier("menubar.start-server")
             }
             if model.canStopServer {
                 Button("Stop MCP Server") { model.stopServer() }
+                    .accessibilityIdentifier("menubar.stop-server")
             }
             if case .running = model.serverState {
                 Button("Copy MCP Endpoint URL") { model.copyEndpointURL() }
+                    .accessibilityIdentifier("menubar.copy-endpoint")
             }
             Button("Open Server Log") { model.openServerLog() }
+                .accessibilityIdentifier("menubar.open-server-log")
 
             Divider()
 
@@ -44,12 +48,20 @@ struct MenuBarContent: View {
                     set: { model.setLaunchAtLogin($0) }
                 )
             )
+            .accessibilityIdentifier("menubar.launch-at-login")
             Toggle("Start MCP at Login", isOn: $model.startServerAtLogin)
+                .accessibilityIdentifier("menubar.start-server-at-login")
 
             Text(model.loginItemController.statusDescription)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("menubar.login-item-status")
+
+            if model.shouldShowLoginItemSettings {
+                Button("Open Login Item Settings") { model.openLoginItemSettings() }
+                    .accessibilityIdentifier("menubar.open-login-item-settings")
+            }
 
             if let message = model.message {
                 Text(message)
@@ -61,8 +73,10 @@ struct MenuBarContent: View {
             Divider()
             Button("Quit") { model.quit() }
                 .keyboardShortcut("q")
+                .accessibilityIdentifier("menubar.quit")
         }
         .padding(14)
         .frame(width: 280)
+        .accessibilityIdentifier("menubar.popover")
     }
 }

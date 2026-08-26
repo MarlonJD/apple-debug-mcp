@@ -37,7 +37,7 @@ The current implementation supports verified macOS and iOS Simulator fixture wor
 | Sources/AppleDebugPluginHost/ | Separate JSON-line plugin host executable with timeout/output limits and sandbox boundary | Maintainers; update only with signed host/release changes |
 | Sources/AppleDebugPluginXPCService/ | Signed App Sandbox XPC protocol fixture and third-party plugin service contract | Maintainers; update only with XPC protocol or entitlement changes |
 | Sources/AppleDebugWorkbench/ | Native SwiftUI macOS analyzer workbench with target/session, typed stop-evidence, analyzer, and read-only workflow-evidence panels | Maintainers; update with GUI panels and core API changes |
-| Sources/AppleDebugMenuBar/ | SwiftUI `MenuBarExtra`, `SMAppService.mainApp` login registration, and bundled MCP child supervisor | Maintainers; update with menu actions, startup, or child-process lifecycle changes |
+| Sources/AppleDebugMenuBar/ | SwiftUI `MenuBarExtra`, `SMAppService.mainApp` login registration, Login Items guidance, OSLog telemetry, termination cleanup, and bundled MCP child supervisor | Maintainers; update with menu actions, startup, telemetry, or child-process lifecycle changes |
 | Sources/AppleDebugCore/AppleRuntimeDiagnostics.swift | Attach-gated heap, leaks, malloc-history, and sample adapters | Maintainers; update with Apple runtime diagnostic tools |
 | Sources/AppleDebugCore/AppleReverseExecution.swift | Installed-LLDB reverse/time-travel capability report and fail-closed boundary | Maintainers; update with LLDB backend capabilities |
 | Sources/AppleDebugCore/AppleKernelCapabilities.swift | Kernel-debugging boundary report and supported user-process alternatives | Maintainers; update with SIP/KDK/entitlement boundary changes |
@@ -124,7 +124,7 @@ No backend may expose arbitrary shell execution or silently broaden a target’s
 22. `apple_plugin_host_execute` connects to an embedded signed App Sandbox XPC plugin service; `transport=profile` remains an explicit legacy diagnostic path.
 23. `apple_log_show` reads bounded host or Simulator unified logs; it never starts an unbounded stream.
 24. `apple_device_processes`, `apple_device_terminate`, `apple_device_suspend`, `apple_device_resume`, and `apple_device_signal` expose bounded CoreDevice process lifecycle; `apple_device_sysdiagnose` writes only to an explicit destination; `apple_performance_record` accepts a paired CoreDevice UUID.
-25. The menu bar app registers/unregisters its main bundle with `SMAppService.mainApp`, starts the bundled daemon child according to the persisted preference, waits for health, and stops only that owned child on Quit.
+25. The menu bar app registers/unregisters its main bundle with `SMAppService.mainApp`, opens Login Items settings when registration needs approval, starts the bundled daemon child according to the persisted preference, waits for health, and stops only that owned child on Quit or application termination.
 26. The daemon publishes/removes endpoint metadata, owns per-client MCP HTTP sessions, and closes them before the process exits.
 27. Server shutdown closes every owned LLDB-DAP adapter before the process exits.
 

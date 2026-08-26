@@ -186,6 +186,8 @@ make simulator-check
 make package
 # Workbench UI/runtime smoke is local GUI-only and requires an accessible macOS session
 make workbench-ui-smoke
+# Menu bar popover/runtime smoke is local GUI-only and exercises daemon lifecycle
+make menubar-ui-smoke
 ```
 
 `make pr-check` is the deterministic push/pull-request gate. It covers the core tests, MCP protocol smoke, registered-tool dispatch coverage, capability/toolchain probes, Mach-O/crash fixtures, the signed macOS debugger fixture, daemon session isolation, replay, plugin XPC, and cleanup. `make host-integration-check` repeats the host-only integration tier, while `make simulator-check` is an explicit manual/scheduled Simulator tier. `make physical-device-check` never runs automatically and requires explicit device IDs, a signed app, Developer Mode, and grants. `make harness-check` validates repository-owned workflow and evidence contracts. `make package` creates an unsigned relocatable macOS archive; signing and notarization are separate release-authorized steps. See the [compatibility and verification matrix](docs/product-specs/compatibility-matrix.md) for declared versus exercised baselines.
@@ -266,7 +268,7 @@ The daemon uses `127.0.0.1:49321` by default and publishes its URL, bearer token
 ~/Library/Application Support/AppleDebugMCP/endpoint.json
 ```
 
-Clients should read that file rather than guess a port. Set `APPLE_DEBUG_MCP_PORT=0` only for isolated test runs. The packaged menu bar app owns the bundled daemon, provides launch-at-login/server-at-login controls, and writes its log to the user log directory.
+Clients should read that file rather than guess a port. Set `APPLE_DEBUG_MCP_PORT=0` only for isolated test runs. The packaged menu bar app owns the bundled daemon, provides launch-at-login/server-at-login controls, opens Login Items settings when approval is needed, exposes endpoint/log/Quit actions, and writes its log to the user log directory. Its termination hook synchronously cleans up the owned daemon and endpoint metadata.
 
 ## Authorization and safe defaults
 
@@ -290,7 +292,7 @@ Memory writes are bounded to 4096 bytes per operation, expression evaluation is 
 
 ## Current verification boundary
 
-The local macOS debugger, checkpoint/source-location replay, menu bar app, iOS Simulator, legacy iOS transport, and modern CoreDevice workflows are verified against repository fixtures or explicitly authorized devices. The kernel-lab provider is verified fail-closed without a configured KDP target; an actual two-machine KDK/KDP session remains environment-dependent. CI builds and tests the unsigned macOS path; signing and notarization require a separate release workflow with Apple Developer credentials.
+The local macOS debugger, checkpoint/source-location replay, menu bar app (`make menubar-ui-smoke`), iOS Simulator, legacy iOS transport, and modern CoreDevice workflows are verified against repository fixtures or explicitly authorized devices. The kernel-lab provider is verified fail-closed without a configured KDP target; an actual two-machine KDK/KDP session remains environment-dependent. CI builds and tests the unsigned macOS path; signing and notarization require a separate release workflow with Apple Developer credentials.
 
 Apple tool availability and security policy vary by host. Physical-device support depends on the device transport, Xcode version, signing, Developer Mode, entitlements, and pairing state. The server reports those differences through `apple_capabilities` and fails closed when a required boundary is unavailable.
 

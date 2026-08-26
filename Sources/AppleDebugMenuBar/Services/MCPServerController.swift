@@ -5,6 +5,7 @@
 import AppleDebugCore
 import Darwin
 import Foundation
+import OSLog
 
 @MainActor
 final class MCPServerController {
@@ -18,7 +19,10 @@ final class MCPServerController {
 
     var onStateChange: ((State) -> Void)?
     private(set) var state: State = .stopped {
-        didSet { onStateChange?(state) }
+        didSet {
+            onStateChange?(state)
+            logger.info("MCP server state changed: \(self.state.label, privacy: .public)")
+        }
     }
 
     private var process: Process?
@@ -28,6 +32,10 @@ final class MCPServerController {
     private var readinessTask: Task<Void, Never>?
     private var pendingFailure: String?
     private(set) var endpoint: AppleDebugDaemonEndpoint?
+    private let logger = Logger(
+        subsystem: "com.burakkarahan.apple-debug-menubar",
+        category: "MCPServer"
+    )
 
     var logURL: URL {
         FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
@@ -36,9 +44,11 @@ final class MCPServerController {
 
     func start() throws {
         guard process?.isRunning != true else { return }
+        logger.info("Bundled MCP daemon start requested")
         guard let executableURL = resolveServerURL() else {
             let message = "Bundled apple-debug-mcp executable was not found."
             state = .failed(message)
+            logger.error("Bundled MCP daemon executable was not found")
             throw MCPServerControllerError.executableNotFound
         }
 
@@ -75,6 +85,7 @@ final class MCPServerController {
             try? outputHandle.close()
             try? errorHandle.close()
             state = .failed(error.localizedDescription)
+            logger.error("Bundled MCP daemon process failed to start: \(error.localizedDescription, privacy: .public)")
             throw error
         }
 
@@ -83,12 +94,14 @@ final class MCPServerController {
         self.outputHandle = outputHandle
         self.errorHandle = errorHandle
         let processID = process.processIdentifier
+        logger.info("Bundled MCP daemon process started with pid \(processID, privacy: .public)")
         readinessTask = Task { @MainActor [weak self] in
             await self?.waitForReady(processID: processID)
         }
     }
 
     func stop() {
+        logger.info("Bundled MCP daemon stop requested")
         readinessTask?.cancel()
         readinessTask = nil
         guard let process else {
@@ -115,6 +128,37 @@ final class MCPServerController {
         } else {
             handleTermination(status: process.terminationStatus)
         }
+    }
+
+    func stopImmediatelyForTermination() {
+        readinessTask?.cancel()
+        readinessTask = nil
+        inputWriter = nil
+        try? outputHandle?.close()
+        try? errorHandle?.close()
+
+        guard let process else {
+            if let endpoint {
+                AppleDebugDaemonEndpoint.removeIfOwned(pid: endpoint.pid, token: endpoint.token)
+            }
+            endpoint = nil
+            state = .stopped
+            return
+        }
+
+        process.terminationHandler = nil
+        if process.isRunning {
+            let processID = process.processIdentifier
+            process.terminate()
+            usleep(250_000)
+            if process.isRunning {
+                _ = kill(processID, SIGKILL)
+            }
+            process.waitUntilExit()
+        }
+
+        handleTermination(status: process.terminationStatus)
+        logger.info("Bundled MCP daemon stopped during app termination")
     }
 
     private func requestShutdown(_ endpoint: AppleDebugDaemonEndpoint) async {
@@ -173,6 +217,7 @@ final class MCPServerController {
 
         guard !Task.isCancelled else { return }
         pendingFailure = "MCP daemon did not publish a healthy local endpoint."
+        logger.error("Bundled MCP daemon readiness timed out")
         stop()
     }
 
@@ -207,6 +252,18 @@ final class MCPServerController {
         candidates.append(URL(fileURLWithPath: "/opt/homebrew/bin/apple-debug-mcp"))
         candidates.append(URL(fileURLWithPath: "/usr/local/bin/apple-debug-mcp"))
         return candidates.first(where: { fileManager.isExecutableFile(atPath: $0.path) })
+    }
+}
+
+private extension MCPServerController.State {
+    var label: String {
+        switch self {
+        case .stopped: return "stopped"
+        case .starting: return "starting"
+        case .running: return "running"
+        case .stopping: return "stopping"
+        case .failed: return "failed"
+        }
     }
 }
 

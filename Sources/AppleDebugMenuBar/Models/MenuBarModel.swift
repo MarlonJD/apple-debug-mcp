@@ -4,6 +4,7 @@
 
 import AppKit
 import Foundation
+import OSLog
 import SwiftUI
 
 @MainActor
@@ -18,8 +19,11 @@ final class MenuBarModel: ObservableObject {
     let serverController: MCPServerController
     let loginItemController: LoginItemController
 
+    private let logger = Logger(
+        subsystem: "com.burakkarahan.apple-debug-menubar",
+        category: "MenuBar"
+    )
     private static let startServerAtLoginKey = "startMCPServerAtLogin"
-    private var didRunStartupAction = false
 
     init() {
         let serverController = MCPServerController()
@@ -38,7 +42,7 @@ final class MenuBarModel: ObservableObject {
         if startServerAtLogin {
             startServer()
         }
-        didRunStartupAction = true
+        logger.info("Menu bar initialized with start-at-login preference: \(self.startServerAtLogin, privacy: .public)")
     }
 
     var menuBarIcon: String {
@@ -74,40 +78,60 @@ final class MenuBarModel: ObservableObject {
         }
     }
 
-    func startIfNeeded() {
-        guard !didRunStartupAction else { return }
-        didRunStartupAction = true
-        guard startServerAtLogin else { return }
-        startServer()
-    }
-
     func startServer() {
+        logger.info("MCP server start requested")
         do {
             try serverController.start()
             message = nil
         } catch {
+            logger.error("MCP server start failed: \(error.localizedDescription, privacy: .public)")
             message = error.localizedDescription
         }
     }
 
     func stopServer() {
+        logger.info("MCP server stop requested")
         serverController.stop()
         message = nil
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
+        logger.info("Launch-at-login change requested: \(enabled, privacy: .public)")
         do {
             try loginItemController.setEnabled(enabled)
             launchAtLogin = loginItemController.isEnabled
+            logger.info("Launch-at-login status: \(self.loginItemController.statusDescription, privacy: .public)")
             message = nil
         } catch {
             launchAtLogin = loginItemController.isEnabled
+            logger.error("Launch-at-login change failed: \(error.localizedDescription, privacy: .public)")
             message = error.localizedDescription
         }
     }
 
+    var shouldShowLoginItemSettings: Bool {
+        switch loginItemController.status {
+        case .requiresApproval, .notFound: return true
+        case .enabled, .notRegistered: return false
+        @unknown default: return true
+        }
+    }
+
+    func openLoginItemSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"),
+              NSWorkspace.shared.open(url) else {
+            message = "Could not open Login Items settings."
+            logger.error("Login Items settings could not be opened")
+            return
+        }
+        logger.info("Login Items settings opened")
+        message = nil
+    }
+
     func openServerLog() {
+        logger.info("Server log open requested")
         guard NSWorkspace.shared.open(serverController.logURL) else {
+            logger.error("Server log could not be opened")
             message = "Could not open the MCP server log."
             return
         }
@@ -115,8 +139,10 @@ final class MenuBarModel: ObservableObject {
     }
 
     func copyEndpointURL() {
+        logger.info("MCP endpoint copy requested")
         guard case .running(_, let url) = serverState else {
             message = "The MCP daemon endpoint is not available."
+            logger.error("MCP endpoint copy rejected because the daemon is not running")
             return
         }
         NSPasteboard.general.clearContents()
@@ -125,6 +151,7 @@ final class MenuBarModel: ObservableObject {
     }
 
     func quit() {
+        logger.info("Menu bar quit requested")
         serverController.stop()
         NSApplication.shared.terminate(nil)
     }
