@@ -183,6 +183,8 @@ make host-integration-check
 make simulator-check
 # physical-device-check is manual and requires explicit device inputs
 make package
+# Workbench UI/runtime smoke is local GUI-only and requires an accessible macOS session
+make workbench-ui-smoke
 ```
 
 `make pr-check` is the deterministic push/pull-request gate. It covers the core tests, MCP protocol smoke, registered-tool dispatch coverage, capability/toolchain probes, Mach-O/crash fixtures, the signed macOS debugger fixture, daemon session isolation, replay, plugin XPC, and cleanup. `make host-integration-check` repeats the host-only integration tier, while `make simulator-check` is an explicit manual/scheduled Simulator tier. `make physical-device-check` never runs automatically and requires explicit device IDs, a signed app, Developer Mode, and grants. `make harness-check` validates repository-owned workflow and evidence contracts. `make package` creates an unsigned relocatable macOS archive; signing and notarization are separate release-authorized steps. See the [compatibility and verification matrix](docs/product-specs/compatibility-matrix.md) for declared versus exercised baselines.
@@ -214,6 +216,7 @@ make patch-workflow-smoke
 make plugin-smoke
 make plugin-xpc-smoke
 make workbench-build-smoke
+make workbench-ui-smoke
 make reverse-capability-smoke
 ```
 

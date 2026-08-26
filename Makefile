@@ -1,4 +1,4 @@
-.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke mcp-mac-debug-workflow-smoke menubar-build-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke mcp-mac-debug-workflow-smoke menubar-build-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke workbench-ui-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -128,6 +128,9 @@ plugin-host-build-smoke:
 
 workbench-build-smoke:
 	swift build --product apple-debug-workbench
+
+workbench-ui-smoke:
+	./scripts/workbench_ui_smoke.sh
 
 reverse-capability-smoke: build
 	python3 ./scripts/reverse_capability_smoke.py
