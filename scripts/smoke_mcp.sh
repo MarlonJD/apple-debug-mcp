@@ -42,12 +42,13 @@ trap cleanup EXIT HUP INT TERM
         '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"apple_binary_inspect","arguments":{"path":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"apple_binary_diff","arguments":{"leftPath":"/bin/echo","rightPath":"/bin/echo"}}}' \
         '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"apple_crash_symbolicate","arguments":{"crashPath":"Tests/Fixtures/example.crash","artifacts":[{"imageName":"AppleDebugFixture","binaryPath":"/bin/echo","architecture":"arm64e"}]}}}'
-    sleep 15
+    sleep 45
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
 grep -q '"id":1' "$output_file"
 grep -q 'apple_capabilities' "$output_file"
 grep -q 'apple_toolchain_status' "$output_file"
+grep -q '"id":4' "$output_file"
 grep -q 'ios-device' "$output_file"
 grep -q 'lldb-dap' "$output_file"
 grep -q 'Mach-O' "$output_file"
