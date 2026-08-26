@@ -10,7 +10,7 @@ This matrix separates the environments exercised by the repository from the mini
 | Host integration | Multi-client daemon isolation/cleanup, checkpoint replay, and signed XPC plugin transport | `make host-integration-check` | macOS host with the repository fixture and signing tools; no physical-device state required | verified locally; CI/manual-capable |
 | Simulator integration | Simulator lifecycle, LLDB-DAP attach, MCP controls, XCUITest UI, Xcode build/test, environment controls, and repro bundle | `make simulator-check` | Requires an available iOS Simulator and Xcode; mutation is enabled only inside this explicit command | configured-with-boundary; manual/scheduled |
 | Physical-device integration | Modern CoreDevice and legacy iOS transport lifecycle/debug-control | `make physical-device-check` | Requires explicit device IDs, signed app, Developer Mode, matching Xcode support, and mutation/debug grants | verified-with-boundary; manual only |
-| Release | Unsigned package in CI; signed/notarized archive on an authorized Mac | `make package` / `make release-package` | Developer ID identity, notary profile, and Gatekeeper authority are external to the repository | release pending |
+| Release | Unsigned package in CI; signed/notarized archive on an authorized Mac | `make package` / `make release-package` | Developer ID identity, notary profile, and Gatekeeper authority are external to the repository; the current arm64 archive was notarized and Gatekeeper-validated locally | verified locally |
 
 ## Declared versus exercised baseline
 

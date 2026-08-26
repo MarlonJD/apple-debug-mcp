@@ -14,6 +14,5 @@ python3 ./scripts/ios_arbitrary_ui_smoke.py
 APPLE_DEBUG_ALLOW_XCODE_BUILD=1 python3 ./scripts/xcode_artifact_smoke.py
 APPLE_DEBUG_ALLOW_XCODE_BUILD=1 python3 ./scripts/xcode_test_smoke.py
 python3 ./scripts/simulator_environment_smoke.py
-python3 ./scripts/repro_bundle_smoke.py
 
-printf '%s\n' 'simulator-check: lifecycle, debugger, MCP, UI, Xcode, environment, and repro-bundle integration passed'
+printf '%s\n' 'simulator-check-core: lifecycle, debugger, MCP, UI, Xcode, and environment integration passed; repro-bundle runs in the separate simulator-repro-bundle-check target'

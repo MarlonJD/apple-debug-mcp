@@ -60,4 +60,18 @@ jobs:
         run: swift package resolve
 
       - name: Run Simulator integration tier
-        run: make simulator-check
+        run: make simulator-check-core
+
+  simulator-repro-bundle:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve Swift package
+        run: swift package resolve
+
+      - name: Run Simulator repro-bundle tier
+        run: make simulator-repro-bundle-check
