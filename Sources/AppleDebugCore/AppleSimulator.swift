@@ -266,10 +266,12 @@ public enum SimulatorService {
         process.standardOutput = FileHandle.nullDevice
         let errorPipe = Pipe()
         process.standardError = errorPipe
+        var requestedStop = false
         do {
             try process.run()
             Thread.sleep(forTimeInterval: TimeInterval(durationSeconds))
             if process.isRunning {
+                requestedStop = true
                 _ = Darwin.kill(process.processIdentifier, SIGINT)
             }
             let deadline = Date().addingTimeInterval(10)
@@ -293,21 +295,25 @@ public enum SimulatorService {
         }
         let diagnostic = String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard process.terminationStatus == 0 else {
+        let recordingSize = (try? FileManager.default.attributesOfItem(atPath: destination.path))?[.size] as? NSNumber
+        guard FileManager.default.fileExists(atPath: destination.path),
+              let recordingSize,
+              recordingSize.intValue > 0 else {
+            let status = process.terminationStatus == 0 ? "" : " (exit status \(process.terminationStatus))"
+            throw SimulatorError.commandFailed(
+                diagnostic.isEmpty
+                    ? "simctl recordVideo did not produce a non-empty video file\(status)."
+                    : "simctl recordVideo did not produce a non-empty video file\(status): \(diagnostic)"
+            )
+        }
+        // The recorder is intentionally stopped with SIGINT. Some hosted Simulator
+        // images finalize a valid movie while reporting a non-zero exit status.
+        // The finalized artifact is authoritative once the requested stop occurred.
+        guard process.terminationStatus == 0 || requestedStop else {
             throw SimulatorError.commandFailed(
                 diagnostic.isEmpty
                     ? "simctl recordVideo exited with status \(process.terminationStatus)."
                     : diagnostic
-            )
-        }
-        guard FileManager.default.fileExists(atPath: destination.path),
-              let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path),
-              let size = attributes[.size] as? NSNumber,
-              size.intValue > 0 else {
-            throw SimulatorError.commandFailed(
-                diagnostic.isEmpty
-                    ? "simctl recordVideo did not produce a non-empty video file."
-                    : "simctl recordVideo did not produce a non-empty video file: \(diagnostic)"
             )
         }
         return SimulatorRecordingResult(
