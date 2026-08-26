@@ -41,7 +41,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-26 09:45Z) Add all-registered-tool dispatch coverage, real daemon debugger-session isolation/owned-debuggee cleanup smoke, deterministic/host/Simulator/physical verification tiers, scheduled/manual CI routing, and the compatibility/SDK baseline matrix.
 - [x] (2026-08-26 15:12Z) Split the MCP catalog into schema, support, router, and domain dispatch files; add representative domain success/error contract coverage; verify the refactor with `make check`, `make harness-check`, and `git diff --check`.
 - [x] (2026-08-26 15:38Z) Repair CI SwiftPM manifest parsing by moving the tools-version marker to the first line; add the cross-domain MCP behavior matrix and verify foundation, artifact, debugger lifecycle, performance, Simulator, device, and Xcode dispatch contracts locally.
-- [ ] (2026-08-26 15:45Z) Lower the manifest tools-version floor to 5.10 after hosted macOS-14 reported Swift tools 5.10; rerun the full local harness and confirm the new CI run reaches package resolution.
+- [ ] (2026-08-26 15:45Z) Lower the manifest tools-version floor to 5.10 after hosted macOS-14 reported Swift tools 5.10; pin Swift NIO to its latest 5.10-compatible release; rerun the full local harness and confirm the new CI run reaches package resolution.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.

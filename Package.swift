@@ -44,7 +44,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio.git",
-            from: "2.101.3"
+            "2.86.2" ..< "2.87.0"
         )
     ],
     targets: [
