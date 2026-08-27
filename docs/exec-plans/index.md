@@ -7,7 +7,7 @@ The files under active/ and completed/ are authoritative. Keep this index synchr
 | Plan | Owner | State | Updated (UTC) | Current milestone or blocker |
 | --- | --- | --- | --- | --- |
 <!-- harness:plans:active:start -->
-| [Establish the Apple Debug MCP foundation](active/apple-debug-mcp-foundation.md) | Apple Debug MCP maintainers | implementing | 2026-08-27 | Foundation release published; direct iPhone 17 CoreDevice evidence revalidated, with a later combined-wrapper retry recorded as locked-device fail-closed |
+| [Establish the Apple Debug MCP foundation](active/apple-debug-mcp-foundation.md) | Apple Debug MCP maintainers | implementing | 2026-08-27 | Foundation release published; complete unlocked-device iPhone 17 CoreDevice wrapper passed, with the earlier locked-device retry retained as fail-closed evidence |
 <!-- harness:plans:active:end -->
 
 ## Completed
