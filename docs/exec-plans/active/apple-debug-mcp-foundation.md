@@ -110,6 +110,7 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-25 02:10Z) Add xctrace timeline points, trace-to-trace semantic/hotspot diffs, CFG annotated pseudo-code, and native workbench graph/timeline/diff panels.
 - [x] (2026-08-25 02:15Z) Add bounded multi-file Swift AST inspection and Xcode project/scheme target context with SDK and target-triple resolution.
 - [x] (2026-08-25 02:20Z) Replace production plugin execution transport with an independently signed App Sandbox XPC plugin protocol; retain sandbox-exec only as explicit legacy diagnostics and verify a signed XPC fixture.
+- [x] (2026-08-27 15:06Z) Add the AWS Agent Toolkit-style repo marketplace `Apple Debug` Codex plugin with a bundled MCP manifest, workflow skill, executable launcher, package/release staging, plugin smoke, and installation documentation.
 
 ## Surprises & Discoveries
 
@@ -120,6 +121,8 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - CoreDevice inventory can report a paired device with a disconnected tunnel until a read-only `devicectl device info lockState` probe acquires the tunnel; the adapter refreshes that state before authorization decisions and remains fail-closed when the probe fails.
 - The connected iPhone 17 (CoreDevice UUID `02329A9F-84C9-5499-9EBF-074EFCB45F7C`, iOS 27 beta) is verified through CoreDevice install, deterministic terminate-existing launch, PID discovery, custom LLDB-DAP `device process attach --pid` attach, source breakpoint/control, memory rollback, and cleanup. The connected iPod touch 7 (iOS 15.8.8) remains covered by the separate legacy `ios-deploy` transport.
 - Codex CLI and Claude Code do not expose one shared `mcp install` command; their supported local registration commands are client-specific `mcp add` forms. The repository helper wraps those forms, defaults to the bundled stdio executable, preserves existing same-named entries, and never grants mutation authority.
+- The AWS Agent Toolkit plugin layout maps cleanly to this project: the repo marketplace points at `plugins/apple-debug`, the plugin carries `.codex-plugin/plugin.json`, `skills/`, and `.mcp.json`, and the local MCP executable remains the implementation behind that package.
+- A native Apple MCP executable cannot be assumed to exist in a source checkout or Git-backed marketplace clone, so the plugin launcher supports a staged release binary, an explicit executable path, local SwiftPM builds, and the signed application bundles. `make package` and `make release-package` stage the executable into the plugin archive without changing the standalone MCP release.
 - The 2026-08-27 iPhone 17 refresh reproduced the complete direct modern-device evidence after tunnel acquisition: signed fixture build, lifecycle, LLDB-DAP inspection/control, memory patch/rollback, and cleanup all passed. The later wrapper retry encountered the phone's automatic lock before launch and remained fail-closed, which is a device-state limitation rather than a transport authorization bypass.
 - The subsequent unlocked-device rerun completed the full `make physical-device-check` wrapper, confirming that the earlier locked-device result was transient device state rather than a product or transport failure.
 - CoreDevice LLDB-DAP can return from its attach command before the process is stopped and can emit the initial SIGSTOP after the attach response; the adapter pauses, waits for the initial stop, drains stale events, and bounds adapter shutdown so subsequent breakpoint waits observe only new stops.
@@ -171,14 +174,24 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - Decision: Register Codex CLI and Claude Code against the embedded stdio daemon by default, with the menu bar HTTP supervisor remaining optional.
   Rationale: A stable executable path avoids exposing the daemon's dynamic bearer token to client setup, keeps client startup self-contained, and preserves the menu bar's separate status/login/shutdown role.
   Date/Author: 2026-08-27 / Apple Debug MCP maintainers
+- Decision: Adopt an AWS Agent Toolkit-style repo marketplace plugin named `apple-debug` while keeping `apple-debug-mcp` as the repository and canonical MCP server name.
+  Rationale: The plugin bundles workflow guidance and MCP wiring for Codex without hiding the standalone MCP surface or coupling the Apple debugging core to a client-specific package.
+  Date/Author: 2026-08-27 / Apple Debug MCP maintainers
+- Decision: Keep the plugin MCP transport local stdio and ship the release-built executable inside package/release plugin archives.
+  Rationale: Apple target access, codesigning, Developer Mode, and debugger state must remain on the authorized Mac; a remote public endpoint would violate the existing loopback-only security boundary.
+  Date/Author: 2026-08-27 / Apple Debug MCP maintainers
 
 ## Outcomes & Retrospective
 
 The macOS, checkpoint replay, iOS Simulator, physical-device, Workbench, and menu bar product paths are locally verified with repository fixtures or explicitly authorized devices. The MCP server exposes analysis and debugger tools through typed schemas, bounds Apple-tool/DAP input and output, gives each MCP server instance isolated debugger ownership, cleans up owned LLDB-DAP, CoreDevice, legacy `ios-deploy`, kernel-lab, and menu-supervised child processes, and fails closed for unauthorized mutation. The authenticated daemon checkpoint is verified through health authorization, bearer rejection, MCP initialize/session routing, all-registered-tool dispatch coverage, per-client debugger isolation, bounded concurrent-session rejection, DELETE cleanup, graceful shutdown, and endpoint-file removal. Hosted workflow run `33028167208` passes deterministic macOS/package, host integration, Simulator core, and isolated repro-bundle jobs on the same source commit. The current iPhone 17 refresh passes the complete `make physical-device-check` wrapper, including CoreDevice lifecycle, install, PID discovery, LLDB-DAP attach, inspection, control, memory rollback, and cleanup; an earlier retry correctly failed closed when the phone auto-locked before launch. The server now also publishes server-wide MCP use guidance and future archives include a safe Codex/Claude Code stdio registration helper; the published `v0.1.0` archive predates that helper. The physical iOS 15 fixture remains verified through its separate legacy debugserver path. The kernel-lab connection itself remains unverified without a configured two-machine KDK target. GitHub Release `v0.1.0` is published with an arm64 archive whose Developer ID signatures, notarization staples, Gatekeeper acceptance, and SHA-256 digest were read back after publication. Compatibility evidence is tiered separately: the artifact declares macOS 13, but runtime and toolchain behavior is verified only on macOS 26.5.2 with Xcode 26.6/Swift 6.3.3.
 
+The Codex plugin checkpoint is independently verified through the official plugin validator, a source-checkout launcher override, a packaged release executable, and a real MCP initialize response. The plugin is intentionally a local distribution layer: it carries the workflow skill and MCP configuration, while Apple debugger permissions and the standalone server's policy gates remain unchanged.
+
 ## Context and Orientation
 
 The repository contains `AppleDebugCore` and `AppleDebugMCP`. The core owns capability policy, DAP framing/session lifecycle, debugger policy, Mach-O/crash/symbolication analyzers, Simulator/CoreDevice/Xcode/log adapters, and their tests. The executable owns MCP tool schemas and dispatch. Product scope is in `docs/product-specs/platform-scope.md`; security and reliability boundaries are in `docs/SECURITY.md` and `docs/RELIABILITY.md`.
+
+The repository also contains a repo-marketplace Codex plugin under `plugins/apple-debug/`. It packages workflow instructions and MCP wiring but does not replace the `AppleDebugMCP` executable or its authorization policy.
 
 ## Plan of Work
 
@@ -217,6 +230,7 @@ The current verified checkpoint requires:
 - modern CoreDevice evidence covers paired/tunnel refresh, install, deterministic launch/PID discovery, LLDB-DAP attach, inspection/control, rollback, and cleanup;
 - modern CoreDevice lifecycle evidence covers process inventory, resume/suspend, termination, and physical xctrace capture;
 - menu bar evidence covers a real `.app` bundle, bundled daemon child startup/health, package contents, login-at-startup controls, log action, endpoint status, and Quit action;
+- Codex plugin evidence covers a valid repo marketplace, plugin manifest, skill frontmatter, `.mcp.json`, source launcher, staged executable, and real stdio MCP initialize response;
 - authorized legacy physical-device evidence covers `ios-deploy` debugserver ownership and MCP LLDB-DAP inspection;
 - authorized legacy physical-device control evidence covers breakpoint hit, stepping, pause/continue, evaluation, and memory patch/rollback;
 - no unresolved harness placeholders remain;
@@ -253,4 +267,5 @@ The MCP server uses `MCP.Server`, `MCP.StdioTransport`, `MCP.StatefulHTTPServerT
 - 2026-08-27: Revalidated the paired iPhone 17 CoreDevice tunnel, signed fixture, lifecycle, remote LLDB-DAP control, memory rollback, and cleanup through the direct physical-device smokes; recorded a later combined-wrapper auto-lock failure as fail-closed before launch.
 - 2026-08-27: Re-ran the complete unlocked-device `make physical-device-check` wrapper for iPhone 17; lifecycle, LLDB-DAP control, rollback, and cleanup passed.
 - 2026-08-27: Added server-wide MCP routing instructions, Codex/Claude Code stdio registration helper coverage, and archive packaging for the helper; the published `v0.1.0` artifact remains unchanged.
+- 2026-08-27: Added the AWS Agent Toolkit-style repo marketplace and `apple-debug` Codex plugin with bundled MCP wiring, skill routing, executable fallback launcher, package/release staging, and plugin smoke verification.
 - 2026-08-24: Added symbolication, crash analysis, unified logs, Simulator screenshot capture, richer debugger control, and bounded mutation gates.

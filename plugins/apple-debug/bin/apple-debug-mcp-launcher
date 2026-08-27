@@ -1,0 +1,47 @@
+#!/bin/sh
+
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+run_candidate() {
+    candidate=$1
+    shift
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+        exec "$candidate" "$@"
+    fi
+}
+
+configured_executable=${APPLE_DEBUG_MCP_EXECUTABLE:-}
+if [ -n "$configured_executable" ]; then
+    case "$configured_executable" in
+        /*) run_candidate "$configured_executable" "$@" ;;
+        *)
+            printf '%s\n' 'apple-debug: APPLE_DEBUG_MCP_EXECUTABLE must be an absolute executable path' >&2
+            exit 1
+            ;;
+    esac
+fi
+
+# Release plugin archives place the signed MCP executable beside this launcher.
+run_candidate "$script_dir/apple-debug-mcp-bin" "$@"
+
+# A developer checkout can use either build configuration directly.
+repository_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
+run_candidate "$repository_root/.build/release/apple-debug-mcp" "$@"
+run_candidate "$repository_root/.build/debug/apple-debug-mcp" "$@"
+
+# End users who installed one of the notarized application bundles can reuse
+# its embedded stdio executable without registering a second MCP server.
+run_candidate "/Applications/AppleDebugMCP.app/Contents/MacOS/apple-debug-mcp" "$@"
+run_candidate "/Applications/AppleDebugMenuBar.app/Contents/Resources/apple-debug-mcp" "$@"
+
+user_name=$(/usr/bin/id -un)
+user_home=$(/usr/bin/dscl . -read "/Users/$user_name" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}' || true)
+if [ -n "$user_home" ]; then
+    run_candidate "$user_home/Applications/AppleDebugMCP.app/Contents/MacOS/apple-debug-mcp" "$@"
+    run_candidate "$user_home/Applications/AppleDebugMenuBar.app/Contents/Resources/apple-debug-mcp" "$@"
+fi
+
+printf '%s\n' 'apple-debug: no MCP executable found. Build the repository, install AppleDebugMCP.app or AppleDebugMenuBar.app, or set APPLE_DEBUG_MCP_EXECUTABLE to an absolute path.' >&2
+exit 1

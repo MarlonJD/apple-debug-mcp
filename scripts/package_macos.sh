@@ -25,6 +25,7 @@ cp .build/release/apple-debug-mcp "$package_directory/apple-debug-mcp"
 cp .build/release/apple-debug-plugin-host "$package_directory/apple-debug-plugin-host"
 cp scripts/install_mcp.sh "$package_directory/install_mcp.sh"
 cp LICENSE README.md ARCHITECTURE.md "$package_directory/"
+./scripts/stage_codex_plugin.sh "$package_directory" "$root/.build/release/apple-debug-mcp"
 
 menu_bar_app="$package_directory/AppleDebugMenuBar.app"
 mkdir -p "$menu_bar_app/Contents/MacOS" "$menu_bar_app/Contents/Resources"

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "apple-debug": {
+      "command": "./bin/apple-debug-mcp-launcher",
+      "args": [],
+      "cwd": ".",
+      "env_vars": [
+        "APPLE_DEBUG_MCP_EXECUTABLE"
+      ]
+    }
+  }
+}

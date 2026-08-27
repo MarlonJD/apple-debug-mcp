@@ -27,6 +27,28 @@ claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
 
 Archives produced from the current repository also include `install_mcp.sh`; after moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory. Verify with `codex mcp list` or `claude mcp list`. The published `v0.1.0` archive predates this helper, but the direct commands above work with it. See [detailed release installation](docs/RELEASE.md#end-user-mcp-installation) for MenuBar supervisor and endpoint details.
 
+## Codex plugin installation
+
+The repository follows the AWS Agent Toolkit-style marketplace layout: `plugins/apple-debug` contains the plugin manifest, a focused `skills/` directory, and an `.mcp.json` that wires the plugin to Apple Debug MCP.
+
+> **Installing the Apple Debug plugin also installs the Apple Debug MCP integration.** This is a combined plugin, not a skill-only package: the plugin includes the MCP server configuration and its launcher, and release archives include the MCP executable inside the plugin package. Users do not need to run `codex mcp add` separately.
+
+From a GitHub checkout, add the repository marketplace once:
+
+```sh
+codex plugin marketplace add MarlonJD/apple-debug-mcp
+```
+
+Launch Codex, run `/plugins`, and install **Apple Debug**. Start a new session after installation so Codex loads the bundled skill and MCP definition. From an archive produced by the current repository, add the extracted `apple-debug-mcp` (unsigned) or `apple-debug-mcp-release` (signed) directory as the marketplace root instead:
+
+```sh
+codex plugin marketplace add /absolute/path/to/apple-debug-mcp
+```
+
+Archives produced by the current repository carry the MCP executable inside the plugin package; the published `v0.1.0` archive predates this plugin. A source checkout can use the same plugin after `swift build`, an installed `AppleDebugMCP.app`/`AppleDebugMenuBar.app`, or an explicit `APPLE_DEBUG_MCP_EXECUTABLE` path. The plugin starts stdio MCP on demand; it does not enable debugger, evaluation, memory-write, Simulator-mutation, device-mutation, or external-plugin grants. macOS, Xcode, signing, pairing, and Developer Mode requirements still apply to the selected workflow.
+
+After installation, ask Codex to use **Apple Debug** or start a task that needs Apple runtime inspection. Codex starts the bundled/local MCP process on demand, then discovers the typed Apple Debug tools. If the plugin was installed from the GitHub source marketplace rather than a release archive, install or build the local Mac executable first; the plugin still supplies the MCP wiring and skill.
+
 ## Why does this project exist?
 
 Apple debugging is powerful, but its useful evidence is spread across many tools and stateful workflows. An AI agent that only has a terminal often has to parse ad-hoc text, reconstruct debugger state from separate commands, guess which Apple capability is available, and clean up processes or Simulators itself.
@@ -223,6 +245,7 @@ The repository also includes focused smoke workflows:
 make fixture
 make mcp-mac-debug-workflow-smoke
 make mcp-install-smoke
+make codex-plugin-smoke
 make replay-smoke
 make ios-fixture
 make ios-fixture-smoke

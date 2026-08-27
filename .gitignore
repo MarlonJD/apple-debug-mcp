@@ -10,6 +10,7 @@ __pycache__/
 # Local MCP/client configuration
 .codex/
 .mcp.json
+!plugins/apple-debug/.mcp.json
 
 # Debug artefacts
 *.dSYM/

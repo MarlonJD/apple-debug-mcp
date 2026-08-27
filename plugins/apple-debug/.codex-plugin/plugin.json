@@ -1,0 +1,43 @@
+{
+  "name": "apple-debug",
+  "version": "0.1.0",
+  "description": "Debug authorized macOS and iOS targets with Apple Debug MCP.",
+  "author": {
+    "name": "Burak Karahan",
+    "url": "https://github.com/MarlonJD"
+  },
+  "homepage": "https://github.com/MarlonJD/apple-debug-mcp",
+  "repository": "https://github.com/MarlonJD/apple-debug-mcp",
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "apple",
+    "debugging",
+    "lldb",
+    "xcode",
+    "macos",
+    "ios",
+    "simulator",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Apple Debug",
+    "shortDescription": "Debug authorized Apple targets with Codex",
+    "longDescription": "Apple Debug bundles the Apple Debug MCP server and a focused workflow skill for inspecting authorized macOS processes, iOS Simulator targets, development-authorized iOS apps, Apple artifacts, performance traces, and reproducible evidence.",
+    "developerName": "Burak Karahan",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Debug",
+      "Analyze",
+      "Performance",
+      "Simulator"
+    ],
+    "defaultPrompt": [
+      "Inspect this authorized macOS process with Apple Debug",
+      "Triage this Apple crash report and matching dSYM",
+      "Investigate this iOS Simulator regression with evidence"
+    ],
+    "brandColor": "#0F172A"
+  }
+}

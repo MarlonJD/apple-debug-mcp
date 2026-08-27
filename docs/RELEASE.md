@@ -31,6 +31,20 @@ The helper registers stdio and does not enable any mutation grant. The menu bar 
 
 Codex CLI and Claude Code use their own `mcp add` commands rather than a shared `mcp install` command. See the [Codex MCP documentation](https://developers.openai.com/codex/mcp) and [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for client-side configuration options.
 
+## Codex plugin distribution
+
+The repository includes an AWS Agent Toolkit-style repo marketplace at `.agents/plugins/marketplace.json` and the `Apple Debug` plugin under `plugins/apple-debug/`. The plugin manifest, skill, and `.mcp.json` are source-controlled; the packaging scripts add the release-built MCP executable as `plugins/apple-debug/bin/apple-debug-mcp-bin` so the plugin can start the local server without a separate `codex mcp add` registration.
+
+For a source checkout, add the repository as a Codex marketplace and install `Apple Debug` from `/plugins`:
+
+```sh
+codex plugin marketplace add /absolute/path/to/apple-debug-mcp
+```
+
+For an archive produced by the current repository, use the extracted `apple-debug-mcp` (unsigned) or `apple-debug-mcp-release` (signed) directory as the marketplace root. The published `v0.1.0` archive predates this plugin. Start a new Codex session after installation. The plugin launcher prefers its packaged executable and then falls back to an explicit `APPLE_DEBUG_MCP_EXECUTABLE`, a local SwiftPM build, or the signed application bundles. It only starts the stdio MCP process; the menu-bar daemon remains an optional supervisor.
+
+`make package` includes the plugin with the unsigned release-build executable. `make release-package` signs the plugin executable and includes the plugin directory in the notarization submission and final archive. Public plugin publication is a separate product decision: this repository intentionally keeps Apple target access local and loopback-only.
+
 Before release, run `make menubar-ui-smoke` in an accessible local GUI session and `make release-package`. The release script verifies the Developer ID signature before submission and runs `codesign --verify`, `stapler validate`, and `spctl --assess` after Apple accepts the submission. Release credentials, Apple account authorization, and external notarization are intentionally not part of ordinary `make check` or pull-request CI.
 
 ## Published release

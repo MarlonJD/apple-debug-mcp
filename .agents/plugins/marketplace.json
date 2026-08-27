@@ -1,0 +1,20 @@
+{
+  "name": "apple-debug-mcp",
+  "interface": {
+    "displayName": "Apple Debug"
+  },
+  "plugins": [
+    {
+      "name": "apple-debug",
+      "source": {
+        "source": "local",
+        "path": "./plugins/apple-debug"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
