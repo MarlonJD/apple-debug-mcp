@@ -6,7 +6,7 @@ cd "$root"
 
 identity=${CODESIGN_IDENTITY:-}
 notary_profile=${NOTARY_PROFILE:-general-notary}
-version=${RELEASE_VERSION:-0.1.0}
+version=${RELEASE_VERSION:-0.2.0}
 plugin_xpc_bundle=${PLUGIN_XPC_BUNDLE:-}
 architecture=$(uname -m)
 output_path=${1:-"$root/dist/apple-debug-mcp-macos-$architecture-notarized.zip"}

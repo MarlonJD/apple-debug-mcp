@@ -18,5 +18,10 @@ Use this page to find the authoritative source for repository knowledge.
 ## Additional collections
 
 - [design-docs/](design-docs/) — durable engineering decisions.
+- [examples.md](examples.md) — reader-facing examples, “what changes,” use cases, and evidence paths.
+- [demos/](demos/) — runnable MCP-vs-manual debugging case studies and model comparison contracts.
+- [exec-plans/active/post-fix-verification-symbolication.md](exec-plans/active/post-fix-verification-symbolication.md) — active adaptive verification and crash symbolication contract, evidence, and verification record.
+- `make adaptive-verification-test` — deterministic fake-clock verification state-machine checks.
+- `make symbolication-crash-smoke` — real object → macOS binary → dSYM plus bounded text/.ips identity/source-line evidence.
 - [generated/](generated/) — machine-produced material; currently no generated artifacts.
 - [references/](references/) — stable upstream constraints needed by agents.

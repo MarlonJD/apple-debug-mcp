@@ -303,14 +303,17 @@ extension ToolCatalog {
             ]),
             "artifacts": .object([
                 "type": .string("array"),
-                "description": .string("Up to 32 image-to-binary/dSYM mappings"),
+                "description": .string("Up to 32 explicit executable/app or dSYM providers; one exact dSYM may provide image identity when no executable is supplied"),
                 "items": .object([
                     "type": .string("object"),
                     "properties": .object([
                         "imageName": .object(["type": .string("string")]),
                         "binaryPath": .object(["type": .string("string")]),
                         "architecture": .object(["type": .string("string")]),
-                        "loadAddress": .object(["type": .string("string")])
+                        "dSYMPath": .object([
+                            "type": .string("string"),
+                            "description": .string("Optional explicit absolute dSYM provider paired with this executable")
+                        ])
                     ]),
                     "required": .array([
                         .string("binaryPath"),

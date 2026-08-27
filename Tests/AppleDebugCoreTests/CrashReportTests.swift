@@ -67,7 +67,7 @@ final class CrashReportTests: XCTestCase {
         XCTAssertEqual(report.images.first?.uuid, "ABC")
     }
 
-    func testSymbolicatesCrashFramesAgainstNamedArtifact() throws {
+    func testCrashFramesDoNotUseNameOnlyArtifactFallback() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -86,8 +86,9 @@ final class CrashReportTests: XCTestCase {
 
         XCTAssertEqual(report.crash.format, "crash")
         XCTAssertEqual(report.frames.count, 3)
-        XCTAssertEqual(report.unmatchedFrameCount, 0)
-        XCTAssertTrue(report.frames.allSatisfy { $0.artifactPath == "/bin/echo" })
+        XCTAssertEqual(report.unmatchedFrameCount, 3)
+        XCTAssertTrue(report.frames.allSatisfy { $0.artifactPath == nil })
+        XCTAssertTrue(report.frames.allSatisfy { $0.status == .missingImageIdentity })
     }
 
     func testCrashSymbolicationRequiresAtLeastOneArtifact() {
@@ -102,5 +103,44 @@ final class CrashReportTests: XCTestCase {
                 .invalidRequest("Crash symbolication requires between 1 and 32 artifacts.")
             )
         }
+    }
+
+    func testTextCrashLimitsConstructedImagesThreadsAndFrames() throws {
+        var lines = [
+            "Process: Fixture [1]",
+            "Triggered by Thread: 0",
+            "",
+        ]
+        for thread in 0..<130 {
+            lines.append("Thread \(thread):")
+            for frame in 0..<20 {
+                lines.append("\(frame) Fixture 0x100000001 function_\(frame)")
+            }
+            lines.append("")
+        }
+        lines.append("Binary Images:")
+        for image in 0..<300 {
+            let base = 0x100000000 + image * 0x1000
+            let end = base + 0x800
+            let uuid = String(format: "%032x", image + 1)
+            lines.append(
+                String(format: "0x%llx - 0x%llx Fixture arm64 <%@> /tmp/Fixture-%d", base, end, uuid, image)
+            )
+        }
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apple-debug-mcp-bounded-crash-\(UUID().uuidString).crash")
+        try lines.joined(separator: "\n").write(to: path, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: path) }
+
+        let report = try CrashReportAnalyzer.inspect(path: path.path)
+
+        XCTAssertEqual(report.observedImageCount, 300)
+        XCTAssertEqual(report.images.count, 256)
+        XCTAssertEqual(report.observedThreadCount, 130)
+        XCTAssertEqual(report.threads.count, 128)
+        XCTAssertEqual(report.observedFrameCount, 2_600)
+        XCTAssertEqual(report.observedFrameCount, report.threads.reduce(0) { $0 + $1.frames.count } + 552)
+        XCTAssertTrue(report.truncated)
+        XCTAssertLessThanOrEqual(report.threads.reduce(0) { $0 + $1.frames.count }, 2_048)
     }
 }

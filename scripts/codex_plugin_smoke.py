@@ -54,8 +54,8 @@ def main() -> None:
     manifest = read_json(MANIFEST)
     if manifest.get("name") != "apple-debug":
         fail("plugin manifest name is not apple-debug")
-    if manifest.get("version") != "0.1.1":
-        fail("Codex plugin manifest version is not 0.1.1")
+    if manifest.get("version") != "0.2.0":
+        fail("Codex plugin manifest version is not 0.2.0")
     if manifest.get("skills") != "./skills/":
         fail("plugin manifest does not point at ./skills/")
     if manifest.get("mcpServers") != "./.mcp.json":
@@ -64,8 +64,8 @@ def main() -> None:
     claude_manifest = read_json(CLAUDE_MANIFEST)
     if claude_manifest.get("name") != "apple-debug":
         fail("Claude Code plugin manifest name is not apple-debug")
-    if claude_manifest.get("version") != "0.1.1":
-        fail("Claude Code plugin manifest version is not 0.1.1")
+    if claude_manifest.get("version") != "0.2.0":
+        fail("Claude Code plugin manifest version is not 0.2.0")
 
     mcp_manifest = read_json(MCP_MANIFEST)
     servers = mcp_manifest.get("mcpServers")

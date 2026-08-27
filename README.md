@@ -25,7 +25,7 @@ codex mcp add apple-debug-mcp -- "$MCP_SERVER"
 claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
 ```
 
-Archives produced from the current repository also include `install_mcp.sh`; after moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory. Verify with `codex mcp list` or `claude mcp list`. The published `v0.1.0` archive predates this helper, but the direct commands above work with it. See [detailed release installation](docs/RELEASE.md#end-user-mcp-installation) for MenuBar supervisor and endpoint details.
+Archives produced from the current repository also include `install_mcp.sh`; after moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory. Verify with `codex mcp list` or `claude mcp list`. The current `v0.2.0` archive includes this helper; the older `v0.1.0` archive predates it, but the direct commands above work with that release. See [detailed release installation](docs/RELEASE.md#end-user-mcp-installation) for MenuBar supervisor and endpoint details.
 
 ## Apple Debug plugin installation
 
@@ -55,7 +55,7 @@ For Claude Code, run these commands inside a Claude Code session:
 
 Claude Code starts the plugin-provided MCP server automatically when the plugin is enabled; use `/mcp` to confirm that Apple Debug tools are available. Codex and Claude Code both use the same shared skill and local stdio MCP definition.
 
-Archives produced by the current repository carry the MCP executable inside the plugin package; the published `v0.1.0` archive predates this plugin. A GitHub source marketplace checkout supplies the plugin configuration and launcher, so install the signed Apple Debug app, build the local executable, or provide `APPLE_DEBUG_MCP_EXECUTABLE` before using it. The plugin does not enable debugger, evaluation, memory-write, Simulator-mutation, device-mutation, or external-plugin grants. macOS, Xcode, signing, pairing, and Developer Mode requirements still apply to the selected workflow.
+Archives produced by the current repository carry the MCP executable inside the plugin package; the current `v0.2.0` archive includes this plugin, while the published `v0.1.0` archive predates it. A GitHub source marketplace checkout supplies the plugin configuration and launcher, so install the signed Apple Debug app, build the local executable, or provide `APPLE_DEBUG_MCP_EXECUTABLE` before using it. The plugin does not enable debugger, evaluation, memory-write, Simulator-mutation, device-mutation, or external-plugin grants. macOS, Xcode, signing, pairing, and Developer Mode requirements still apply to the selected workflow.
 
 ## Why does this project exist?
 
@@ -159,6 +159,24 @@ Work with paired, development-authorized devices using CoreDevice or the legacy 
 ### Release and patch preparation
 
 Audit signing and entitlements, compare binaries or bundles, preview patch payloads, and generate a re-sign plan for review. The server does not silently overwrite or sign release artifacts.
+
+## Complex MCP-vs-manual casebook
+
+The repository also contains runnable cases that show a complete investigation,
+repair, and verification loop rather than a single debugger command:
+
+- `make complex-debug-casebook` diagnoses a deterministic length-boundary bug through LLDB and MCP, checks the no-grant policy path, and proves the fixed binary.
+- `make complex-deadlock-casebook` inspects a deterministic two-thread lock-order deadlock with native LLDB and MCP all-thread evidence, then proves the fixed lock order.
+- `make visual-regression-casebook` builds buggy/fixed SwiftUI variants, reproduces an accessibility-size clipping bug in Simulator, and compares direct screenshots with MCP UI geometry and a repro bundle.
+- `make complex-casebook` runs the runtime, deadlock, and visual lanes sequentially.
+
+The visual lane is intentionally outside `make check`: it needs an available
+Simulator and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1`. The casebook records
+elapsed time, command/tool scope, typed evidence, cleanup, and repair oracles;
+it does not claim MCP is faster when the MCP lane produces more analysis.
+See [Examples & evidence](docs/examples.md), [the detailed complex casebook](docs/demos/complex-casebook.md), and the
+[Sol/Luna comparison contract](docs/demos/model-comparison.md) for the full
+scenarios and the `gpt-5.6-sol`/`xhigh` versus `gpt-5.6-luna`/`max` matrix.
 
 ## What should you expect?
 

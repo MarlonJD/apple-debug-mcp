@@ -1,6 +1,6 @@
 {
   "name": "apple-debug",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Debug authorized macOS and iOS targets with Apple Debug MCP.",
   "author": {
     "name": "Burak Karahan"

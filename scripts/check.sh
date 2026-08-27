@@ -3,6 +3,7 @@ set -eu
 
 swift build
 swift test
+PYTHONPATH=./scripts python3 -m unittest discover -s scripts -p 'test_adaptive_verification.py'
 ./scripts/build_debug_fixture.sh >/dev/null
 ./scripts/smoke_mcp.sh
 ./scripts/mcp_install_smoke.sh

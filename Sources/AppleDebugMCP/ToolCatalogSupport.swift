@@ -61,7 +61,7 @@ extension ToolCatalog {
                     imageName: object["imageName"]?.stringValue,
                     binaryPath: binaryPath,
                     architecture: architecture,
-                    loadAddress: object["loadAddress"]?.stringValue
+                    dSYMPath: object["dSYMPath"]?.stringValue
                 )
             )
         }

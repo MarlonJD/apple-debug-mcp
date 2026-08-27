@@ -1,4 +1,4 @@
-.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check simulator-check-core simulator-repro-bundle-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke mcp-mac-debug-workflow-smoke mcp-install-smoke codex-plugin-smoke menubar-build-smoke menubar-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke workbench-ui-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture replay-smoke adaptive-verification-test symbolication-crash-smoke pr-check host-integration-check simulator-check simulator-check-core simulator-repro-bundle-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke mcp-mac-debug-workflow-smoke mcp-install-smoke codex-plugin-smoke menubar-build-smoke menubar-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke workbench-ui-smoke reverse-capability-smoke complex-debug-casebook complex-deadlock-casebook visual-regression-casebook complex-casebook package release-package check harness-check clean
 
 build:
 	swift build
@@ -27,6 +27,12 @@ fixture:
 
 replay-smoke: build fixture
 	python3 ./scripts/replay_smoke.py
+
+adaptive-verification-test:
+	PYTHONPATH=./scripts python3 -m unittest discover -s scripts -p 'test_adaptive_verification.py'
+
+symbolication-crash-smoke: build
+	python3 ./scripts/symbolication_crash_smoke.py
 
 ios-fixture:
 	./scripts/build_ios_fixture.sh
@@ -148,6 +154,17 @@ workbench-ui-smoke:
 
 reverse-capability-smoke: build
 	python3 ./scripts/reverse_capability_smoke.py
+
+complex-debug-casebook: build
+	python3 ./scripts/complex_debug_casebook.py
+
+complex-deadlock-casebook: build
+	python3 ./scripts/deadlock_casebook.py
+
+visual-regression-casebook: build
+	APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1 python3 ./scripts/visual_regression_casebook.py
+
+complex-casebook: complex-debug-casebook complex-deadlock-casebook visual-regression-casebook
 
 package:
 	./scripts/package_macos.sh

@@ -25,7 +25,7 @@ codex mcp add apple-debug-mcp -- "$MCP_SERVER"
 claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
 ```
 
-Archives produced after the client-integration change include `install_mcp.sh` at their top level. After moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory; it detects installed Codex/Claude CLIs, registers only the clients it finds, and leaves existing same-named entries unchanged. The published `v0.1.0` archive predates this helper, but the direct commands work with it.
+Archives produced after the client-integration change include `install_mcp.sh` at their top level. After moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory; it detects installed Codex/Claude CLIs, registers only the clients it finds, and leaves existing same-named entries unchanged. The current `v0.2.0` archive includes this helper; the older `v0.1.0` archive predates it, but the direct commands work with that release.
 
 The helper registers stdio and does not enable any mutation grant. The menu bar supervisor and stdio client registration are separate modes: use the supervisor for login/status/log/shutdown control, and use the stdio registration for a client-managed local MCP process. A client using the menu bar daemon directly must read the user-private endpoint metadata and bearer token; the endpoint is loopback-only and is not an internet or LAN service.
 
@@ -41,7 +41,7 @@ For a source checkout, add the repository as a Codex marketplace and install `Ap
 codex plugin marketplace add /absolute/path/to/apple-debug-mcp
 ```
 
-For an archive produced by the current repository, use the extracted `apple-debug-mcp` (unsigned) or `apple-debug-mcp-release` (signed) directory as the marketplace root. The published `v0.1.0` archive predates this plugin. Start a new Codex session after installation. The plugin launcher prefers its packaged executable and then falls back to an explicit `APPLE_DEBUG_MCP_EXECUTABLE`, a local SwiftPM build, or the signed application bundles. It only starts the stdio MCP process; the menu-bar daemon remains an optional supervisor.
+For an archive produced by the current repository, use the extracted `apple-debug-mcp` (unsigned) or `apple-debug-mcp-release` (signed) directory as the marketplace root. The current `v0.2.0` archive includes this plugin; the older `v0.1.0` archive predates it. Start a new Codex session after installation. The plugin launcher prefers its packaged executable and then falls back to an explicit `APPLE_DEBUG_MCP_EXECUTABLE`, a local SwiftPM build, or the signed application bundles. It only starts the stdio MCP process; the menu-bar daemon remains an optional supervisor.
 
 For Claude Code, run these commands in a Claude Code session:
 

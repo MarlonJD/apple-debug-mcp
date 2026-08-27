@@ -18,7 +18,7 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | --- | --- | --- | --- |
 | MCP tools | Unknown tools fail closed | `ToolCatalog.call` | `make check` |
 | Toolchain | Only fixed executable paths and explicit argument arrays are used | `ToolchainProbe`, adapters | `CapabilitiesTests` and code review |
-| Artifact files | Mach-O and crash inputs are bounded; binary diff additionally resolves only `.app` and `.dSYM` bundle layouts | `MachOInspector`, `CrashReportAnalyzer`, `AppleBinaryDiffService` | `MachOTests`, `CrashReportTests`, `AppleBinaryDiffTests` |
+| Artifact files | Mach-O and crash inputs are bounded; binary diff and symbolication resolve only an explicitly supplied absolute regular file, `.app` main executable, or direct `.dSYM` DWARF payload | `MachOInspector`, `AppleArtifactLayoutResolver`, `CrashReportAnalyzer`, `AppleBinaryDiffService`, `SymbolicationService` | `MachOIdentityTests`, `AppleArtifactLayoutTests`, `CrashSymbolicationIdentityTests`, `symbolication-crash-smoke` |
 | Target launch | Requires `APPLE_DEBUG_ALLOW_TARGET_LAUNCH=1` and a regular target | `DebugPolicy.validateLaunchTarget` | `DebugSessionTests`, macOS fixture smoke |
 | Target attach | Requires `APPLE_DEBUG_ALLOW_TARGET_ATTACH=1` and a positive process ID | `DebugPolicy.validateAttach` | `DebugSessionTests`, iOS Simulator smoke |
 | Expression evaluation | Requires `APPLE_DEBUG_ALLOW_EVALUATE=1` and a 16 KiB expression limit | `DebugPolicy.validateEvaluate` | `DebugSessionTests` and fixture smoke |
@@ -48,6 +48,56 @@ Apple Debug MCP is a privileged local developer tool. It can start debuggers and
 | Unified logs | Duration is bounded, predicates are single-line/limited, and output is capped at 2 MB | `AppleLogService` | `AppleLogsTests` |
 | Network | The daemon binds only to `127.0.0.1`, publishes a random bearer token in a user-only endpoint file, validates localhost origin/host, and caps HTTP request bodies; it does not expose LAN/TLS/remote access | `AppleDebugMCPDaemonServer`, `AppleDebugDaemonEndpoint`, NIO adapter | `make mcp-daemon-smoke` and endpoint permission tests |
 | Secrets | No credentials or tokens are stored in the repository | Repository contract | `make check` and review |
+
+## Symbolication and artifact identity
+
+Symbolication is fail-closed and non-executing. The caller supplies every
+artifact path; the resolver requires an absolute path, canonicalizes it, and
+allows a bundle child or symlink only when its canonical target remains inside
+the supplied `.app` or `.dSYM` root. The resolver inspects the app main
+executable or a direct regular DWARF entry only. It does not recurse into
+frameworks, search arbitrary symbol roots, or select a payload from an image
+name.
+
+Each thin Mach-O slice must contain exactly one non-zero `LC_UUID`, and the
+normalized UUID is paired with the exact CPU subtype architecture. Crash
+Binary Images and `.ips` image records must provide the same identity. An
+executable/app image and a dSYM are complementary providers; when no
+executable/app is supplied, one exact dSYM may serve as the identity and debug
+provider. Multiple distinct providers in one role are ambiguous. Wrong UUID, wrong architecture, missing
+debug data, ambiguous providers, malformed layouts, and changed file identity
+remain typed non-success results. The payload path, device/inode when
+available, size, and modification time are snapshotted and revalidated before
+`atos`.
+
+Crash locations are either absolute or image-relative. `.ips` image-relative
+offsets use the explicitly indexed image and checked `base + offset`; text
+reports map an absolute frame to exactly one Binary Images range. Preferred
+`__TEXT` VM address, runtime base, slide, and `atos` input remain separate
+values. Overflow, underflow, missing load data, and out-of-range addresses are
+rejected before tool invocation. `atos` is fixed to `/usr/bin/xcrun` with an
+argument array, a 4 KiB batch diagnostic cap, 5 seconds per batch, 30 seconds
+cumulative, at most 32 batches, and no invocation for known pre-resolution
+identity/address failures.
+
+## Adaptive verification boundary
+
+Post-fix verification is casebook orchestration, not a generic MCP execution
+surface. `scripts/adaptive_verification.py` defaults to quick (one baseline and
+one candidate, 5 seconds per attempt, 15 seconds cumulative); standard is at
+most two plus two at 15/60 seconds and strict is at most three plus three at
+30/180 seconds. A monotonic deadline is passed into each callback, including
+fresh-state and cleanup operations. Automatic escalation is limited to typed
+timing, concurrency, state-leakage, inconsistent-observation, or known-
+flakiness evidence; explicit levels are recorded as policy choices.
+
+The runner never treats an arbitrary replay manifest as identity. Reuse
+requires a computed executable SHA-256, Mach-O UUID/architecture, build/source,
+environment, target, and scenario/oracle match. A decisive candidate or
+guardrail regression is `failed` even if cleanup fails afterward. Missing,
+stale, contaminated, conflicting, exhausted, or non-fresh evidence without a
+decisive regression is `inconclusive`; `verified` requires reliable baseline,
+candidate thresholds, guardrails, fresh/restored/notRequired state, and cleanup.
 
 ## Physical-device boundary
 

@@ -31,12 +31,6 @@ public enum AppleBinaryDiffError: Error, Equatable, LocalizedError, Sendable {
     }
 }
 
-public enum AppleArtifactKind: String, Codable, Equatable, Sendable {
-    case binary
-    case app
-    case dSYM
-}
-
 public struct AppleArtifactDescriptor: Codable, Equatable, Sendable {
     public let path: String
     public let kind: AppleArtifactKind
@@ -315,49 +309,43 @@ public enum AppleBinaryDiffService {
     }
 
     private static func resolve(path: String, architecture: String?) throws -> ResolvedArtifact {
-        guard FileManager.default.fileExists(atPath: path) else {
+        let layout: AppleArtifactLayout
+        do {
+            layout = try AppleArtifactLayoutResolver.resolve(path: path, architecture: architecture)
+        } catch AppleArtifactLayoutError.fileNotFound {
             throw AppleBinaryDiffError.fileNotFound
+        } catch AppleArtifactLayoutError.executableNotFound {
+            throw AppleBinaryDiffError.executableNotFound
+        } catch AppleArtifactLayoutError.malformedBundle {
+            throw AppleBinaryDiffError.malformedInfoPlist
+        } catch AppleArtifactLayoutError.unsupportedArtifact,
+                AppleArtifactLayoutError.invalidPath,
+                AppleArtifactLayoutError.notRegularFile,
+                AppleArtifactLayoutError.ambiguousDwarf,
+                AppleArtifactLayoutError.symlinkEscapesBundle,
+                AppleArtifactLayoutError.fileTooLarge,
+                AppleArtifactLayoutError.invalidArchitecture,
+                AppleArtifactLayoutError.tooManyDwarfEntries {
+            throw AppleBinaryDiffError.unsupportedArtifact
         }
 
-        var kind: AppleArtifactKind
-        var binaryPath = path
-        var bundleMetadata: [String: String] = [:]
-        switch try fileType(path: path) {
-        case .regular:
-            kind = .binary
-        case .directory:
-            if path.hasSuffix(".app") {
-                kind = .app
-                let info = try readInfoPlist(path: path, appBundle: true)
-                bundleMetadata = info.metadata
-                binaryPath = try appExecutable(path: path, metadata: info.metadata)
-            } else if path.hasSuffix(".dSYM") {
-                kind = .dSYM
-                binaryPath = try dSYMExecutable(path: path)
-            } else {
-                throw AppleBinaryDiffError.unsupportedArtifact
-            }
-        }
-
-        let binary = try AppleBinaryIntelligenceService.inspect(
-            path: binaryPath,
-            architecture: architecture
-        )
+        let binaryPath = layout.resolvedBinaryPath
+        let binary = try AppleBinaryIntelligenceService.inspect(path: binaryPath, architecture: architecture)
         let signature = binary.codeSignature
         let attributes = try FileManager.default.attributesOfItem(atPath: binaryPath)
         guard let fileSize = attributes[.size] as? NSNumber else {
             throw AppleBinaryDiffError.executableNotFound
         }
         let executableName = URL(fileURLWithPath: binaryPath).lastPathComponent
-        let uuids = (try? dwarfdumpUUIDs(path: path)) ?? []
+        let uuids = layout.macho.uuids
         let descriptor = AppleArtifactDescriptor(
             path: path,
-            kind: kind,
+            kind: layout.kind,
             executablePath: binaryPath,
-            executableName: bundleMetadata["CFBundleExecutable"] ?? executableName,
-            bundleIdentifier: bundleMetadata["CFBundleIdentifier"],
-            bundleVersion: bundleMetadata["CFBundleVersion"],
-            shortVersion: bundleMetadata["CFBundleShortVersionString"],
+            executableName: layout.bundleMetadata["CFBundleExecutable"] ?? executableName,
+            bundleIdentifier: layout.bundleMetadata["CFBundleIdentifier"],
+            bundleVersion: layout.bundleMetadata["CFBundleVersion"],
+            shortVersion: layout.bundleMetadata["CFBundleShortVersionString"],
             fileSize: fileSize.int64Value,
             sha256: try sha256(path: binaryPath),
             uuids: uuids
@@ -365,98 +353,15 @@ public enum AppleBinaryDiffService {
         return ResolvedArtifact(
             descriptor: descriptor,
             binary: binary,
-            bundleMetadata: bundleMetadata,
+            bundleMetadata: layout.bundleMetadata,
             signature: signature
         )
-    }
-
-    private enum FileType {
-        case regular
-        case directory
-    }
-
-    private static func fileType(path: String) throws -> FileType {
-        let attributes = try FileManager.default.attributesOfItem(atPath: path)
-        guard let type = attributes[.type] as? FileAttributeType else {
-            throw AppleBinaryDiffError.unsupportedArtifact
-        }
-        if type == .typeRegular { return .regular }
-        if type == .typeDirectory { return .directory }
-        throw AppleBinaryDiffError.unsupportedArtifact
-    }
-
-    private static func readInfoPlist(path: String, appBundle: Bool) throws -> (metadata: [String: String], plist: [String: Any]) {
-        let root = URL(fileURLWithPath: path)
-        let candidates = appBundle
-            ? [root.appendingPathComponent("Contents/Info.plist"), root.appendingPathComponent("Info.plist")]
-            : [root.appendingPathComponent("Contents/Info.plist")]
-        guard let infoURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }),
-              let data = try? Data(contentsOf: infoURL),
-              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
-              let values = plist as? [String: Any] else {
-            throw AppleBinaryDiffError.malformedInfoPlist
-        }
-        let keys = [
-            "CFBundleIdentifier", "CFBundleExecutable", "CFBundleVersion",
-            "CFBundleShortVersionString", "MinimumOSVersion", "DTPlatformName"
-        ]
-        let metadata = keys.reduce(into: [String: String]()) { result, key in
-            if let value = values[key] as? String, !value.isEmpty {
-                result[key] = value
-            }
-        }
-        return (metadata, values)
-    }
-
-    private static func appExecutable(path: String, metadata: [String: String]) throws -> String {
-        let name = metadata["CFBundleExecutable"] ?? URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-        let root = URL(fileURLWithPath: path)
-        let candidates = [
-            root.appendingPathComponent(name),
-            root.appendingPathComponent("Contents/MacOS").appendingPathComponent(name)
-        ]
-        guard let candidate = candidates.first(where: { isRegularFile($0.path) }) else {
-            throw AppleBinaryDiffError.executableNotFound
-        }
-        return candidate.path
-    }
-
-    private static func dSYMExecutable(path: String) throws -> String {
-        let dwarfURL = URL(fileURLWithPath: path).appendingPathComponent("Contents/Resources/DWARF")
-        guard let entries = try? FileManager.default.contentsOfDirectory(
-            at: dwarfURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            throw AppleBinaryDiffError.executableNotFound
-        }
-        for entry in entries.sorted(by: { $0.path < $1.path }) where isRegularFile(entry.path) {
-            if (try? MachOInspector.inspect(path: entry.path)) != nil {
-                return entry.path
-            }
-        }
-        throw AppleBinaryDiffError.executableNotFound
-    }
-
-    private static func isRegularFile(_ path: String) -> Bool {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-              let type = attributes[.type] as? FileAttributeType else { return false }
-        return type == .typeRegular
     }
 
     private static func sha256(path: String) throws -> String {
         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
         let digest = SHA256.hash(data: data)
         return digest.map { String(format: "%02x", $0) }.joined()
-    }
-
-    private static func dwarfdumpUUIDs(path: String) throws -> [String] {
-        let result = try runXcrun(arguments: ["dwarfdump", "--uuid", path])
-        return result.split(whereSeparator: \.isNewline).compactMap { line in
-            let parts = line.split(whereSeparator: \.isWhitespace)
-            guard let uuidIndex = parts.firstIndex(of: "UUID:"), parts.count > uuidIndex + 1 else { return nil }
-            return String(parts[uuidIndex + 1])
-        }.sorted()
     }
 
     private static func runXcrun(arguments: [String]) throws -> String {
