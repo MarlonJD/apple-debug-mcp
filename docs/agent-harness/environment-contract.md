@@ -28,7 +28,7 @@
 | Host integration | `make host-integration-check` | Manual or scheduled host integration validation | Uses only local fixtures, authenticated loopback, and signed repository XPC fixtures | configured-with-boundary |
 | Simulator | `make simulator-check` | Manual or scheduled validation on a configured Mac | Requires an available runtime and `APPLE_DEBUG_ALLOW_SIMULATOR_MUTATION=1`; cleans only selected fixture state | configured-with-boundary |
 | Physical device | `make physical-device-check` | Explicit maintainer-authorized run | Requires device identifiers, signed app, Developer Mode, and explicit debug/mutation grants; never automatic | configured-with-boundary |
-| Release | `make package` / `make release-package` | Release preparation | Signing/notarization is authority-gated and not part of the PR tier; the current arm64 archive passed local notarization/Gatekeeper validation and was explicitly published as `v0.1.0` | verified locally; published |
+| Release | `make package` / `make release-package` | Release preparation | Signing/notarization is authority-gated and not part of the PR tier; the current arm64 archive passed local and post-publication notarization/Gatekeeper validation and was explicitly published as `v0.2.0` | verified locally; published |
 
 ## Agent-readable surfaces
 
