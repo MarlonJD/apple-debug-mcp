@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 
 // Apple Debug MCP
 // Copyright (C) 2026 Burak Karahan

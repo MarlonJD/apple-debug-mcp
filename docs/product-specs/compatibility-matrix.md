@@ -10,14 +10,15 @@ This matrix separates the environments exercised by the repository from the mini
 | Host integration | Multi-client daemon isolation/cleanup, checkpoint replay, and signed XPC plugin transport | `make host-integration-check` | macOS host with the repository fixture and signing tools; no physical-device state required | verified locally; CI/manual-capable |
 | Simulator integration | Simulator lifecycle, LLDB-DAP attach, MCP controls, XCUITest UI, Xcode build/test, environment controls, and repro bundle | `make simulator-check` | Requires an available iOS Simulator and Xcode; mutation is enabled only inside this explicit command; local and hosted run `33014844655` passed the split core/repro targets | verified-with-boundary; manual/scheduled |
 | Physical-device integration | Modern CoreDevice and legacy iOS transport lifecycle/debug-control | `make physical-device-check` | Requires explicit device IDs, signed app, Developer Mode, matching Xcode support, and mutation/debug grants | verified-with-boundary; manual only |
-| Release | Unsigned package in CI; signed/notarized archive on an authorized Mac | `make package` / `make release-package` | Developer ID identity, notary profile, and Gatekeeper authority are external to the repository; the current arm64 archive was notarized and Gatekeeper-validated locally | verified locally |
+| Workbench and menu bar UI | Native debugger/evidence UI plus supervised daemon popover lifecycle | `make workbench-ui-smoke` / `make menubar-ui-smoke` | Requires an accessible local GUI session; both UI smokes passed on the current host and the menu bar app ships in the notarized release | verified locally; GUI-only |
+| Release | Unsigned package in CI; signed/notarized archive on an authorized Mac | `make package` / `make release-package` | Developer ID identity, notary profile, and Gatekeeper authority are external to the repository; GitHub Release `v0.1.0` carries the notarized, stapled, Gatekeeper-accepted arm64 archive | verified locally; published |
 
 ## Declared versus exercised baseline
 
 | Component | Declared baseline | Exercised baseline | Compatibility claim |
 | --- | --- | --- | --- |
-| macOS | macOS 13 or later | macOS 26.5.2 arm64e | Current-host behavior is verified; macOS 13 is not independently run in this checkout |
-| Xcode/Swift | Xcode 16 or later; Swift 6 compiler; SwiftPM tools 6.0 manifest floor | Xcode 26.6; Apple Swift 6.3.3 | Current-host behavior is verified; older Xcode 16 compatibility remains unverified |
+| macOS | macOS 13 deployment target | macOS 26.5.2 arm64e | Release Info.plists and Mach-O `LC_BUILD_VERSION` records declare macOS 13; runtime behavior is verified only on macOS 26.5.2, so macOS 13 remains candidate-only |
+| Xcode/Swift | Swift tools 6.1 manifest floor; an Xcode toolchain containing Swift 6.1 or later | Xcode 26.6; Apple Swift 6.3.3 | The former blanket “Xcode 16 or later” claim is removed; current-host behavior is verified and older toolchains remain outside the verified boundary |
 | MCP Swift SDK | Package requirement starts at 0.11.0 | `Package.resolved` pins 0.12.1 | The locked 0.12.1 graph is verified; 0.11.0 is a declared floor, not a separately certified build |
 | Swift NIO | Package requirement starts at 2.101.3 | `Package.resolved` pins 2.101.3 | Locked version is verified through the daemon build/smoke on the current Swift 6.3/macOS-26 CI baseline |
 | iOS Simulator | Xcode-provided available runtime | Local fixture and the selected available Simulator | Simulator behavior is conditional on the installed runtime and is not part of every PR run |
@@ -30,4 +31,4 @@ This matrix separates the environments exercised by the repository from the mini
 - Simulator integration is manual or scheduled because it depends on installed runtimes and mutable CoreSimulator state.
 - Physical-device integration is never inferred from compilation or Simulator evidence and is run only after explicit authorization.
 - A change to Xcode, Swift, the MCP SDK, NIO, CoreSimulator, CoreDevice, or `ios-deploy` support invalidates the affected compatibility claim until its tier is rerun.
-- The menu bar application is outside this core compatibility matrix; its separate build/UI workflow is intentionally paused.
+- Workbench and menu bar UI evidence is local GUI-only and does not run in headless PR CI; the published release readback verifies signatures, notarization staples, and Gatekeeper acceptance separately from runtime UI behavior.

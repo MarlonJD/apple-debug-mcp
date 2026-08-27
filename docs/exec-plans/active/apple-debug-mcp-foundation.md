@@ -2,14 +2,14 @@
 id: apple-debug-mcp-foundation
 status: active
 created: 2026-08-24
-updated: 2026-08-26
+updated: 2026-08-27
 completed:
 owner: Apple Debug MCP maintainers
 -->
 
 # Establish the Apple Debug MCP foundation
 
-Maintain this plan according to the [configured planning policy](../../PLANS.md). The plan remains active while release gates remain outside the verified local boundary.
+Maintain this plan according to the [configured planning policy](../../PLANS.md). The foundation release is published; the plan remains active only for explicitly recorded environment-dependent follow-up evidence.
 
 ## Purpose / Big Picture
 
@@ -52,12 +52,11 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - [x] (2026-08-26 22:52Z) Complete the menu bar surface with explicit Login Items settings guidance, OSLog action/state telemetry, synchronous owned-daemon cleanup during application termination, accessibility identifiers, and a GUI-only `menubar-ui-smoke` covering popover lifecycle, endpoint copy, Quit cleanup, and telemetry.
 - [x] (2026-08-26 21:04Z) Run the authorized release gate with the available Developer ID identity: both app bundles passed strict codesign verification, Apple Notary Service returned `Accepted`, stapler validation passed, Gatekeeper accepted both bundles, and `dist/apple-debug-mcp-macos-arm64-notarized.zip` was produced; production publication remains release-authorized work.
 - [x] (2026-08-26 23:02Z) Publish the final menu bar supervisor artifact as GitHub Release `v0.1.0` from commit `59bda01`; the release is non-draft/non-prerelease and carries `apple-debug-mcp-macos-arm64-v0.1.0-notarized.zip` after successful Developer ID/notarization/Gatekeeper validation.
-- [x] (2026-08-26 21:05Z) Revalidate the declared macOS 13 deployment target for the MCP and Workbench products; the host exposes only Xcode 26.6/Swift 6.3.3/macOS SDK 26.5, so the Xcode 16 compatibility floor remains explicitly unverified.
+- [x] (2026-08-27 00:42Z) Align the package and documentation with the real toolchain boundary: Swift tools 6.1 is required by the locked MCP SDK/NIO manifests, Xcode 26.6/Swift 6.3.3 is the verified build environment, and the release artifact retains a macOS 13 deployment target while macOS 13 runtime behavior remains candidate-only.
 - [x] (2026-08-26 21:19Z) Split the hosted Simulator integration workflow into `simulator-check-core` and a dedicated `simulator-repro-bundle` job with a separate 20-minute budget; the combined local `make simulator-check` passes both targets, with hosted verification recorded below.
 - [x] (2026-08-26 21:33Z) Repair legacy physical control timing by waiting for a bounded stop event after instruction stepping; the authorized iOS 15 iPod touch tier then passed breakpoint, evaluate, step, pause/continue, memory rollback, and cleanup.
-- [ ] (blocked, 2026-08-26 21:34Z) Re-run the modern CoreDevice physical tier when the paired iPhone 17 is unlocked/connected and its CoreDevice tunnel is available; the current read-only inventory and `devicectl device info lockState` both report `unavailable`, and the lifecycle smoke fails closed before mutation.
+- [ ] (blocked, 2026-08-27 00:42Z) Re-run the modern CoreDevice physical tier when the paired iPhone 17 is unlocked/connected and its CoreDevice tunnel is available; the current read-only inventory reports `tunnelState=unavailable`, `xcdevice` reports the phone unavailable, and `devicectl device info lockState` cannot locate the device, so no mutation was attempted.
 - [x] (2026-08-26 22:17Z) Verify the hosted CI split in workflow run `33014844655`: the isolated Simulator repro-bundle job passed in 6 minutes, the core Simulator rerun passed in 41m35s, and host/macOS jobs passed; the initial core attempt’s LLDB-DAP attach timeout was a hosted flake and did not recur on rerun.
-- [ ] (deferred, 2026-08-26 18:58Z) Bound the hosted Simulator repro-bundle smoke: the same CI run reached `repro-bundle-smoke` only after the video, UI, arbitrary-UI, Xcode, and environment smokes passed, then hit the Simulator job timeout before the repro-bundle result was emitted. The local repro-bundle smoke passes; revisit only if hosted Simulator becomes a required PR or release gate.
 - [x] (2026-08-24 16:00Z) Add dedicated Objective-C/Swift metadata reports and bounded Simulator UI inspection/action evidence.
 - [x] (2026-08-24 16:34Z) Add signed/notarized packaging workflow; CI validation remains unsigned and external notarization requires release authority.
 - [x] (2026-08-24 04:25Z) Add unsigned macOS packaging with a reproducible release-build archive.
@@ -159,13 +158,13 @@ Deliver a local, GPL-3.0-or-later MCP workbench for authorized macOS and iOS deb
 - Decision: Bind the daemon to stable `127.0.0.1:49321` by default, allow explicit port `0` for isolated tests, and publish a random bearer token in `~/Library/Application Support/AppleDebugMCP/endpoint.json`.
   Rationale: A stable default makes client configuration durable; the test-only ephemeral override avoids collisions, while the private discovery file, token, and localhost validation prevent unauthenticated local or DNS-rebinding access.
   Date/Author: 2026-08-26 / Apple Debug MCP maintainers
-- Decision: Treat hosted Simulator full-tier completion as non-blocking for the local-first product.
-  Rationale: Local `make check` and Simulator smoke evidence pass, while the hosted macOS-26 run verified video/UI/Xcode/environment paths and timed out only at the final repro-bundle step; do not spend repeated CI time on an optional environment gate.
+- Decision: Keep hosted Simulator core and repro-bundle evidence in separate jobs.
+  Rationale: The original combined job exceeded its 45-minute budget. Workflow run `33014844655` verified that the isolated repro-bundle job passes in 6 minutes and the core tier passes within its independent budget, preserving focused failure evidence without weakening either gate.
   Date/Author: 2026-08-26 / Apple Debug MCP maintainers
 
 ## Outcomes & Retrospective
 
-The macOS, checkpoint replay, iOS Simulator, physical-device, and menu bar product paths are locally verified with repository fixtures or explicitly authorized devices. The MCP server exposes analysis and debugger tools through typed schemas, bounds Apple-tool/DAP input and output, gives each MCP server instance isolated debugger ownership, cleans up owned LLDB-DAP, CoreDevice, legacy `ios-deploy`, kernel-lab, and menu-supervised child processes, and fails closed for unauthorized mutation. The authenticated daemon checkpoint is verified through health authorization, bearer rejection, MCP initialize/session routing, all-registered-tool dispatch coverage, per-client debugger isolation, bounded concurrent-session rejection, DELETE cleanup, graceful shutdown, and endpoint-file removal. The iPhone 17 CoreDevice fixture is verified through process lifecycle, install, PID-returning launch, remote LLDB-DAP attach, xctrace capture, threads, stack, registers, memory, disassembly, breakpoint hit, evaluation, instruction step, pause/continue, memory rollback, and cleanup. The physical iOS 15 fixture remains verified through its separate legacy debugserver path; the kernel-lab connection itself remains unverified without a configured two-machine KDK target; release signing/notarization and persistent login registration remain authority-gated by the signed app bundle. Compatibility evidence is tiered separately for the current host, Simulator, and authorized physical devices; the declared minimum macOS/Xcode/SDK baselines are not inferred from newer-host runs.
+The macOS, checkpoint replay, iOS Simulator, physical-device, Workbench, and menu bar product paths are locally verified with repository fixtures or explicitly authorized devices. The MCP server exposes analysis and debugger tools through typed schemas, bounds Apple-tool/DAP input and output, gives each MCP server instance isolated debugger ownership, cleans up owned LLDB-DAP, CoreDevice, legacy `ios-deploy`, kernel-lab, and menu-supervised child processes, and fails closed for unauthorized mutation. The authenticated daemon checkpoint is verified through health authorization, bearer rejection, MCP initialize/session routing, all-registered-tool dispatch coverage, per-client debugger isolation, bounded concurrent-session rejection, DELETE cleanup, graceful shutdown, and endpoint-file removal. Hosted Simulator core and repro-bundle jobs pass independently. The iPhone 17 CoreDevice fixture has prior lifecycle/debug-control evidence, while the current rerun remains blocked by device/tunnel availability; the physical iOS 15 fixture remains verified through its separate legacy debugserver path. The kernel-lab connection itself remains unverified without a configured two-machine KDK target. GitHub Release `v0.1.0` is published with an arm64 archive whose Developer ID signatures, notarization staples, Gatekeeper acceptance, and SHA-256 digest were read back after publication. Compatibility evidence is tiered separately: the artifact declares macOS 13, but runtime and toolchain behavior is verified only on macOS 26.5.2 with Xcode 26.6/Swift 6.3.3.
 
 ## Context and Orientation
 

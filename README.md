@@ -163,8 +163,8 @@ The default transport is stdio. `--daemon` enables a local Streamable HTTP/SSE e
 
 ## Requirements
 
-- macOS 13 or later;
-- Swift 6 / Xcode 16 or later;
+- verified runtime environment: macOS 26.5.2; release binaries retain a macOS 13 deployment target, but macOS 13 runtime behavior is candidate-only until exercised on that OS;
+- Swift 6.1 or later; the current verified toolchain is Swift 6.3.3 with Xcode 26.6, and older Xcode 16 releases are not covered by a blanket compatibility claim;
 - Xcode and its command-line tools;
 - an MCP-compatible client with local stdio support, or a client configured for the authenticated loopback endpoint;
 - for physical-device workflows: a paired development device, Developer Mode, valid signing/entitlements, compatible Apple tools, and explicit authorization.
