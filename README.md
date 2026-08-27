@@ -37,6 +37,12 @@ Codex build workflows and Apple Debug MCP are complementary layers, not competin
 
 In short: a skill is generally the workflow guidance; MCP is the callable capability surface. A Build for iOS workflow can build and launch an app, while this server can give an agent a structured LLDB session, inspect its dSYM, capture a trace, query its Simulator UI, and preserve evidence. Apple Debug MCP does not replace app scaffolding, SwiftUI design guidance, or Xcode project setup. It gives those workflows a deeper and reusable debugging/analysis backend when an MCP client is configured to use it.
 
+### When should an agent use this MCP?
+
+The server returns an MCP `instructions` field during initialization. That is the server-wide routing guidance: use Apple Debug MCP when an authorized Apple target is already built or running and the task needs runtime inspection or control, LLDB-DAP state, artifact/crash/DWARF analysis, profiling, Simulator/device lifecycle, or reproducible evidence. Individual tool descriptions in `Sources/AppleDebugMCP/ToolCatalog.swift` provide the narrower input and authorization guidance for each operation.
+
+The MCP client/model still makes the final tool choice. Installing the server does not force it into every task. For project creation, source edits, ordinary build/run/test work, SwiftUI design, or general Simulator UI interaction, prefer the Build for iOS/macOS workflow first; use this server when the investigation crosses into structured debugger state, Apple artifact analysis, controlled runtime mutation, physical development-device evidence, or durable evidence capture.
+
 ## What does the MCP server provide?
 
 The server exposes more than 100 named tools. The main domains are:
@@ -165,9 +171,35 @@ The default transport is stdio. `--daemon` enables a local Streamable HTTP/SSE e
 
 - verified runtime environment: macOS 26.5.2; release binaries retain a macOS 13 deployment target, but macOS 13 runtime behavior is candidate-only until exercised on that OS;
 - Swift 6.1 or later; the current verified toolchain is Swift 6.3.3 with Xcode 26.6, and older Xcode 16 releases are not covered by a blanket compatibility claim;
-- Xcode and its command-line tools;
+- Xcode and its command-line tools for Apple-specific build, Simulator, debugger, device, and profiling operations; the notarized menu bar bundle already contains the MCP daemon, so a separate Swift compiler, Python, Node, or Homebrew installation is not needed just to launch/register the server;
 - an MCP-compatible client with local stdio support, or a client configured for the authenticated loopback endpoint;
 - for physical-device workflows: a paired development device, Developer Mode, valid signing/entitlements, compatible Apple tools, and explicit authorization.
+
+## Install for Codex CLI and Claude Code
+
+There is no universal `mcp install` command. Codex CLI and Claude Code each register local stdio servers with their own `mcp add` command. The commands below point both clients at the signed daemon embedded in the menu bar app:
+
+```sh
+MCP_SERVER=/Applications/AppleDebugMenuBar.app/Contents/Resources/apple-debug-mcp
+
+# Codex CLI (writes the shared Codex MCP configuration)
+codex mcp add apple-debug-mcp -- "$MCP_SERVER"
+
+# Claude Code (user scope; use --scope project for a checked-in project config)
+claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
+```
+
+Archives produced from this repository also include a safe helper at `install_mcp.sh`. Run it after moving `AppleDebugMenuBar.app` to `/Applications`:
+
+```sh
+./install_mcp.sh --client auto
+```
+
+Use `--client codex`, `--client claude`, or `--client both` to select a client explicitly. The helper discovers the installed bundled executable, leaves an existing same-named entry unchanged, and never enables debugger, evaluation, memory-write, device-mutation, or other grants. Verify registration with `codex mcp list` or `claude mcp list`.
+
+This stdio setup is the simplest client integration and runs the bundled server when the client needs it. The menu bar app is optional supervision: open it separately when you want the status popover, login-at-startup control, log action, and authenticated loopback daemon. The menu bar daemon is not a public endpoint and its bearer token remains in the user-private endpoint file.
+
+The currently published `v0.1.0` archive predates `install_mcp.sh`; use the direct commands above with that archive. New archives include the helper.
 
 ## Build and verify
 
@@ -198,6 +230,7 @@ The repository also includes focused smoke workflows:
 ```sh
 make fixture
 make mcp-mac-debug-workflow-smoke
+make mcp-install-smoke
 make replay-smoke
 make ios-fixture
 make ios-fixture-smoke

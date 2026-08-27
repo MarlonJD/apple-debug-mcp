@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+printf 'claude %s\n' "$*" >> "${MCP_INSTALL_SMOKE_LOG:?}"
+if [ "${1:-}" = mcp ] && [ "${2:-}" = get ]; then
+    exit 1
+fi
+exit 0

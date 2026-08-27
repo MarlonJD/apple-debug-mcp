@@ -23,6 +23,7 @@ package_directory="$staging_directory/apple-debug-mcp"
 mkdir -p "$package_directory"
 cp .build/release/apple-debug-mcp "$package_directory/apple-debug-mcp"
 cp .build/release/apple-debug-plugin-host "$package_directory/apple-debug-plugin-host"
+cp scripts/install_mcp.sh "$package_directory/install_mcp.sh"
 cp LICENSE README.md ARCHITECTURE.md "$package_directory/"
 
 menu_bar_app="$package_directory/AppleDebugMenuBar.app"
@@ -32,6 +33,7 @@ cp .build/release/apple-debug-mcp "$menu_bar_app/Contents/Resources/apple-debug-
 cp Resources/AppleDebugMenuBar-Info.plist "$menu_bar_app/Contents/Info.plist"
 cp LICENSE README.md "$menu_bar_app/Contents/Resources/"
 chmod +x "$menu_bar_app/Contents/MacOS/AppleDebugMenuBar" "$menu_bar_app/Contents/Resources/apple-debug-mcp"
+chmod +x "$package_directory/install_mcp.sh"
 codesign --force --deep --sign - "$menu_bar_app" >/dev/null
 
 tar -czf "$output_path" -C "$staging_directory" apple-debug-mcp

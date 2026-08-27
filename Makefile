@@ -1,4 +1,4 @@
-.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check simulator-check-core simulator-repro-bundle-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke mcp-mac-debug-workflow-smoke menubar-build-smoke menubar-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke workbench-ui-smoke reverse-capability-smoke package release-package check harness-check clean
+.PHONY: build test fixture replay-smoke pr-check host-integration-check simulator-check simulator-check-core simulator-repro-bundle-check physical-device-check ios-fixture ios-physical-fixture ios-fixture-smoke ios-debug-fixture-smoke ios-mcp-tool-smoke ios-ui-tree-smoke ios-arbitrary-ui-smoke ios-legacy-debug-smoke ios-legacy-debug-control-smoke ios-coredevice-debug-control-smoke ios-coredevice-lifecycle-smoke mcp-daemon-smoke mcp-domain-behavior-smoke mcp-mac-debug-workflow-smoke mcp-install-smoke menubar-build-smoke menubar-ui-smoke xcode-artifact-smoke xcode-test-smoke dwarf-smoke swift-ast-smoke performance-smoke performance-analysis-smoke swift-concurrency-graph-smoke runtime-diagnostics-smoke assembler-smoke control-flow-smoke memory-map-smoke dyld-cache-smoke simulator-environment-smoke repro-bundle-smoke signing-audit-smoke patch-workflow-smoke plugin-smoke plugin-xpc-smoke plugin-host-build-smoke workbench-build-smoke workbench-ui-smoke reverse-capability-smoke package release-package check harness-check clean
 
 build:
 	swift build
@@ -69,6 +69,9 @@ mcp-domain-behavior-smoke: build fixture
 
 mcp-mac-debug-workflow-smoke: build fixture
 	python3 ./scripts/debug_fixture_smoke.py --extended --evidence-output .build/evidence/mcp-mac-debug-workflow.json
+
+mcp-install-smoke: build
+	./scripts/mcp_install_smoke.sh
 
 menubar-build-smoke:
 	./script/build_and_run.sh --verify

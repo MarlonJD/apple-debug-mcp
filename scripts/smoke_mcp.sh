@@ -46,6 +46,8 @@ trap cleanup EXIT HUP INT TERM
 } | .build/debug/apple-debug-mcp > "$output_file" 2> "$error_file"
 
 grep -q '"id":1' "$output_file"
+grep -q '"instructions":' "$output_file"
+grep -q 'Prefer Build for iOS/macOS for' "$output_file"
 grep -q 'apple_capabilities' "$output_file"
 grep -q 'apple_toolchain_status' "$output_file"
 grep -q '"id":4' "$output_file"

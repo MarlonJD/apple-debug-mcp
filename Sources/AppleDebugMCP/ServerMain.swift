@@ -26,10 +26,15 @@ struct AppleDebugMCPMain {
 }
 
 enum AppleDebugMCPServerFactory {
+    static let serverInstructions = """
+    Use this MCP for authorized Apple targets when you need LLDB-DAP runtime state/control, artifact analysis, profiling, Simulator/device lifecycle, or reproducible evidence. Prefer Build for iOS/macOS for project creation, build/run/test, UI work, and ordinary Simulator interaction. Start with apple_capabilities and apple_toolchain_status; inspect read-only first. Mutation and plugin actions require explicit grants. Never bypass Apple security or use unsupported reverse/kernel debugging.
+    """
+
     static func makeServer(context: ToolCatalog.Context) async -> Server {
         let server = Server(
             name: "apple-debug-mcp",
             version: "0.1.0",
+            instructions: serverInstructions,
             capabilities: .init(
                 logging: .init(),
                 tools: .init(listChanged: false)
