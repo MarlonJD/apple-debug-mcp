@@ -26,6 +26,15 @@ fi
 # Release plugin archives place the signed MCP executable beside this launcher.
 run_candidate "$script_dir/apple-debug-mcp-bin" "$@"
 
+# Claude Code exposes the active project root to plugin MCP processes.
+project_root=${CLAUDE_PROJECT_DIR:-}
+case "$project_root" in
+    /*)
+        run_candidate "$project_root/.build/release/apple-debug-mcp" "$@"
+        run_candidate "$project_root/.build/debug/apple-debug-mcp" "$@"
+        ;;
+esac
+
 # A developer checkout can use either build configuration directly.
 repository_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
 run_candidate "$repository_root/.build/release/apple-debug-mcp" "$@"

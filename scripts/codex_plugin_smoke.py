@@ -15,6 +15,7 @@ from typing import NoReturn
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins" / "apple-debug"
 MANIFEST = PLUGIN / ".codex-plugin" / "plugin.json"
+CLAUDE_MANIFEST = PLUGIN / ".claude-plugin" / "plugin.json"
 MCP_MANIFEST = PLUGIN / ".mcp.json"
 SKILL = PLUGIN / "skills" / "apple-debug" / "SKILL.md"
 LAUNCHER = PLUGIN / "bin" / "apple-debug-mcp-launcher"
@@ -42,7 +43,7 @@ def require_regular_file(path: Path) -> None:
 
 
 def main() -> None:
-    for path in (MANIFEST, MCP_MANIFEST, SKILL, LAUNCHER, MARKETPLACE, SERVER):
+    for path in (MANIFEST, CLAUDE_MANIFEST, MCP_MANIFEST, SKILL, LAUNCHER, MARKETPLACE, SERVER):
         require_regular_file(path)
 
     if not os.access(LAUNCHER, os.X_OK):
@@ -53,24 +54,33 @@ def main() -> None:
     manifest = read_json(MANIFEST)
     if manifest.get("name") != "apple-debug":
         fail("plugin manifest name is not apple-debug")
-    if manifest.get("version") != "0.1.0":
-        fail("plugin manifest version is not 0.1.0")
+    if manifest.get("version") != "0.1.1":
+        fail("Codex plugin manifest version is not 0.1.1")
     if manifest.get("skills") != "./skills/":
         fail("plugin manifest does not point at ./skills/")
     if manifest.get("mcpServers") != "./.mcp.json":
         fail("plugin manifest does not point at ./.mcp.json")
+
+    claude_manifest = read_json(CLAUDE_MANIFEST)
+    if claude_manifest.get("name") != "apple-debug":
+        fail("Claude Code plugin manifest name is not apple-debug")
+    if claude_manifest.get("version") != "0.1.1":
+        fail("Claude Code plugin manifest version is not 0.1.1")
 
     mcp_manifest = read_json(MCP_MANIFEST)
     servers = mcp_manifest.get("mcpServers")
     if not isinstance(servers, dict) or not isinstance(servers.get("apple-debug"), dict):
         fail(".mcp.json does not define the apple-debug server")
     server_config = servers["apple-debug"]
-    if server_config.get("command") != "./bin/apple-debug-mcp-launcher":
-        fail(".mcp.json does not use the bundled launcher")
+    if server_config.get("command") != "/bin/sh":
+        fail(".mcp.json does not use the portable plugin shell launcher")
+    if server_config.get("args") != [
+        "-c",
+        'plugin_root="${CLAUDE_PLUGIN_ROOT:-.}"; exec "$plugin_root/bin/apple-debug-mcp-launcher"',
+    ]:
+        fail(".mcp.json does not resolve the launcher through CLAUDE_PLUGIN_ROOT")
     if server_config.get("cwd") != ".":
         fail(".mcp.json must run from the plugin root")
-    if server_config.get("args") != []:
-        fail(".mcp.json must not pass daemon or mutation arguments")
 
     skill_text = SKILL.read_text(encoding="utf-8")
     if not skill_text.startswith("---\n") or "\n---\n" not in skill_text[4:]:
@@ -107,8 +117,10 @@ def main() -> None:
     }
     environment = os.environ.copy()
     environment["APPLE_DEBUG_MCP_EXECUTABLE"] = str(SERVER)
+    environment["CLAUDE_PLUGIN_ROOT"] = str(PLUGIN)
+    mcp_command = [str(server_config["command"]), *server_config["args"]]
     process = subprocess.Popen(
-        [str(LAUNCHER)],
+        mcp_command,
         cwd=PLUGIN,
         env=environment,
         stdin=subprocess.PIPE,
@@ -154,7 +166,7 @@ def main() -> None:
     if not isinstance(result, dict) or "instructions" not in result:
         fail("MCP initialize result did not include server instructions")
 
-    print("codex-plugin-smoke: manifest, marketplace, MCP config, skill, launcher, and stdio handshake passed")
+    print("codex-plugin-smoke: Codex/Claude manifests, marketplace, MCP config, skill, launcher, and stdio handshake passed")
 
 
 if __name__ == "__main__":

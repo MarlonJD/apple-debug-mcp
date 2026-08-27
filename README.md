@@ -27,11 +27,11 @@ claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
 
 Archives produced from the current repository also include `install_mcp.sh`; after moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory. Verify with `codex mcp list` or `claude mcp list`. The published `v0.1.0` archive predates this helper, but the direct commands above work with it. See [detailed release installation](docs/RELEASE.md#end-user-mcp-installation) for MenuBar supervisor and endpoint details.
 
-## Codex plugin installation
+## Apple Debug plugin installation
 
-The repository follows the AWS Agent Toolkit-style marketplace layout: `plugins/apple-debug` contains the plugin manifest, a focused `skills/` directory, and an `.mcp.json` that wires the plugin to Apple Debug MCP.
+The repository follows the AWS Agent Toolkit-style marketplace layout: `plugins/apple-debug` contains both `.codex-plugin/plugin.json` and `.claude-plugin/plugin.json`, a shared `skills/` directory, and an `.mcp.json` that wires the plugin to Apple Debug MCP.
 
-> **Installing the Apple Debug plugin also installs the Apple Debug MCP integration.** This is a combined plugin, not a skill-only package: the plugin includes the MCP server configuration and its launcher, and release archives include the MCP executable inside the plugin package. Users do not need to run `codex mcp add` separately.
+> **Installing the Apple Debug plugin also installs the Apple Debug MCP integration.** This is a combined plugin, not a skill-only package: the plugin includes the MCP server configuration and launcher, and release archives include the MCP executable inside the plugin package. Users do not need to configure the MCP server separately.
 
 From a GitHub checkout, add the repository marketplace once:
 
@@ -39,15 +39,23 @@ From a GitHub checkout, add the repository marketplace once:
 codex plugin marketplace add MarlonJD/apple-debug-mcp
 ```
 
-Launch Codex, run `/plugins`, and install **Apple Debug**. Start a new session after installation so Codex loads the bundled skill and MCP definition. From an archive produced by the current repository, add the extracted `apple-debug-mcp` (unsigned) or `apple-debug-mcp-release` (signed) directory as the marketplace root instead:
+Then launch Codex, run `/plugins`, and install **Apple Debug**. Start a new session after installation so Codex loads the skill and MCP definition. From an archive produced by the current repository, add the extracted `apple-debug-mcp` (unsigned) or `apple-debug-mcp-release` (signed) directory as the marketplace root instead:
 
 ```sh
 codex plugin marketplace add /absolute/path/to/apple-debug-mcp
 ```
 
-Archives produced by the current repository carry the MCP executable inside the plugin package; the published `v0.1.0` archive predates this plugin. A source checkout can use the same plugin after `swift build`, an installed `AppleDebugMCP.app`/`AppleDebugMenuBar.app`, or an explicit `APPLE_DEBUG_MCP_EXECUTABLE` path. The plugin starts stdio MCP on demand; it does not enable debugger, evaluation, memory-write, Simulator-mutation, device-mutation, or external-plugin grants. macOS, Xcode, signing, pairing, and Developer Mode requirements still apply to the selected workflow.
+For Claude Code, run these commands inside a Claude Code session:
 
-After installation, ask Codex to use **Apple Debug** or start a task that needs Apple runtime inspection. Codex starts the bundled/local MCP process on demand, then discovers the typed Apple Debug tools. If the plugin was installed from the GitHub source marketplace rather than a release archive, install or build the local Mac executable first; the plugin still supplies the MCP wiring and skill.
+```text
+/plugin marketplace add MarlonJD/apple-debug-mcp
+/plugin install apple-debug@apple-debug-mcp
+/reload-plugins
+```
+
+Claude Code starts the plugin-provided MCP server automatically when the plugin is enabled; use `/mcp` to confirm that Apple Debug tools are available. Codex and Claude Code both use the same shared skill and local stdio MCP definition.
+
+Archives produced by the current repository carry the MCP executable inside the plugin package; the published `v0.1.0` archive predates this plugin. A GitHub source marketplace checkout supplies the plugin configuration and launcher, so install the signed Apple Debug app, build the local executable, or provide `APPLE_DEBUG_MCP_EXECUTABLE` before using it. The plugin does not enable debugger, evaluation, memory-write, Simulator-mutation, device-mutation, or external-plugin grants. macOS, Xcode, signing, pairing, and Developer Mode requirements still apply to the selected workflow.
 
 ## Why does this project exist?
 

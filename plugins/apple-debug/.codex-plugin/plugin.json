@@ -1,6 +1,6 @@
 {
   "name": "apple-debug",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Debug authorized macOS and iOS targets with Apple Debug MCP.",
   "author": {
     "name": "Burak Karahan",
@@ -23,8 +23,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Apple Debug",
-    "shortDescription": "Debug authorized Apple targets with Codex",
-    "longDescription": "Apple Debug bundles the Apple Debug MCP server and a focused workflow skill for inspecting authorized macOS processes, iOS Simulator targets, development-authorized iOS apps, Apple artifacts, performance traces, and reproducible evidence.",
+    "shortDescription": "Debug authorized Apple targets with Codex or Claude Code",
+    "longDescription": "Apple Debug bundles the Apple Debug MCP server and a focused workflow skill for inspecting authorized macOS processes, iOS Simulator targets, development-authorized iOS apps, Apple artifacts, performance traces, and reproducible evidence in Codex or Claude Code.",
     "developerName": "Burak Karahan",
     "category": "Developer Tools",
     "capabilities": [

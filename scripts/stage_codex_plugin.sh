@@ -22,6 +22,10 @@ source_plugin="$root/plugins/apple-debug"
     printf 'codex-plugin: source plugin is missing: %s\n' "$source_plugin" >&2
     exit 1
 }
+[ -d "$source_plugin/.claude-plugin" ] || {
+    printf 'codex-plugin: Claude Code manifest is missing: %s\n' "$source_plugin/.claude-plugin" >&2
+    exit 1
+}
 [ -f "$source_plugin/.mcp.json" ] || {
     printf 'codex-plugin: source MCP manifest is missing: %s\n' "$source_plugin/.mcp.json" >&2
     exit 1
@@ -38,11 +42,13 @@ plugin_destination="$destination/plugins/apple-debug"
 }
 
 mkdir -p \
+    "$plugin_destination/.claude-plugin" \
     "$plugin_destination/bin" \
     "$plugin_destination/skills" \
     "$destination/.agents/plugins"
 
 cp -R "$source_plugin/.codex-plugin" "$plugin_destination/"
+cp -R "$source_plugin/.claude-plugin" "$plugin_destination/"
 cp "$source_plugin/.mcp.json" "$plugin_destination/.mcp.json"
 cp -R "$source_plugin/skills/." "$plugin_destination/skills/"
 cp "$source_plugin/bin/apple-debug-mcp-launcher" "$plugin_destination/bin/apple-debug-mcp-launcher"

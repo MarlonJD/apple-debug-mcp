@@ -1,0 +1,21 @@
+{
+  "name": "apple-debug",
+  "version": "0.1.1",
+  "description": "Debug authorized macOS and iOS targets with Apple Debug MCP.",
+  "author": {
+    "name": "Burak Karahan"
+  },
+  "homepage": "https://github.com/MarlonJD/apple-debug-mcp",
+  "repository": "https://github.com/MarlonJD/apple-debug-mcp",
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "apple",
+    "debugging",
+    "lldb",
+    "xcode",
+    "macos",
+    "ios",
+    "simulator",
+    "mcp"
+  ]
+}
