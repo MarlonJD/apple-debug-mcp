@@ -9,6 +9,24 @@ It turns Apple's debugger and developer-tool ecosystem—LLDB-DAP, Xcode, Simula
 
 > This is a local developer tool for software and devices you are authorized to debug. It is not a signing bypass, a remote public debugger, or an arbitrary shell-execution service.
 
+## Quick install
+
+For the notarized macOS release, download the [latest arm64 archive](https://github.com/MarlonJD/apple-debug-mcp/releases/latest), extract it, move `AppleDebugMenuBar.app` to `/Applications`, and open it. The menu bar app already contains the MCP daemon; no separate Swift, Python, Node.js, or Homebrew installation is needed just to run it.
+
+Register the local MCP server with the client you use:
+
+```sh
+MCP_SERVER=/Applications/AppleDebugMenuBar.app/Contents/Resources/apple-debug-mcp
+
+# Codex CLI
+codex mcp add apple-debug-mcp -- "$MCP_SERVER"
+
+# Claude Code
+claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
+```
+
+Archives produced from the current repository also include `install_mcp.sh`; after moving the app, run `./install_mcp.sh --client auto` from the extracted archive directory. Verify with `codex mcp list` or `claude mcp list`. The published `v0.1.0` archive predates this helper, but the direct commands above work with it. See [detailed release installation](docs/RELEASE.md#end-user-mcp-installation) for MenuBar supervisor and endpoint details.
+
 ## Why does this project exist?
 
 Apple debugging is powerful, but its useful evidence is spread across many tools and stateful workflows. An AI agent that only has a terminal often has to parse ad-hoc text, reconstruct debugger state from separate commands, guess which Apple capability is available, and clean up processes or Simulators itself.
@@ -174,32 +192,6 @@ The default transport is stdio. `--daemon` enables a local Streamable HTTP/SSE e
 - Xcode and its command-line tools for Apple-specific build, Simulator, debugger, device, and profiling operations; the notarized menu bar bundle already contains the MCP daemon, so a separate Swift compiler, Python, Node, or Homebrew installation is not needed just to launch/register the server;
 - an MCP-compatible client with local stdio support, or a client configured for the authenticated loopback endpoint;
 - for physical-device workflows: a paired development device, Developer Mode, valid signing/entitlements, compatible Apple tools, and explicit authorization.
-
-## Install for Codex CLI and Claude Code
-
-There is no universal `mcp install` command. Codex CLI and Claude Code each register local stdio servers with their own `mcp add` command. The commands below point both clients at the signed daemon embedded in the menu bar app:
-
-```sh
-MCP_SERVER=/Applications/AppleDebugMenuBar.app/Contents/Resources/apple-debug-mcp
-
-# Codex CLI (writes the shared Codex MCP configuration)
-codex mcp add apple-debug-mcp -- "$MCP_SERVER"
-
-# Claude Code (user scope; use --scope project for a checked-in project config)
-claude mcp add --scope user --transport stdio apple-debug-mcp -- "$MCP_SERVER"
-```
-
-Archives produced from this repository also include a safe helper at `install_mcp.sh`. Run it after moving `AppleDebugMenuBar.app` to `/Applications`:
-
-```sh
-./install_mcp.sh --client auto
-```
-
-Use `--client codex`, `--client claude`, or `--client both` to select a client explicitly. The helper discovers the installed bundled executable, leaves an existing same-named entry unchanged, and never enables debugger, evaluation, memory-write, device-mutation, or other grants. Verify registration with `codex mcp list` or `claude mcp list`.
-
-This stdio setup is the simplest client integration and runs the bundled server when the client needs it. The menu bar app is optional supervision: open it separately when you want the status popover, login-at-startup control, log action, and authenticated loopback daemon. The menu bar daemon is not a public endpoint and its bearer token remains in the user-private endpoint file.
-
-The currently published `v0.1.0` archive predates `install_mcp.sh`; use the direct commands above with that archive. New archives include the helper.
 
 ## Build and verify
 
